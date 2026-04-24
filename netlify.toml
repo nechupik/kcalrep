@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  VITE_FIREBASE_API_KEY = "AIzaSyAENoyiyZtSeqbFRjPOGTXQUymTxN5z1YU"
+  VITE_FIREBASE_AUTH_DOMAIN = "eattrack-aaed3.firebaseapp.com"
+  VITE_FIREBASE_PROJECT_ID = "eattrack-aaed3"
+  VITE_FIREBASE_STORAGE_BUCKET = "eattrack-aaed3.firebasestorage.app"
+  VITE_FIREBASE_MESSAGING_SENDER_ID = "741601163782"
+  VITE_FIREBASE_APP_ID = "1:741601163782:web:83fd9260578c69b43de187"
