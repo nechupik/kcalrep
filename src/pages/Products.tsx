@@ -8,13 +8,10 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, saveProduct, searchProducts, deleteProduct, type Product } from "@/lib/products";
 import { searchByBarcode, searchByName } from "@/lib/openFoodFacts";
-import { Package, Search, Plus, Edit, Trash2, Camera } from "lucide-react";
+import { Package, Search, Plus, Edit, Trash2 } from "lucide-react";
 
-// TypeScript declaration for BarcodeDetector
-declare class BarcodeDetector {
-  constructor(options?: { formats: string[] });
-  detect(image: ImageBitmapSource): Promise<Array<{ rawValue: string }>>;
-}
+// Search cache for performance
+const searchCache = new Map<string, any[]>();
 
 const Products = () => {
   const { user } = useAuth();
@@ -34,8 +31,6 @@ const Products = () => {
   // Barcode scanner state
   const [barcode, setBarcode] = useState("");
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
-  const [cameraSupported, setCameraSupported] = useState(true);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Guard: if no user, don't render
   if (!user) {
@@ -67,6 +62,15 @@ const Products = () => {
 
     setLoading(true);
     try {
+      // Check cache first
+      const cacheKey = searchQuery.toLowerCase();
+      if (searchCache.has(cacheKey)) {
+        const cachedResults = searchCache.get(cacheKey);
+        setProducts(cachedResults);
+        setLoading(false);
+        return;
+      }
+
       // Search in user's products first
       const userProducts = await searchProducts(user.uid, searchQuery);
       
@@ -79,6 +83,8 @@ const Products = () => {
         ...offResults.map(p => ({ ...p, source: 'open_food_facts' as const })),
       ];
       
+      // Store in cache
+      searchCache.set(cacheKey, allResults);
       setProducts(allResults);
     } catch (error) {
       console.error("Error searching:", error);
@@ -88,53 +94,8 @@ const Products = () => {
     }
   };
 
-  const handleCameraCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-
-    try {
-      // Check if BarcodeDetector is supported
-      if (!('BarcodeDetector' in window)) {
-        setCameraSupported(false);
-        toast.error("Barcode scanning not supported on this device. Use manual barcode input.");
-        return;
-      }
-
-      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      
-      img.onload = async () => {
-        try {
-          const barcodes = await detector.detect(img);
-          if (barcodes.length > 0) {
-            const detectedBarcode = barcodes[0].rawValue;
-            setBarcode(detectedBarcode);
-            
-            // Search for product with detected barcode
-            const result = await searchByBarcode(detectedBarcode);
-            if (result) {
-              setScannedProduct(result);
-              toast.success(`Barcode detected: ${detectedBarcode}`);
-            } else {
-              toast.error("Product not found for this barcode");
-            }
-          } else {
-            toast.error("No barcode detected in image");
-          }
-        } catch (error) {
-          console.error("Error detecting barcode:", error);
-          toast.error("Failed to detect barcode");
-        }
-      };
-    } catch (error) {
-      console.error("Error processing image:", error);
-      toast.error("Failed to process image");
-    }
-  };
-
-  const handleBarcodeScan = async () => {
-    if (!user) return;
+  const handleBarcodeSearch = async () => {
+    if (!barcode.trim() || !user) return;
     
     try {
       // Check if product exists in user's database first
@@ -143,15 +104,21 @@ const Products = () => {
       
       if (existingProduct) {
         toast.success("Product already exists in your database");
+        setProducts([existingProduct]);
         return;
       }
 
-      // Simple barcode input without external libraries
-      setBarcode(barcode);
-      toast.success(`Scanning barcode: ${barcode}`);
+      // Search Open Food Facts by barcode
+      const result = await searchByBarcode(barcode);
+      if (result) {
+        setScannedProduct(result);
+        toast.success(`Product found: ${result.name}`);
+      } else {
+        toast.error("Product not found for this barcode");
+      }
     } catch (error) {
-      console.error("Error scanning barcode:", error);
-      toast.error("Failed to scan barcode");
+      console.error("Error searching barcode:", error);
+      toast.error("Failed to search barcode");
     }
   };
 
@@ -288,72 +255,61 @@ const Products = () => {
         </div>
 
         {/* Search bar */}
-        <Card className="p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-          <div className="flex gap-2">
+        <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
+          {/* Main search */}
+          <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
               <Input
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4"
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
             <Button
               onClick={handleSearch}
               disabled={loading}
-              className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+              className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
             >
               Search
             </Button>
           </div>
 
-          {/* Barcode scanner */}
+          {/* Barcode input */}
           <div className="flex gap-2">
-            <div className="relative">
+            <div className="relative flex-1">
+              <div className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2 flex items-center justify-center text-sm">
+                📷
+              </div>
               <Input
                 type="text"
-                placeholder="Enter barcode..."
+                placeholder="Enter barcode number from package..."
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 className="pl-10 pr-4"
+                onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSearch()}
               />
             </div>
             <Button
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={!user}
-              className="bg-white border-2 border-border/50 text-foreground hover:bg-gray-50"
+              onClick={handleBarcodeSearch}
+              disabled={!user || !barcode.trim()}
+              className="bg-white border-2 border-border/50 text-foreground hover:bg-gray-50 px-4 md:px-6"
             >
-              <Camera className="h-4 w-4 mr-2" />
-              Scan Barcode
-            </Button>
-            <Button
-              onClick={handleBarcodeScan}
-              disabled={!user}
-              className="bg-white border-2 border-border/50 text-foreground hover:bg-gray-50"
-            >
-              Search Barcode
+              Search
             </Button>
             <Button
               onClick={handleAddProduct}
               disabled={!user}
-              className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+              className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Product
+              <span className="hidden sm:inline">Add Product</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </div>
-
-          {/* Hidden file input for camera */}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            ref={cameraInputRef}
-            style={{ display: 'none' }}
-            onChange={handleCameraCapture}
-          />
 
           {/* Product preview */}
           {scannedProduct && (
@@ -364,20 +320,20 @@ const Products = () => {
                   {scannedProduct.brand && (
                     <div className="text-sm text-muted-foreground mb-3">{scannedProduct.brand}</div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))' }}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))' }}>
                       <span>🔥</span>
                       <span>{scannedProduct.calories} ккал</span>
                     </div>
-                    <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))' }}>
+                    <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))' }}>
                       <span>Б</span>
                       <span>{scannedProduct.protein}г</span>
                     </div>
-                    <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))' }}>
+                    <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))' }}>
                       <span>Ж</span>
                       <span>{scannedProduct.fat}г</span>
                     </div>
-                    <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))' }}>
+                    <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))' }}>
                       <span>У</span>
                       <span>{scannedProduct.carbs}г</span>
                     </div>
@@ -413,8 +369,8 @@ const Products = () => {
         </Card>
 
         {/* Products list */}
-        <Card className="bg-card/80 backdrop-blur-sm border-border/50 shadow-soft">
-          <div className="p-6">
+        <Card className="bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-8">
+          <div className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Your Products</h2>
               <div className="text-sm text-muted-foreground">
@@ -466,49 +422,49 @@ const Products = () => {
                     </div>
 
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-base mb-1">{product.name}</h3>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base mb-1 break-words">{product.name}</h3>
                         {product.brand && (
-                          <div className="text-sm text-muted-foreground mb-3">{product.brand}</div>
+                          <div className="text-sm text-muted-foreground mb-3 break-words">{product.brand}</div>
                         )}
                         
                         {/* Macro badges row */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))' }}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))' }}>
                             <span>🔥</span>
                             <span>{product.calories} ккал</span>
                           </div>
-                          <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))' }}>
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))' }}>
                             <span>Б</span>
                             <span>{product.protein}г</span>
                           </div>
-                          <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))' }}>
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))' }}>
                             <span>Ж</span>
                             <span>{product.fat}г</span>
                           </div>
-                          <div className="flex items-center gap-1 px-3 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))' }}>
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))' }}>
                             <span>У</span>
                             <span>{product.carbs}г</span>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-1 md:gap-2 items-center ml-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditProduct(product)}
-                          className="text-muted-foreground hover:text-primary"
+                          className="text-muted-foreground hover:text-primary p-2 md:p-2"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDeleteProduct(product.id)}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-destructive p-2 md:p-2"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
                       </div>
                     </div>
