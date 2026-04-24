@@ -8,13 +8,23 @@ const API_BASE_URL_DE = 'https://world.openfoodfacts.org/cgi/search.pl';
 // Search by barcode
 export async function searchByBarcode(barcode: string) {
   try {
-    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-    if (!response.ok) {
+    // Try original barcode first
+    let response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    let data = await response.json();
+    
+    // If not found, try with leading zero
+    if (!response.ok || data.status === 0) {
+      response = await fetch(`https://world.openfoodfacts.org/api/v0/product/0${barcode}.json`);
+      data = await response.json();
+    }
+    
+    // Check if product not found
+    if (!response.ok || data.status === 0) {
       return null;
     }
     
-    const data = await response.json();
-    if (data.status === 0) {
+    // Check if product has no name
+    if (!data.product_name) {
       return null;
     }
     
@@ -45,7 +55,12 @@ export async function searchByBarcode(barcode: string) {
 
 // Search by name
 export async function searchByName(query: string): Promise<Partial<Product>[]> {
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&lc=de&cc=de`;
+  const isDev = window.location.hostname === 'localhost';
+  const baseUrl = isDev 
+    ? 'https://corsproxy.io/?https://world.openfoodfacts.org/cgi/search.pl'
+    : 'https://world.openfoodfacts.org/cgi/search.pl';
+  
+  const url = `${baseUrl}?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&lc=de&cc=de`;
   
   for (let attempt = 0; attempt < 2; attempt++) {
     try {

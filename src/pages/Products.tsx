@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, saveProduct, searchProducts, deleteProduct, type Product } from "@/lib/products";
 import { searchByBarcode, searchByName } from "@/lib/openFoodFacts";
-import { Package, Search, Plus, Edit, Trash2 } from "lucide-react";
+import { Package, Search, Plus, Edit, Trash2, X } from "lucide-react";
 
 // Search cache for performance
 const searchCache = new Map<string, any[]>();
@@ -31,6 +31,7 @@ const Products = () => {
   // Barcode scanner state
   const [barcode, setBarcode] = useState("");
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
 
   // Guard: if no user, don't render
   if (!user) {
@@ -97,6 +98,7 @@ const Products = () => {
   const handleBarcodeSearch = async () => {
     if (!barcode.trim() || !user) return;
     
+    setBarcodeLoading(true);
     try {
       // Check if product exists in user's database first
       const userProducts = await loadProducts(user.uid);
@@ -119,6 +121,8 @@ const Products = () => {
     } catch (error) {
       console.error("Error searching barcode:", error);
       toast.error("Failed to search barcode");
+    } finally {
+      setBarcodeLoading(false);
     }
   };
 
@@ -286,19 +290,27 @@ const Products = () => {
               </div>
               <Input
                 type="text"
-                placeholder="Enter barcode number from package..."
+                placeholder="e.g. 4000339457823"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
-                className="pl-10 pr-4"
+                className="pl-10 pr-10"
                 onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSearch()}
               />
+              {barcode && (
+                <button
+                  onClick={() => setBarcode("")}
+                  className="absolute right-3 top-1/2 h-4 w-4 text-muted-foreground hover:text-primary -translate-y-1/2"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
             <Button
               onClick={handleBarcodeSearch}
-              disabled={!user || !barcode.trim()}
+              disabled={!user || !barcode.trim() || barcodeLoading}
               className="bg-white border-2 border-border/50 text-foreground hover:bg-gray-50 px-4 md:px-6"
             >
-              Search
+              {barcodeLoading ? "Searching..." : "Search"}
             </Button>
             <Button
               onClick={handleAddProduct}
