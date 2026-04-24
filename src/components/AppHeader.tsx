@@ -1,4 +1,4 @@
-import { Flame, BarChart3, User, Home, Package } from "lucide-react";
+import { Flame, BarChart3, User, Home, Package, BookOpen } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const links = [
@@ -6,6 +6,7 @@ const links = [
   { to: "/stats", label: "Статистика", icon: BarChart3 },
   { to: "/profile", label: "Профиль", icon: User },
   { to: "/products", label: "Продукты", icon: Package },
+  { to: "/recipes", label: "Рецепты", icon: BookOpen },
 ];
 
 export const AppHeader = () => {
