@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Calculator } from "lucide-react";
+import { Flame, Calculator, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Diary } from "@/components/Diary";
 import { MacroRing } from "@/components/MacroRing";
@@ -7,46 +7,87 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   loadDiary,
   loadNorm,
-  saveDiary,
-  todayKey,
+  addDiaryEntry,
+  removeDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
 
 const Index = () => {
+  const { user } = useAuth();
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  });
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString + 'T00:00:00');
+    const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const currentDate = new Date(selectedDate + 'T00:00:00');
+    const newDate = new Date(currentDate);
+    if (direction === 'prev') {
+      newDate.setDate(newDate.getDate() - 1);
+    } else {
+      newDate.setDate(newDate.getDate() + 1);
+    }
+    const newDateString = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, "0")}-${String(newDate.getDate()).padStart(2, "0")}`;
+    setSelectedDate(newDateString);
+  };
+
+  const goToToday = () => {
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    setSelectedDate(todayString);
+  };
 
   useEffect(() => {
     const loadData = async () => {
+      if (!user) return;
+      
       const normData = await loadNorm();
-      const diaryData = await loadDiary();
+      const diaryData = await loadDiary(selectedDate);
       setNorm(normData);
       setEntries(Array.isArray(diaryData) ? diaryData : []);
     };
     
     loadData();
-  }, []);
+  }, [user, selectedDate]);
 
-  const handleAddEntry = async (entry: DiaryEntry) => {
-    const next = [...entries, entry];
-    setEntries(next);
-    await saveDiary(next);
-    toast.success(`Добавлено: ${entry.name}`);
+  const handleAddEntry = async (entry: Omit<DiaryEntry, 'id' | 'addedAt'>) => {
+    try {
+      const entryWithDate = { ...entry, date: selectedDate };
+      await addDiaryEntry(entryWithDate);
+      const diaryData = await loadDiary(selectedDate);
+      setEntries(Array.isArray(diaryData) ? diaryData : []);
+      toast.success(`Добавлено: ${entry.name}`);
+    } catch (error) {
+      toast.error('Ошибка добавления записи');
+    }
   };
 
   const handleRemoveEntry = async (id: string) => {
-    const next = entries.filter((e) => e.id !== id);
-    setEntries(next);
-    await saveDiary(next);
+    try {
+      await removeDiaryEntry(id);
+      const diaryData = await loadDiary(selectedDate);
+      setEntries(Array.isArray(diaryData) ? diaryData : []);
+    } catch (error) {
+      toast.error('Ошибка удаления записи');
+    }
   };
 
-  const todayTotals = useMemo(() => {
-    const today = entries.filter((e) => e.date === todayKey());
-    return today.reduce(
+  const selectedDateTotals = useMemo(() => {
+    return entries.reduce(
       (acc, e) => ({
         calories: acc.calories + e.calories,
         protein: acc.protein + e.protein,
@@ -56,6 +97,11 @@ const Index = () => {
       { calories: 0, protein: 0, fat: 0, carbs: 0 },
     );
   }, [entries]);
+
+  const isToday = selectedDate === (() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  })();
 
   return (
     <div className="min-h-screen">
@@ -70,21 +116,27 @@ const Index = () => {
           <Card className="p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
               <div>
-                <h2 className="text-xl font-bold">Сегодня</h2>
+                <h2 className="text-xl font-bold">{isToday ? 'Сегодня' : formatDate(selectedDate)}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {todayTotals.calories} из {norm.calories} ккал · осталось{" "}
+                  {selectedDateTotals.calories} из {norm.calories} ккал · осталось{" "}
                   <span className="font-semibold text-foreground">
-                    {Math.max(0, norm.calories - todayTotals.calories)}
+                    {Math.max(0, norm.calories - selectedDateTotals.calories)}
                   </span>{" "}
                   ккал
                 </p>
               </div>
+              {!isToday && (
+                <Button onClick={goToToday} variant="outline" size="sm">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Сегодня
+                </Button>
+              )}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
-              <MacroRing consumed={todayTotals.calories} total={norm.calories} label="Калории" unit=" ккал" colorVar="--macro-calories" />
-              <MacroRing consumed={todayTotals.protein} total={norm.protein} label="Белки" colorVar="--macro-protein" />
-              <MacroRing consumed={todayTotals.fat} total={norm.fat} label="Жиры" colorVar="--macro-fat" />
-              <MacroRing consumed={todayTotals.carbs} total={norm.carbs} label="Углеводы" colorVar="--macro-carbs" />
+              <MacroRing consumed={selectedDateTotals.calories} total={norm.calories} label="Калории" unit=" ккал" colorVar="--macro-calories" />
+              <MacroRing consumed={selectedDateTotals.protein} total={norm.protein} label="Белки" colorVar="--macro-protein" />
+              <MacroRing consumed={selectedDateTotals.fat} total={norm.fat} label="Жиры" colorVar="--macro-fat" />
+              <MacroRing consumed={selectedDateTotals.carbs} total={norm.carbs} label="Углеводы" colorVar="--macro-carbs" />
             </div>
           </Card>
         ) : (
@@ -108,11 +160,39 @@ const Index = () => {
 
       {/* Diary */}
       <section className="container max-w-5xl pb-20">
+        <Card className="p-6 md:p-8 shadow-card border-border/50 backdrop-blur-sm bg-card/80 mb-6">
+          {/* Date Navigation */}
+          <div className="flex items-center justify-between mb-6">
+            <Button
+              onClick={() => navigateDate('prev')}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <div className="text-center">
+              <h3 className="text-lg font-semibold">{formatDate(selectedDate)}</h3>
+              {isToday && <p className="text-sm text-muted-foreground">Сегодня</p>}
+            </div>
+            
+            <Button
+              onClick={() => navigateDate('next')}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </Card>
+        
         <Diary entries={entries} onAdd={handleAddEntry} onRemove={handleRemoveEntry} />
       </section>
 
       <footer className="container py-8 text-center text-xs text-muted-foreground border-t border-border/40">
-        Расчёт по формуле Миффлина–Сан Жеора. Данные хранятся локально в браузере.
+        Данные синхронизируются через Firebase
       </footer>
     </div>
   );

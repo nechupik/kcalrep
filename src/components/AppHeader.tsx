@@ -28,7 +28,7 @@ export const AppHeader = () => {
             to={l.to}
             end={l.to === "/"}
             className={({ isActive }) =>
-              `flex items-center gap-1.5 rounded-full px-3 sm:px-4 py-1.5 text-sm font-medium transition-smooth ${
+              `flex items-center gap-1.5 rounded-full px-2 sm:px-4 py-1.5 text-sm font-medium transition-smooth ${
                 isActive
                   ? "bg-gradient-sunset text-primary-foreground shadow-glow"
                   : "text-muted-foreground hover:text-foreground"

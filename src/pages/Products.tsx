@@ -44,7 +44,7 @@ const Products = () => {
       setProducts(userProducts);
     } catch (error) {
       console.error("Error loading products:", error);
-      toast.error("Failed to load products");
+      toast.error("Ошибка загрузки продуктов");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ const Products = () => {
       setProducts(userProducts);
     } catch (error) {
       console.error("Error searching:", error);
-      toast.error("Search failed");
+      toast.error("Ошибка поиска");
     } finally {
       setLoading(false);
     }
@@ -88,13 +88,13 @@ const Products = () => {
         verified: false,
       });
       
-      toast.success(`Added: ${formData.name}`);
+      toast.success(`Добавлено: ${formData.name}`);
       setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0 });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
     } catch (error) {
       console.error("Error saving product:", error);
-      toast.error("Failed to save product");
+      toast.error("Ошибка сохранения продукта");
     }
   };
 
@@ -118,7 +118,7 @@ const Products = () => {
         product = { ...product, id: productId };
       } catch (error) {
         console.error("Error saving product before edit:", error);
-        toast.error("Failed to save product");
+        toast.error("Ошибка сохранения продукта");
         return;
       }
     }
@@ -152,14 +152,14 @@ const Products = () => {
         verified: false,
       });
       
-      toast.success(`Updated: ${formData.name}`);
+      toast.success(`Обновлено: ${formData.name}`);
       setEditingProduct(null);
       setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0 });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
     } catch (error) {
       console.error("Error updating product:", error);
-      toast.error("Failed to update product");
+      toast.error("Ошибка обновления продукта");
     }
   };
 
@@ -168,11 +168,11 @@ const Products = () => {
     
     try {
       await deleteProduct(user.uid, productId);
-      toast.success("Product deleted");
+      toast.success("Продукт удалён");
       loadUserProducts(); // Refresh list
     } catch (error) {
       console.error("Error deleting product:", error);
-      toast.error("Failed to delete product");
+      toast.error("Ошибка удаления продукта");
     }
   };
 
@@ -192,9 +192,9 @@ const Products = () => {
             <Package className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Products</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Мои продукты</h1>
             <p className="text-sm text-muted-foreground">
-              Manage your product database
+              Управляйте базой продуктов
             </p>
           </div>
         </div>
@@ -207,7 +207,7 @@ const Products = () => {
               <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
               <Input
                 type="text"
-                placeholder="Search products..."
+                placeholder="Поиск продуктов..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4"
@@ -219,7 +219,7 @@ const Products = () => {
               disabled={loading}
               className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
             >
-              Search
+              Поиск
             </Button>
           </div>
 
@@ -229,8 +229,8 @@ const Products = () => {
             className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
           >
             <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Add Product</span>
-            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Добавить продукт</span>
+            <span className="sm:hidden">Добавить</span>
           </Button>
 
         </Card>
@@ -239,22 +239,22 @@ const Products = () => {
         <Card className="bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-8">
           <div className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Your Products</h2>
+              <h2 className="text-lg font-semibold">Мои продукты</h2>
               <div className="text-sm text-muted-foreground">
-                {products.length} products • KBJU per 100g shown
+                {products.length} продуктов · КБЖУ на 100г
               </div>
             </div>
 
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">Loading...</div>
+                <div className="text-muted-foreground">Загрузка...</div>
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-8">
                 <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No products yet</h3>
+                <h3 className="text-lg font-semibold mb-2">Продуктов пока нет</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Add your first product
+                  Добавьте первый продукт
                 </p>
                 <Button
                   onClick={handleAddProduct}
@@ -262,7 +262,7 @@ const Products = () => {
                   className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Product
+                  Добавить продукт
                 </Button>
               </div>
             ) : (
@@ -323,10 +323,10 @@ const Products = () => {
         {/* Add/Edit Product Modal */}
         {showAddForm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-md border border-border/50">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">
-                  {editingProduct ? "Edit Product" : "Add Product"}
+                  {editingProduct ? "Редактировать продукт" : "Добавить продукт"}
                 </h2>
                 <Button
                   variant="ghost"
@@ -340,19 +340,19 @@ const Products = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Product Name</Label>
+                  <Label htmlFor="name">Название продукта</Label>
                   <Input
                     id="name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Product name"
+                    placeholder="Название продукта"
                     required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="calories">Calories (per 100g)</Label>
+                    <Label htmlFor="calories">Калории (на 100г)</Label>
                     <Input
                       id="calories"
                       type="number"
@@ -363,7 +363,7 @@ const Products = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="protein">Protein (per 100g)</Label>
+                    <Label htmlFor="protein">Белки (на 100г)</Label>
                     <Input
                       id="protein"
                       type="number"
@@ -375,7 +375,7 @@ const Products = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="fat">Fat (per 100g)</Label>
+                    <Label htmlFor="fat">Жиры (на 100г)</Label>
                     <Input
                       id="fat"
                       type="number"
@@ -387,7 +387,7 @@ const Products = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="carbs">Carbs (per 100g)</Label>
+                    <Label htmlFor="carbs">Углеводы (на 100г)</Label>
                     <Input
                       id="carbs"
                       type="number"
@@ -407,14 +407,14 @@ const Products = () => {
                   onClick={handleCancelEdit}
                   className="flex-1 text-muted-foreground hover:text-primary"
                 >
-                  Cancel
+                  Отмена
                 </Button>
                 <Button
                   onClick={editingProduct ? handleUpdateProduct : handleSaveProduct}
                   disabled={!formData.name.trim()}
                   className="flex-1 bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
                 >
-                  {editingProduct ? "Update Product" : "Save Product"}
+                  {editingProduct ? "Обновить продукт" : "Сохранить продукт"}
                 </Button>
               </div>
             </div>
