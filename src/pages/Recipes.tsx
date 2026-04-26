@@ -10,6 +10,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { loadRecipes, saveRecipe, searchRecipes, deleteRecipe, updateRecipe, type Recipe } from "@/lib/recipes";
 import { BookOpen, Search, Plus, Edit, Trash2 } from "lucide-react";
 
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return `${n} ${many}`;
+  if (mod10 === 1) return `${n} ${one}`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+
 const Recipes = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -215,7 +224,7 @@ const Recipes = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Мои рецепты</h2>
               <div className="text-sm text-muted-foreground">
-                {recipes.length} рецептов · КБЖУ на 100г
+                {pluralize(recipes.length, 'рецепт', 'рецепта', 'рецептов')} · КБЖУ на 100г
               </div>
             </div>
 

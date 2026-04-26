@@ -9,6 +9,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, saveProduct, searchProducts, deleteProduct, type Product } from "@/lib/products";
 import { Package, Search, Plus, Edit, Trash2 } from "lucide-react";
 
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return `${n} ${many}`;
+  if (mod10 === 1) return `${n} ${one}`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+
 const Products = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -241,7 +250,7 @@ const Products = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Мои продукты</h2>
               <div className="text-sm text-muted-foreground">
-                {products.length} продуктов · КБЖУ на 100г
+                {pluralize(products.length, 'продукт', 'продукта', 'продуктов')} · КБЖУ на 100г
               </div>
             </div>
 
