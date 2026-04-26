@@ -314,9 +314,9 @@ const Stats = () => {
                   key={index}
                   className={`aspect-square rounded ${day.color} flex items-center justify-center text-white font-medium relative`}
                 >
-                  {day.calories > 0 && (
-                    <span className="text-xs">{day.date}</span>
-                  )}
+                  <span className={`text-xs ${day.calories > 0 ? 'text-white font-medium' : 'text-gray-500'}`}>
+                    {day.date}
+                  </span>
                 </div>
               ))}
             </div>
