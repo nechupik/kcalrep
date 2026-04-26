@@ -213,13 +213,13 @@ const Profile = () => {
               <div className="rounded-2xl bg-gradient-sunset-soft border border-primary/20 p-5 mb-4">
                 <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
                   <CheckCircle2 className="h-4 w-4 text-macro-protein" />
-                  Norm set
+                  Норма задана
                 </div>
                 <div className="grid grid-cols-4 gap-3 mb-4">
-                  <NormStat label="Calories" value={`${norm.calories}`} unit="kcal" colorClass="text-macro-calories" />
-                  <NormStat label="Protein" value={`${norm.protein}`} unit="g" colorClass="text-macro-protein" />
-                  <NormStat label="Fat" value={`${norm.fat}`} unit="g" colorClass="text-macro-fat" />
-                  <NormStat label="Carbs" value={`${norm.carbs}`} unit="g" colorClass="text-macro-carbs" />
+                  <NormStat label="КАЛОРИИ" value={`${norm.calories}`} unit="ккал" colorClass="text-macro-calories" />
+                  <NormStat label="БЕЛКИ" value={`${norm.protein}`} unit="г" colorClass="text-macro-protein" />
+                  <NormStat label="ЖИРЫ" value={`${norm.fat}`} unit="г" colorClass="text-macro-fat" />
+                  <NormStat label="УГЛЕВОДЫ" value={`${norm.carbs}`} unit="г" colorClass="text-macro-carbs" />
                 </div>
                 <Button
                   variant="outline"
@@ -227,7 +227,7 @@ const Profile = () => {
                   className="border-primary/30 hover:bg-gradient-sunset-soft hover:border-primary"
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
-                  Recalculate norm
+                  Пересчитать норму
                 </Button>
               </div>
             )}
