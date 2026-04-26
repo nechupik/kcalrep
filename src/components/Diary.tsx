@@ -283,7 +283,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
                   </div>
                   <button
                     onClick={async () => await onRemove(e.id)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1"
+                    className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1"
                     aria-label="Delete"
                   >
                     <Trash2 className="h-4 w-4" />
