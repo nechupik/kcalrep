@@ -11,7 +11,7 @@ const links = [
 
 export const AppHeader = () => {
   return (
-    <header className="container py-5 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/40 px-4 py-3 flex items-center justify-between gap-4">
       <NavLink to="/" className="flex items-center gap-2.5">
         <div className="rounded-xl bg-gradient-sunset p-2 shadow-glow">
           <Flame className="h-5 w-5 text-primary-foreground" />

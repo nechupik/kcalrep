@@ -455,6 +455,7 @@ const Stats = () => {
           </div>
         </Card>
       </section>
+      <div className="h-8" />
     </div>
   );
 };

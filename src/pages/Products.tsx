@@ -421,6 +421,7 @@ const Products = () => {
           </div>
         )}
       </section>
+      <div className="h-8" />
     </div>
   );
 };

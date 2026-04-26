@@ -376,6 +376,7 @@ const Profile = () => {
           </p>
         </div>
       </section>
+      <div className="h-8" />
     </div>
   );
 };

@@ -2,7 +2,8 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Viewport for iPhone -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>LoviEat — дневник питания и расчёт КБЖУ</title>
     <meta name="description" content="LoviEat — личный дневник питания и калькулятор нормы КБЖУ. Считайте калории, белки, жиры и углеводы и анализируйте свой рацион." />
     <meta name="author" content="LoviEat" />
@@ -10,6 +11,14 @@
     <meta property="og:title" content="LoviEat — дневник питания и расчёт КБЖУ" />
     <meta property="og:description" content="Личный дневник питания и калькулятор нормы КБЖУ." />
     <meta property="og:type" content="website" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LoviEat" />
+    <meta name="theme-color" content="#09090b" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

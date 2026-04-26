@@ -194,6 +194,7 @@ const Index = () => {
       <footer className="container py-8 text-center text-xs text-muted-foreground border-t border-border/40">
         Данные синхронизируются через Firebase
       </footer>
+      <div className="h-8" />
     </div>
   );
 };
