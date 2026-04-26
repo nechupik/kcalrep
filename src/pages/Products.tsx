@@ -32,6 +32,7 @@ const Products = () => {
     fat: 0,
     carbs: 0,
   });
+  const [loadingError, setLoadingError] = useState<string | null>(null);
 
 
   // Guard: if no user, don't render
@@ -48,12 +49,25 @@ const Products = () => {
 
   const loadUserProducts = async () => {
     setLoading(true);
+    setLoadingError(null);
+    
+    // Set up timeout fallback
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setLoadingError("Не удалось загрузить продукты. Проверьте подключение.");
+      toast.error("Не удалось загрузить продукты. Проверьте подключение.");
+    }, 8000);
+    
     try {
       const userProducts = await loadProducts(user.uid);
+      clearTimeout(timeoutId);
       setProducts(userProducts);
+      setLoadingError(null);
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error("Error loading products:", error);
       toast.error("Ошибка загрузки продуктов");
+      setLoadingError("Ошибка загрузки продуктов");
     } finally {
       setLoading(false);
     }
@@ -258,12 +272,27 @@ const Products = () => {
               <div className="flex items-center justify-center py-8">
                 <div className="text-muted-foreground">Загрузка...</div>
               </div>
+            ) : loadingError ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-destructive mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-destructive">Ошибка загрузки</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {loadingError}
+                </p>
+                <Button
+                  onClick={loadUserProducts}
+                  disabled={!user}
+                  className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+                >
+                  Попробовать снова
+                </Button>
+              </div>
             ) : products.length === 0 ? (
               <div className="text-center py-8">
                 <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Продуктов пока нет</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Добавьте первый продукт
+                  У вас пока нет продуктов. Нажмите «Добавить», чтобы создать первый.
                 </p>
                 <Button
                   onClick={handleAddProduct}

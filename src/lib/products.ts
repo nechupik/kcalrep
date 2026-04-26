@@ -96,6 +96,9 @@ export async function searchProducts(userId: string, searchQuery: string): Promi
       });
     });
     
+    // Sort by name for better user experience
+    products.sort((a, b) => a.name.localeCompare(b.name));
+    
     return products;
   } catch (error) {
     console.error("Error searching products:", error);
