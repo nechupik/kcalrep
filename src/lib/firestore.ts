@@ -33,6 +33,12 @@ export interface NormData {
   updatedAt: Timestamp;
 }
 
+export interface WeightEntry {
+  weight: number;
+  date: string; // YYYY-MM-DD
+  createdAt: Timestamp;
+}
+
 // Profile functions
 export async function saveUserProfile(userId: string, profile: Omit<UserProfile, 'createdAt'>) {
   const userDoc = doc(db, "users", userId, "profile", "main");
@@ -147,4 +153,73 @@ export async function updateDiaryEntry(userId: string, entryId: string, entry: P
   }
   
   await setDoc(entryDoc, updateData, { merge: true });
+}
+
+// Weight tracking functions
+export async function saveWeight(userId: string, weight: number, date: string) {
+  const weightCollection = collection(db, "users", userId, "weight");
+  const weightEntry: WeightEntry = {
+    weight,
+    date,
+    createdAt: Timestamp.now(),
+  };
+  const docRef = await addDoc(weightCollection, weightEntry);
+  return docRef.id;
+}
+
+export async function loadWeight(userId: string, limit?: number): Promise<Array<WeightEntry & { id: string }>> {
+  const weightCollection = collection(db, "users", userId, "weight");
+  const q = query(
+    weightCollection,
+    orderBy("date", "desc"),
+    orderBy("createdAt", "desc")
+  );
+  
+  const querySnapshot = await getDocs(q);
+  const entries: Array<WeightEntry & { id: string }> = [];
+  
+  querySnapshot.forEach((doc) => {
+    const data = doc.data() as WeightEntry;
+    entries.push({
+      id: doc.id,
+      weight: data.weight,
+      date: data.date,
+      createdAt: data.createdAt,
+    });
+  });
+  
+  return limit ? entries.slice(0, limit) : entries;
+}
+
+// Diary range loading function
+export async function loadDiaryRange(userId: string, startDate: string, endDate: string): Promise<DiaryEntry[]> {
+  const diaryCollection = collection(db, "users", userId, "diary");
+  const q = query(
+    diaryCollection,
+    where("date", ">=", startDate),
+    where("date", "<=", endDate),
+    orderBy("date", "asc"),
+    orderBy("addedAt", "asc")
+  );
+  
+  const querySnapshot = await getDocs(q);
+  const entries: DiaryEntry[] = [];
+  
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    entries.push({
+      id: doc.id,
+      foodId: data.foodId,
+      name: data.name,
+      grams: data.grams,
+      calories: data.calories,
+      protein: data.protein,
+      fat: data.fat,
+      carbs: data.carbs,
+      date: data.date,
+      addedAt: data.addedAt?.toMillis ? data.addedAt.toMillis() : (data.addedAt || Date.now()),
+    });
+  });
+  
+  return entries;
 }
