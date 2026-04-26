@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Search, Trash2, Utensils, Package, BookOpen } from "lucide-react";
-import { FOODS, type FoodItem } from "@/lib/nutrition";
+import type { FoodItem } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, type Product } from "@/lib/products";
@@ -14,12 +14,12 @@ import { loadRecipes, type Recipe } from "@/lib/recipes";
 interface SearchItem {
   id: string;
   name: string;
-  type: 'food' | 'product' | 'recipe';
+  type: 'product' | 'recipe';
   calories: number;
   protein: number;
   fat: number;
   carbs: number;
-  originalData?: FoodItem | Product | Recipe;
+  originalData?: Product | Recipe;
 }
 
 interface DiaryProps {
@@ -63,19 +63,8 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
     const results: SearchItem[] = [];
     
     if (!q) {
-      // Show default items when no search
-      results.push(...FOODS.slice(0, 8).map(f => ({
-        id: f.id,
-        name: f.name,
-        type: 'food' as const,
-        calories: f.calories,
-        protein: f.protein,
-        fat: f.fat,
-        carbs: f.carbs,
-        originalData: f
-      })));
-      
-      results.push(...userProducts.slice(0, 4).map(p => ({
+      // Show all user products when no search
+      results.push(...userProducts.map(p => ({
         id: p.id,
         name: p.name,
         type: 'product' as const,
@@ -86,7 +75,20 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
         originalData: p
       })));
       
-      results.push(...userRecipes.slice(0, 4).map(r => ({
+      // Add separator if we have both products and recipes
+      if (userProducts.length > 0 && userRecipes.length > 0) {
+        results.push({
+          id: 'recipes-separator',
+          name: 'Рецепты',
+          type: 'recipe' as const,
+          calories: 0,
+          protein: 0,
+          fat: 0,
+          carbs: 0
+        });
+      }
+      
+      results.push(...userRecipes.map(r => ({
         id: r.id,
         name: r.name,
         type: 'recipe' as const,
@@ -97,21 +99,8 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
         originalData: r
       })));
     } else {
-      // Search functionality
-      FOODS.filter((f) => f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q)).slice(0, 6).forEach(f => {
-        results.push({
-          id: f.id,
-          name: f.name,
-          type: 'food' as const,
-          calories: f.calories,
-          protein: f.protein,
-          fat: f.fat,
-          carbs: f.carbs,
-          originalData: f
-        });
-      });
-      
-      userProducts.filter(p => p.name.toLowerCase().includes(q)).slice(0, 6).forEach(p => {
+      // Search functionality - only user products and recipes
+      userProducts.filter(p => p.name.toLowerCase().includes(q)).forEach(p => {
         results.push({
           id: p.id,
           name: p.name,
@@ -124,7 +113,23 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
         });
       });
       
-      userRecipes.filter(r => r.name.toLowerCase().includes(q)).slice(0, 6).forEach(r => {
+      // Add separator if we have both products and recipes in search results
+      const productsInSearch = results.filter(item => item.type === 'product').length;
+      const matchingRecipes = userRecipes.filter(r => r.name.toLowerCase().includes(q));
+      
+      if (productsInSearch > 0 && matchingRecipes.length > 0) {
+        results.push({
+          id: 'recipes-separator',
+          name: 'Рецепты',
+          type: 'recipe' as const,
+          calories: 0,
+          protein: 0,
+          fat: 0,
+          carbs: 0
+        });
+      }
+      
+      matchingRecipes.forEach(r => {
         results.push({
           id: r.id,
           name: r.name,
@@ -138,7 +143,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
       });
     }
     
-    return results.slice(0, 12);
+    return results;
   }, [query, userProducts, userRecipes]);
 
 
@@ -196,25 +201,30 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
               {filtered.map((item) => (
                 <button
                   key={`${item.type}-${item.id}`}
-                  onClick={() => setSelected(item)}
-                  className="w-full text-left rounded-lg px-3 py-2 hover:bg-gradient-sunset-soft transition-smooth flex items-center justify-between gap-3"
+                  onClick={() => item.id !== 'recipes-separator' && setSelected(item)}
+                  disabled={item.id === 'recipes-separator'}
+                  className={`w-full text-left rounded-lg px-3 py-2 transition-smooth flex items-center justify-between gap-2 ${
+                    item.id === 'recipes-separator' 
+                      ? 'bg-muted/50 cursor-default font-semibold text-muted-foreground' 
+                      : 'hover:bg-gradient-sunset-soft'
+                  }`}
                 >
                   <div className="min-w-0 flex items-center gap-2">
-                    {item.type === 'food' && <Package className="h-4 w-4 text-muted-foreground" />}
                     {item.type === 'product' && <Package className="h-4 w-4 text-blue-500" />}
                     {item.type === 'recipe' && <BookOpen className="h-4 w-4 text-green-500" />}
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">{item.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {item.type === 'food' && (item.originalData as FoodItem)?.category}
                         {item.type === 'product' && 'Мой продукт'}
                         {item.type === 'recipe' && 'Мой рецепт'}
                       </div>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground whitespace-nowrap">
-                    <span className="text-macro-calories font-semibold">{item.calories}</span> ккал/100г
-                  </div>
+                  {item.id !== 'recipes-separator' && (
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      <span className="text-macro-calories font-semibold">{item.calories}</span> ккал/100г
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -238,6 +248,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
                   min={1}
                   value={grams}
                   onChange={(e) => setGrams(e.target.value)}
+                  placeholder="Введите граммы"
                   autoFocus
                 />
               </div>
@@ -267,7 +278,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
                     <div className="text-sm font-medium truncate">{e.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {e.grams}г · <span className="text-macro-calories font-semibold">{e.calories}</span> ккал · 
-                      Б{e.protein} Ж{e.fat} У{e.carbs}
+                      Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г
                     </div>
                   </div>
                   <button
