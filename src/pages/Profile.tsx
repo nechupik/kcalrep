@@ -46,7 +46,7 @@ const Profile = () => {
 
   const handleSave = () => {
     // Profile data is now managed by Firebase Auth
-    toast.success("Profile saved");
+    toast.success("Профиль сохранён");
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -57,21 +57,21 @@ const Profile = () => {
     try {
       if (isLoginMode) {
         await signInWithEmail(loginEmail, loginPassword);
-        toast.success("Welcome!");
+        toast.success("Добро пожаловать!");
       } else {
         if (!registerName.trim()) {
-          toast.error("Please enter your name");
+          toast.error("Введите ваше имя");
           setIsSubmitting(false);
           return;
         }
         await signUpWithEmail(loginEmail, loginPassword, registerName.trim());
-        toast.success(`Welcome, ${registerName}!`);
+        toast.success(`Добро пожаловать, ${registerName}!`);
       }
       setLoginEmail("");
       setLoginPassword("");
       setRegisterName("");
     } catch (error: any) {
-      toast.error(error.message || "Authentication error");
+      toast.error(error.message || "Ошибка авторизации");
     } finally {
       setIsSubmitting(false);
     }
@@ -83,9 +83,9 @@ const Profile = () => {
     setIsSubmitting(true);
     try {
       await signInWithGoogle();
-      toast.success("Welcome!");
+      toast.success("Добро пожаловать!");
     } catch (error: any) {
-      toast.error(error.message || "Google sign-in error");
+      toast.error(error.message || "Ошибка входа через Google");
     } finally {
       setIsSubmitting(false);
     }
@@ -96,9 +96,9 @@ const Profile = () => {
       await signOut();
       setShowCalculator(false);
       setDraftResult(null);
-      toast.message("You have logged out");
+      toast.message("Вы вышли из аккаунта");
     } catch (error: any) {
-      toast.error(error.message || "Logout error");
+      toast.error(error.message || "Ошибка выхода");
     }
   };
 
@@ -122,7 +122,7 @@ const Profile = () => {
         <AppHeader />
         <section className="container max-w-3xl pt-6 pb-12">
           <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-muted-foreground">Loading...</div>
+            <div className="text-muted-foreground">Загрузка...</div>
           </div>
         </section>
       </div>
@@ -139,9 +139,9 @@ const Profile = () => {
             <User className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Profile</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Профиль</h1>
             <p className="text-sm text-muted-foreground">
-              Manage your account and KBJU norm
+              Управление аккаунтом и нормой КБЖУ
             </p>
           </div>
         </div>
@@ -166,13 +166,13 @@ const Profile = () => {
                 className="ml-auto text-muted-foreground hover:text-destructive"
               >
                 <LogOut className="h-4 w-4 mr-1" />
-                Logout
+                Выйти
               </Button>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">Имя</Label>
                 <Input
                   id="name"
                   value={user.displayName || ""}
@@ -181,7 +181,7 @@ const Profile = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Электронная почта</Label>
                 <Input
                   id="email"
                   type="email"
@@ -193,7 +193,7 @@ const Profile = () => {
             </div>
 
             <div className="text-sm text-muted-foreground">
-              Profile managed via Firebase Auth
+              Профиль управляется через Firebase Auth
             </div>
           </Card>
         )}
@@ -203,10 +203,10 @@ const Profile = () => {
           <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
             <div className="flex items-center gap-2 mb-1">
               <Calculator className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-bold">My KBJU Norm</h2>
+              <h2 className="text-lg font-bold">Моя норма КБЖУ</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-5">
-              Norm is set once during registration. Recalculate it if weight, activity, or goal has changed.
+              Норма задаётся один раз при регистрации. Пересчитайте, если изменился вес, активность или цель.
             </p>
 
             {norm && !showCalculator && (
@@ -370,7 +370,7 @@ const Profile = () => {
           <ShieldCheck className="h-4 w-4 mt-0.5 text-tertiary shrink-0" />
           <p>
             {user 
-              ? "Data syncs via Firebase and is available on all devices."
+              ? "Данные синхронизируются через Firebase и доступны на всех устройствах."
               : "Data is stored locally. Log in to sync between devices."
             }
           </p>
