@@ -127,6 +127,45 @@ const Index = () => {
     );
   }, [entries]);
 
+  const suggestions = useMemo(() => {
+    if (!norm || entries.length === 0) return [];
+    const results: string[] = [];
+    
+    const calPercent = (selectedDateTotals.calories / norm.calories) * 100;
+    const proteinPercent = (selectedDateTotals.protein / norm.protein) * 100;
+    const fatPercent = (selectedDateTotals.fat / norm.fat) * 100;
+    const carbsPercent = (selectedDateTotals.carbs / norm.carbs) * 100;
+    
+    if (calPercent < 70) {
+      const missing = norm.calories - selectedDateTotals.calories;
+      results.push(`Не хватает ${missing} ккал до нормы`);
+    } else if (calPercent > 110) {
+      const over = selectedDateTotals.calories - norm.calories;
+      results.push(`Норма калорий превышена на ${over} ккал`);
+    }
+    
+    if (proteinPercent < 70) {
+      const missing = Math.round(norm.protein - selectedDateTotals.protein);
+      results.push(`Белка не хватает ${missing}г`);
+    }
+    
+    if (fatPercent < 70) {
+      const missing = Math.round(norm.fat - selectedDateTotals.fat);
+      results.push(`Жиров не хватает ${missing}г`);
+    }
+    
+    if (carbsPercent < 70) {
+      const missing = Math.round(norm.carbs - selectedDateTotals.carbs);
+      results.push(`Углеводов не хватает ${missing}г`);
+    }
+    
+    if (calPercent >= 90 && calPercent <= 110 && proteinPercent >= 90 && fatPercent >= 90 && carbsPercent >= 90) {
+      results.push('Отлично! Все показатели в норме 🎉');
+    }
+    
+    return results;
+  }, [norm, entries, selectedDateTotals]);
+
   const isToday = selectedDate === (() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -186,6 +225,26 @@ const Index = () => {
           </Card>
         )}
       </section>
+
+      {/* Suggestions */}
+      {suggestions.length > 0 && (
+        <section className="container max-w-5xl mb-8">
+          <Card className="p-4 md:p-5 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">💡</span>
+              <h3 className="text-sm font-semibold">Рекомендации на сегодня</h3>
+            </div>
+            <div className="space-y-1.5">
+              {suggestions.map((tip, i) => (
+                <div key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                  <span className="mt-0.5">•</span>
+                  <span>{tip}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </section>
+      )}
 
       {/* Diary */}
       <section className="container max-w-5xl pb-20">
