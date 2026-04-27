@@ -62,22 +62,34 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
     loadData();
   }, [user]);
 
+  const getScore = (itemId: string): number => {
+    const stat = usageStats.find(s => s.productId === itemId);
+    if (!stat) return 0;
+    const frequencyScore = stat.usageCount * 10;
+    const daysSinceUse = (Date.now() - stat.lastUsedAt.toMillis()) / (1000 * 60 * 60 * 24);
+    const recencyScore = Math.max(0, 30 - daysSinceUse);
+    return frequencyScore + recencyScore;
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const results: SearchItem[] = [];
     
     if (!q) {
       // Show all user products when no search
-      results.push(...userProducts.map(p => ({
-        id: p.id,
-        name: p.name,
-        type: 'product' as const,
-        calories: p.calories,
-        protein: p.protein,
-        fat: p.fat,
-        carbs: p.carbs,
-        originalData: p
-      })));
+      results.push(...userProducts
+        .slice()
+        .sort((a, b) => getScore(b.id) - getScore(a.id))
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          type: 'product' as const,
+          calories: p.calories,
+          protein: p.protein,
+          fat: p.fat,
+          carbs: p.carbs,
+          originalData: p
+        })));
       
       // Add separator if we have both products and recipes
       if (userProducts.length > 0 && userRecipes.length > 0) {
@@ -92,30 +104,37 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
         });
       }
       
-      results.push(...userRecipes.map(r => ({
-        id: r.id,
-        name: r.name,
-        type: 'recipe' as const,
-        calories: r.calories,
-        protein: r.protein,
-        fat: r.fat,
-        carbs: r.carbs,
-        originalData: r
-      })));
+      results.push(...userRecipes
+        .slice()
+        .sort((a, b) => getScore(b.id) - getScore(a.id))
+        .map(r => ({
+          id: r.id,
+          name: r.name,
+          type: 'recipe' as const,
+          calories: r.calories,
+          protein: r.protein,
+          fat: r.fat,
+          carbs: r.carbs,
+          originalData: r
+        })));
     } else {
       // Search functionality - only user products and recipes
-      userProducts.filter(p => p.name.toLowerCase().includes(q)).forEach(p => {
-        results.push({
-          id: p.id,
-          name: p.name,
-          type: 'product' as const,
-          calories: p.calories,
-          protein: p.protein,
-          fat: p.fat,
-          carbs: p.carbs,
-          originalData: p
+      const matchingProducts = userProducts.filter(p => p.name.toLowerCase().includes(q));
+      matchingProducts
+        .slice()
+        .sort((a, b) => getScore(b.id) - getScore(a.id))
+        .forEach(p => {
+          results.push({
+            id: p.id,
+            name: p.name,
+            type: 'product' as const,
+            calories: p.calories,
+            protein: p.protein,
+            fat: p.fat,
+            carbs: p.carbs,
+            originalData: p
+          });
         });
-      });
       
       // Add separator if we have both products and recipes in search results
       const productsInSearch = results.filter(item => item.type === 'product').length;
@@ -133,22 +152,25 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
         });
       }
       
-      matchingRecipes.forEach(r => {
-        results.push({
-          id: r.id,
-          name: r.name,
-          type: 'recipe' as const,
-          calories: r.calories,
-          protein: r.protein,
-          fat: r.fat,
-          carbs: r.carbs,
-          originalData: r
+      matchingRecipes
+        .slice()
+        .sort((a, b) => getScore(b.id) - getScore(a.id))
+        .forEach(r => {
+          results.push({
+            id: r.id,
+            name: r.name,
+            type: 'recipe' as const,
+            calories: r.calories,
+            protein: r.protein,
+            fat: r.fat,
+            carbs: r.carbs,
+            originalData: r
+          });
         });
-      });
     }
     
     return results;
-  }, [query, userProducts, userRecipes]);
+  }, [query, userProducts, userRecipes, usageStats]);
 
 
   const handleAdd = async () => {
