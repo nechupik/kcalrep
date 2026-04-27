@@ -86,6 +86,35 @@ const Index = () => {
     }
   };
 
+  const handleRepeatYesterday = async () => {
+    const yesterday = new Date(selectedDate + 'T00:00:00');
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    
+    const yesterdayEntries = await loadDiary(yesterdayStr);
+    if (yesterdayEntries.length === 0) {
+      toast.info('Вчера не было записей');
+      return;
+    }
+    
+    for (const entry of yesterdayEntries) {
+      await addDiaryEntry({
+        foodId: entry.foodId,
+        name: entry.name,
+        grams: entry.grams,
+        calories: entry.calories,
+        protein: entry.protein,
+        fat: entry.fat,
+        carbs: entry.carbs,
+        date: selectedDate,
+      });
+    }
+    
+    const updated = await loadDiary(selectedDate);
+    setEntries(Array.isArray(updated) ? updated : []);
+    toast.success(`Скопировано ${yesterdayEntries.length} записей из вчера`);
+  };
+
   const selectedDateTotals = useMemo(() => {
     return entries.reduce(
       (acc, e) => ({
@@ -186,6 +215,18 @@ const Index = () => {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          {isToday && entries.length === 0 && (
+            <div className="flex justify-center mt-3">
+              <Button
+                onClick={handleRepeatYesterday}
+                variant="outline"
+                size="sm"
+                className="text-sm gap-2"
+              >
+                🔁 Повторить вчера
+              </Button>
+            </div>
+          )}
         </Card>
         
         <Diary entries={entries} onAdd={handleAddEntry} onRemove={handleRemoveEntry} />
