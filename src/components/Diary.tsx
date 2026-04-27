@@ -10,7 +10,7 @@ import type { DiaryEntry } from "@/lib/storage";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, type Product } from "@/lib/products";
 import { loadRecipes, type Recipe } from "@/lib/recipes";
-import { updateUsageStat, getLastAmount } from "@/lib/firestore";
+import { updateUsageStat, getLastAmount, loadUsageStats, type UsageStat } from "@/lib/firestore";
 
 interface SearchItem {
   id: string;
@@ -36,6 +36,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
   const [grams, setGrams] = useState("100");
   const [userProducts, setUserProducts] = useState<Product[]>([]);
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
+  const [usageStats, setUsageStats] = useState<UsageStat[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,12 +44,14 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
       if (!user) return;
       
       try {
-        const [products, recipes] = await Promise.all([
+        const [products, recipes, stats] = await Promise.all([
           loadProducts(user.uid),
-          loadRecipes(user.uid)
+          loadRecipes(user.uid),
+          loadUsageStats(user.uid)
         ]);
         setUserProducts(products);
         setUserRecipes(recipes);
+        setUsageStats(stats.slice(0, 5)); // show top 5 most used
       } catch (error) {
         console.error('Error loading user data:', error);
       } finally {
@@ -193,6 +196,46 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
 
       {/* Поиск */}
       <div className="space-y-3 mb-4">
+        {usageStats.length > 0 && !selected && (
+          <div className="mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Недавнее</p>
+            <div className="flex flex-wrap gap-2">
+              {usageStats.map((stat) => (
+                <button
+                  key={stat.productId}
+                  onClick={async () => {
+                    const item = [...userProducts, ...userRecipes].find(p => p.id === stat.productId);
+                    if (!item) return;
+                    const g = stat.lastAmount;
+                    const factor = g / 100;
+                    await onAdd({
+                      foodId: item.id,
+                      name: item.name,
+                      grams: g,
+                      calories: Math.round(item.calories * factor),
+                      protein: +(item.protein * factor).toFixed(1),
+                      fat: +(item.fat * factor).toFixed(1),
+                      carbs: +(item.carbs * factor).toFixed(1),
+                      date: '',
+                    });
+                    if (user) {
+                      await updateUsageStat(user.uid, {
+                        id: item.id,
+                        name: item.name,
+                        type: stat.productType,
+                        amount: g,
+                      });
+                    }
+                  }}
+                  className="flex items-center gap-1.5 rounded-full bg-muted/50 hover:bg-gradient-sunset-soft border border-border/50 px-3 py-1.5 text-sm font-medium transition-smooth"
+                >
+                  {stat.productType === 'recipe' ? '📖' : '📦'} {stat.productName}
+                  <span className="text-xs text-muted-foreground ml-1">{stat.lastAmount}г</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
