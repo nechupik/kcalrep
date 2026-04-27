@@ -223,3 +223,61 @@ export async function loadDiaryRange(userId: string, startDate: string, endDate:
   
   return entries;
 }
+
+// Usage tracking
+export interface UsageStat {
+  productId: string;
+  productName: string;
+  productType: 'product' | 'recipe';
+  usageCount: number;
+  lastUsedAt: Timestamp;
+  avgAmount: number;
+  lastAmount: number;
+}
+
+export async function updateUsageStat(
+  userId: string,
+  item: { id: string; name: string; type: 'product' | 'recipe'; amount: number }
+) {
+  const statDoc = doc(db, 'users', userId, 'usage_stats', item.id);
+  const existing = await getDoc(statDoc);
+
+  if (existing.exists()) {
+    const data = existing.data() as UsageStat;
+    const newCount = data.usageCount + 1;
+    const newAvg = Math.round((data.avgAmount * data.usageCount + item.amount) / newCount);
+    await setDoc(statDoc, {
+      ...data,
+      usageCount: newCount,
+      lastUsedAt: Timestamp.now(),
+      avgAmount: newAvg,
+      lastAmount: item.amount,
+    });
+  } else {
+    await setDoc(statDoc, {
+      productId: item.id,
+      productName: item.name,
+      productType: item.type,
+      usageCount: 1,
+      lastUsedAt: Timestamp.now(),
+      avgAmount: item.amount,
+      lastAmount: item.amount,
+    });
+  }
+}
+
+export async function loadUsageStats(userId: string): Promise<UsageStat[]> {
+  const statsCollection = collection(db, 'users', userId, 'usage_stats');
+  const q = query(statsCollection, orderBy('usageCount', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as UsageStat);
+}
+
+export async function getLastAmount(userId: string, productId: string): Promise<number | null> {
+  const statDoc = doc(db, 'users', userId, 'usage_stats', productId);
+  const snap = await getDoc(statDoc);
+  if (snap.exists()) {
+    return (snap.data() as UsageStat).lastAmount;
+  }
+  return null;
+}

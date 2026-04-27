@@ -34,7 +34,6 @@ export async function signUpWithEmail(email: string, password: string, name: str
 
 export async function signInWithGoogle() {
   try {
-    // Create provider only when function is called, not on import
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(auth, provider);
     return userCredential.user;

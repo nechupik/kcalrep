@@ -10,6 +10,7 @@ import type { DiaryEntry } from "@/lib/storage";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, type Product } from "@/lib/products";
 import { loadRecipes, type Recipe } from "@/lib/recipes";
+import { updateUsageStat, getLastAmount } from "@/lib/firestore";
 
 interface SearchItem {
   id: string;
@@ -163,6 +164,16 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
       carbs: +(selected.carbs * factor).toFixed(1),
       date: '', // Will be set in Index.tsx
     });
+    
+    if (user) {
+      await updateUsageStat(user.uid, {
+        id: selected.id,
+        name: selected.name,
+        type: selected.type,
+        amount: g,
+      });
+    }
+    
     setSelected(null);
     setQuery("");
     setGrams("100");
@@ -201,7 +212,15 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
               {filtered.map((item) => (
                 <button
                   key={`${item.type}-${item.id}`}
-                  onClick={() => item.id !== 'recipes-separator' && setSelected(item)}
+                  onClick={async () => {
+                    if (item.id !== 'recipes-separator') {
+                      setSelected(item);
+                      if (user) {
+                        const lastAmt = await getLastAmount(user.uid, item.id);
+                        if (lastAmt) setGrams(String(lastAmt));
+                      }
+                    }
+                  }}
                   disabled={item.id === 'recipes-separator'}
                   className={`w-full text-left rounded-lg px-3 py-2 transition-smooth flex items-center justify-between gap-2 ${
                     item.id === 'recipes-separator' 
