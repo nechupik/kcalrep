@@ -42,7 +42,7 @@ const Profile = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [displayName, setDisplayName] = useState(user?.displayName || "");
+  const [displayName, setDisplayName] = useState('');
   const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
@@ -56,13 +56,17 @@ const Profile = () => {
       if (user) {
         const settings = await loadUserSettings(user.uid);
         if (settings) setActivityEnabled(settings.activityTrackingEnabled);
-        // Update display name when user changes
-        setDisplayName(user.displayName || "");
       }
     };
     
     loadNormData();
   }, [user, norm]);
+
+  useEffect(() => {
+    if (user) {
+      setDisplayName(user.displayName || '');
+    }
+  }, [user]);
 
   const handleSave = () => {
     // Profile data is now managed by Firebase Auth
@@ -137,17 +141,12 @@ const Profile = () => {
   };
 
   const handleSaveName = async () => {
-    if (!user || !auth.currentUser) return;
-    
-    setSavingName(true);
+    if (!auth.currentUser) return;
     try {
-      await updateProfile(auth.currentUser, { displayName: displayName.trim() });
+      await updateProfile(auth.currentUser, { displayName });
       toast.success('Имя обновлено');
     } catch (error) {
-      console.error('Error updating name:', error);
-      toast.error('Ошибка обновления имени');
-    } finally {
-      setSavingName(false);
+      toast.error('Ошибка сохранения имени');
     }
   };
 
@@ -242,7 +241,6 @@ const Profile = () => {
                   />
                   <Button
                     onClick={handleSaveName}
-                    disabled={savingName || !displayName.trim() || displayName.trim() === (user?.displayName || "")}
                     size="sm"
                     className="px-3"
                   >
