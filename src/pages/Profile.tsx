@@ -23,6 +23,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm, saveNorm } from "@/lib/storage";
 import { loadUserSettings, saveUserSettings } from "@/lib/firestore";
 import type { CalcInput, MacroResult } from "@/lib/nutrition";
+import { updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 
@@ -40,6 +42,8 @@ const Profile = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.displayName || "");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     const loadNormData = async () => {
@@ -52,6 +56,8 @@ const Profile = () => {
       if (user) {
         const settings = await loadUserSettings(user.uid);
         if (settings) setActivityEnabled(settings.activityTrackingEnabled);
+        // Update display name when user changes
+        setDisplayName(user.displayName || "");
       }
     };
     
@@ -128,6 +134,21 @@ const Profile = () => {
     setDraftResult(null);
     setShowCalculator(false);
     toast.success("Norm saved");
+  };
+
+  const handleSaveName = async () => {
+    if (!user || !auth.currentUser) return;
+    
+    setSavingName(true);
+    try {
+      await updateProfile(auth.currentUser, { displayName: displayName.trim() });
+      toast.success('Имя обновлено');
+    } catch (error) {
+      console.error('Error updating name:', error);
+      toast.error('Ошибка обновления имени');
+    } finally {
+      setSavingName(false);
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -212,12 +233,22 @@ const Profile = () => {
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Имя</Label>
-                <Input
-                  id="name"
-                  value={user.displayName || ""}
-                  disabled
-                  placeholder="Name from Firebase"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Введите ваше имя"
+                  />
+                  <Button
+                    onClick={handleSaveName}
+                    disabled={savingName || !displayName.trim() || displayName.trim() === (user?.displayName || "")}
+                    size="sm"
+                    className="px-3"
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Электронная почта</Label>

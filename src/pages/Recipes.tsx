@@ -29,10 +29,10 @@ const Recipes = () => {
   const [servingType, setServingType] = useState<'grams' | 'portion'>('grams');
   const [formData, setFormData] = useState({
     name: "",
-    calories: 0,
-    protein: 0,
-    fat: 0,
-    carbs: 0,
+    calories: "",
+    protein: "",
+    fat: "",
+    carbs: "",
     description: "",
   });
 
@@ -92,16 +92,16 @@ const Recipes = () => {
     try {
       await saveRecipe({
         name: formData.name,
-        calories: formData.calories,
-        protein: formData.protein,
-        fat: formData.fat,
-        carbs: formData.carbs,
+        calories: Number(formData.calories) || 0,
+        protein: Number(formData.protein) || 0,
+        fat: Number(formData.fat) || 0,
+        carbs: Number(formData.carbs) || 0,
         text: formData.description,
         servingType,
       }, user.uid);
       
       toast.success(`Добавлено: ${formData.name}`);
-      setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0, description: "" });
+      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
       setShowAddForm(false);
       loadUserRecipes(); // Refresh list
     } catch (error) {
@@ -115,10 +115,10 @@ const Recipes = () => {
     setServingType(recipe.servingType || 'grams');
     setFormData({
       name: recipe.name,
-      calories: recipe.calories,
-      protein: recipe.protein,
-      fat: recipe.fat,
-      carbs: recipe.carbs,
+      calories: recipe.calories.toString(),
+      protein: recipe.protein.toString(),
+      fat: recipe.fat.toString(),
+      carbs: recipe.carbs.toString(),
       description: recipe.text || "",
     });
     setShowAddForm(true);
@@ -130,17 +130,17 @@ const Recipes = () => {
     try {
       await updateRecipe(editingRecipe.id!, {
         name: formData.name,
-        calories: formData.calories,
-        protein: formData.protein,
-        fat: formData.fat,
-        carbs: formData.carbs,
+        calories: Number(formData.calories) || 0,
+        protein: Number(formData.protein) || 0,
+        fat: Number(formData.fat) || 0,
+        carbs: Number(formData.carbs) || 0,
         text: formData.description,
         servingType,
       });
       
       toast.success(`Обновлено: ${formData.name}`);
       setEditingRecipe(null);
-      setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0, description: "" });
+      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
       setShowAddForm(false);
       loadUserRecipes(); // Refresh list
     } catch (error) {
@@ -352,7 +352,7 @@ const Recipes = () => {
                       id="calories"
                       type="number"
                       value={formData.calories}
-                      onChange={(e) => setFormData({ ...formData, calories: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
                       placeholder="0"
                       required
                     />
@@ -364,7 +364,7 @@ const Recipes = () => {
                       type="number"
                       step="0.1"
                       value={formData.protein}
-                      onChange={(e) => setFormData({ ...formData, protein: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
                       placeholder="0"
                       required
                     />
@@ -376,7 +376,7 @@ const Recipes = () => {
                       type="number"
                       step="0.1"
                       value={formData.fat}
-                      onChange={(e) => setFormData({ ...formData, fat: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, fat: e.target.value })}
                       placeholder="0"
                       required
                     />
@@ -388,7 +388,7 @@ const Recipes = () => {
                       type="number"
                       step="0.1"
                       value={formData.carbs}
-                      onChange={(e) => setFormData({ ...formData, carbs: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
                       placeholder="0"
                       required
                     />

@@ -35,9 +35,9 @@ const INTENSITY_LABEL: Record<"light" | "moderate" | "hard", string> = {
 
 export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитать норму" }: CalculatorFormProps) => {
   const [gender, setGender] = useState<Gender>("male");
-  const [age, setAge] = useState("28");
-  const [height, setHeight] = useState("178");
-  const [weight, setWeight] = useState("75");
+  const [age, setAge] = useState("");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
   const [activityMode, setActivityMode] = useState<ActivityMode>("steps");
   const [steps, setSteps] = useState(8000);
   const [workoutsPerWeek, setWorkoutsPerWeek] = useState(3);
@@ -106,15 +106,15 @@ export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитат�
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-2">
             <Label htmlFor="age">Возраст</Label>
-            <Input id="age" type="number" min={10} max={100} value={age} onChange={(e) => setAge(e.target.value)} />
+            <Input id="age" type="number" min={10} max={100} value={age} onChange={(e) => setAge(e.target.value)} placeholder="28" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="height">Рост, см</Label>
-            <Input id="height" type="number" min={100} max={250} value={height} onChange={(e) => setHeight(e.target.value)} />
+            <Input id="height" type="number" min={100} max={250} value={height} onChange={(e) => setHeight(e.target.value)} placeholder="178" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="weight">Вес, кг</Label>
-            <Input id="weight" type="number" min={30} max={300} value={weight} onChange={(e) => setWeight(e.target.value)} />
+            <Input id="weight" type="number" min={30} max={300} value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="75" />
           </div>
         </div>
 

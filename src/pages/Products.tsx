@@ -27,10 +27,10 @@ const Products = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    calories: 0,
-    protein: 0,
-    fat: 0,
-    carbs: 0,
+    calories: "",
+    protein: "",
+    fat: "",
+    carbs: "",
   });
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
@@ -105,14 +105,14 @@ const Products = () => {
     try {
       await saveProduct({
         name: formData.name,
-        calories: formData.calories,
-        protein: formData.protein,
-        fat: formData.fat,
-        carbs: formData.carbs,
+        calories: Number(formData.calories) || 0,
+        protein: Number(formData.protein) || 0,
+        fat: Number(formData.fat) || 0,
+        carbs: Number(formData.carbs) || 0,
       }, user.uid);
       
       toast.success(`Добавлено: ${formData.name}`);
-      setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0 });
+      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "" });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
     } catch (error) {
@@ -145,10 +145,10 @@ const Products = () => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
-      calories: product.calories,
-      protein: product.protein,
-      fat: product.fat,
-      carbs: product.carbs,
+      calories: product.calories.toString(),
+      protein: product.protein.toString(),
+      fat: product.fat.toString(),
+      carbs: product.carbs.toString(),
     });
     setShowAddForm(true);
   };
@@ -161,25 +161,25 @@ const Products = () => {
       if (editingProduct.id) {
         await updateProduct(editingProduct.id, {
           name: formData.name,
-          calories: formData.calories,
-          protein: formData.protein,
-          fat: formData.fat,
-          carbs: formData.carbs,
+          calories: Number(formData.calories) || 0,
+          protein: Number(formData.protein) || 0,
+          fat: Number(formData.fat) || 0,
+          carbs: Number(formData.carbs) || 0,
         });
       } else {
         // Create new product if no ID exists
         await saveProduct({
           name: formData.name,
-          calories: formData.calories,
-          protein: formData.protein,
-          fat: formData.fat,
-          carbs: formData.carbs,
+          calories: Number(formData.calories) || 0,
+          protein: Number(formData.protein) || 0,
+          fat: Number(formData.fat) || 0,
+          carbs: Number(formData.carbs) || 0,
         }, user.uid);
       }
       
       toast.success(`Обновлено: ${formData.name}`);
       setEditingProduct(null);
-      setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0 });
+      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "" });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
     } catch (error) {
@@ -203,7 +203,7 @@ const Products = () => {
 
   const handleCancelEdit = () => {
     setEditingProduct(null);
-    setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0 });
+    setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "" });
     setShowAddForm(false);
   };
 
@@ -394,7 +394,7 @@ const Products = () => {
                       id="calories"
                       type="number"
                       value={formData.calories}
-                      onChange={(e) => setFormData({ ...formData, calories: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
                       placeholder="0"
                       required
                     />
@@ -406,7 +406,7 @@ const Products = () => {
                       type="number"
                       step="0.1"
                       value={formData.protein}
-                      onChange={(e) => setFormData({ ...formData, protein: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
                       placeholder="0"
                       required
                     />
@@ -418,7 +418,7 @@ const Products = () => {
                       type="number"
                       step="0.1"
                       value={formData.fat}
-                      onChange={(e) => setFormData({ ...formData, fat: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, fat: e.target.value })}
                       placeholder="0"
                       required
                     />
@@ -430,7 +430,7 @@ const Products = () => {
                       type="number"
                       step="0.1"
                       value={formData.carbs}
-                      onChange={(e) => setFormData({ ...formData, carbs: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
                       placeholder="0"
                       required
                     />
