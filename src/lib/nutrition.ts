@@ -1,5 +1,8 @@
 // Питательные расчёты и база продуктов
 
+const MIN_CALORIES_FEMALE = 1250;
+const MIN_CALORIES_MALE = 1500;
+
 export type Gender = "male" | "female";
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "veryActive";
 export type Goal = "lose" | "maintain" | "gain";
@@ -31,6 +34,7 @@ export interface MacroResult {
   activityFactor: number;
   activityLabel: ActivityLevel;
   goalMultiplier: number;
+  warning?: string;
 }
 
 const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
@@ -42,9 +46,9 @@ const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
 };
 
 const GOAL_ADJUSTMENT: Record<Goal, number> = {
-  lose: -0.2,
+  lose: -0.15,
   maintain: 0,
-  gain: 0.15,
+  gain: 0.10,
 };
 
 export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
@@ -72,7 +76,7 @@ function levelFromSteps(steps: number): ActivityLevel {
   if (steps < 7500) return "light";
   if (steps < 10500) return "moderate";
   if (steps < 13500) return "active";
-  return "veryActive";
+  return "active"; // Cap at active (1.725), not veryActive (1.9) for steps alone
 }
 
 function levelFromWorkouts(w: WorkoutsInfo): ActivityLevel {
@@ -92,9 +96,7 @@ function combineLevels(a: ActivityLevel, b: ActivityLevel): ActivityLevel {
   const order: ActivityLevel[] = ["sedentary", "light", "moderate", "active", "veryActive"];
   const ia = order.indexOf(a);
   const ib = order.indexOf(b);
-  const avg = Math.round((ia + ib) / 2);
-  const max = Math.max(ia, ib);
-  return order[Math.min(max, avg + 1)];
+  return order[Math.min(Math.max(ia, ib), order.length - 1)];
 }
 
 export function resolveActivityLevel(input: CalcInput): ActivityLevel {
@@ -120,21 +122,55 @@ export function calculateMacros(input: CalcInput): MacroResult {
   const goalMultiplier = 1 + GOAL_ADJUSTMENT[goal];
   const calories = Math.round(tdee * goalMultiplier);
 
+  const bmi = weight / ((height / 100) ** 2);
   const proteinPerKg = goal === "maintain" ? 1.6 : 2.0;
-  const protein = Math.round(weight * proteinPerKg);
-  const fat = Math.round((calories * 0.27) / 9);
+  const rawProtein = Math.round(weight * proteinPerKg);
+  const protein = bmi > 30
+    ? Math.round(Math.min(rawProtein, weight * 1.6))
+    : rawProtein;
+  const fatFromPercent = Math.round((calories * 0.27) / 9);
+  const fatFromWeight = Math.round(weight * 1.0);
+  const fat = Math.max(fatFromPercent, fatFromWeight);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 
+  let warning: string | undefined;
+
+  // Minimum fat floor - gender specific
+  const minFat = gender === 'female'
+    ? Math.round(weight * 0.9)
+    : Math.round(weight * 1.0);
+
+  let finalFat = Math.max(fat, minFat);
+
+  // Recalculate carbs if fat was bumped up
+  let finalCarbs = Math.max(0, Math.round((calories - protein * 4 - finalFat * 9) / 4));
+
+  // Minimum calorie floor
+  const minCalories = gender === 'female' ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE;
+  let finalCalories = calories;
+
+  if (calories < minCalories) {
+    finalCalories = minCalories;
+    // Recalculate carbs with new calorie floor
+    finalCarbs = Math.max(0, Math.round((finalCalories - protein * 4 - finalFat * 9) / 4));
+    warning = gender === 'female'
+      ? 'Калораж близок к минимуму для женского здоровья. Чтобы худеть без вреда для гормонов, рекомендуем увеличить активность до 8–10 тыс. шагов в день — это поднимет норму калорий.'
+      : 'Калораж близок к минимуму. Рекомендуем увеличить активность, чтобы не снижать обмен веществ.';
+  } else if (gender === 'female' && calories < 1400) {
+    warning = 'Калораж невысокий. Регулярная активность (8–10 тыс. шагов) позволит поднять норму и худеть комфортнее.';
+  }
+
   return {
-    calories,
+    calories: finalCalories,
     protein,
-    fat,
-    carbs,
+    fat: finalFat,
+    carbs: finalCarbs,
     bmr: Math.round(bmr),
     tdee: Math.round(tdee),
     activityFactor: factor,
     activityLabel: level,
     goalMultiplier,
+    warning,
   };
 }
 
@@ -142,33 +178,56 @@ export function recalculateNormWithNewWeight(
   currentNorm: any, // Using any since NormData is in firestore.ts
   newWeight: number
 ): MacroResult {
-  // Recalculate BMR with new weight, keeping same gender/height/age/activity
-  let newBmr: number;
-  if (currentNorm.gender === 'male') {
-    newBmr = (10 * newWeight) + (6.25 * currentNorm.height) - (5 * currentNorm.age) + 5;
-  } else {
-    newBmr = (10 * newWeight) + (6.25 * currentNorm.height) - (5 * currentNorm.age) - 161;
+  const input: CalcInput = {
+    gender: currentNorm.gender,
+    age: currentNorm.age,
+    height: currentNorm.height,
+    weight: newWeight,
+    activityMode: "steps",
+    steps: 0,
+    goal: currentNorm.goal as Goal,
+  };
+  // Manually set the activity factor instead of recalculating from steps
+  const result = calculateMacros(input);
+  // Override with stored activity factor to preserve original activity level
+  const tdee = Math.round(result.bmr * currentNorm.activityFactor);
+  const calories = Math.round(tdee * currentNorm.goalMultiplier);
+  const bmi = newWeight / ((currentNorm.height / 100) ** 2);
+  const proteinPerKg = currentNorm.goal === "maintain" ? 1.6 : 2.0;
+  const rawProtein = Math.round(newWeight * proteinPerKg);
+  const protein = bmi > 30 ? Math.round(Math.min(rawProtein, newWeight * 1.6)) : rawProtein;
+  const fatFromPercent = Math.round((calories * 0.27) / 9);
+  const fatFromWeight = Math.round(newWeight * 1.0);
+  const fat = Math.max(fatFromPercent, fatFromWeight);
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
+
+  const gender = currentNorm.gender as Gender;
+  const minFat = gender === 'female'
+    ? Math.round(newWeight * 0.9)
+    : Math.round(newWeight * 1.0);
+  const finalFat = Math.max(fat, minFat);
+  const minCalories = gender === 'female' ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE;
+  const finalCalories = Math.max(calories, minCalories);
+  const finalCarbs = Math.max(0, Math.round((finalCalories - protein * 4 - finalFat * 9) / 4));
+
+  let warning: string | undefined;
+  if (calories < minCalories) {
+    warning = gender === 'female'
+      ? 'Калораж близок к минимуму для женского здоровья. Рекомендуем увеличить активность до 8–10 тыс. шагов.'
+      : 'Калораж близок к минимуму. Рекомендуем увеличить активность.';
   }
-  
-  const newTdee = newBmr * currentNorm.activityFactor;
-  const newCalories = Math.round(newTdee * currentNorm.goalMultiplier);
-  
-  // Recalculate macros based on new weight and calories
-  const protein = Math.round(newWeight * 1.6);
-  const fat = Math.round(newWeight * 1.0);
-  const carbsCalories = newCalories - (protein * 4) - (fat * 9);
-  const carbs = Math.round(Math.max(carbsCalories, 0) / 4);
-  
+
   return {
-    calories: newCalories,
+    calories: finalCalories,
     protein,
-    fat,
-    carbs,
-    bmr: Math.round(newBmr),
-    tdee: Math.round(newTdee),
+    fat: finalFat,
+    carbs: finalCarbs,
+    bmr: result.bmr,
+    tdee,
     activityFactor: currentNorm.activityFactor,
-    activityLabel: currentNorm.activityLabel as any,
+    activityLabel: currentNorm.activityLabel,
     goalMultiplier: currentNorm.goalMultiplier,
+    warning,
   };
 }
 

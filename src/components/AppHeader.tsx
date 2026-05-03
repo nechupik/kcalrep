@@ -8,7 +8,7 @@ const links = [
   { to: "/stats", label: "Статистика", icon: BarChart3 },
   { to: "/profile", label: "Профиль", icon: User },
   { to: "/products", label: "Продукты", icon: Package },
-  { to: "/recipes", label: "Рецепты", icon: BookOpen },
+  { to: "/recipes", label: "Блюда", icon: BookOpen },
 ];
 
 export const AppHeader = () => {

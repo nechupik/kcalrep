@@ -42,6 +42,15 @@ export const ResultsCard = ({ result, onSave, saved }: ResultsCardProps) => {
         ))}
       </div>
 
+      {result.warning && (
+        <div className="mt-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4">
+          <div className="flex items-start gap-2">
+            <span className="text-lg">⚠️</span>
+            <p className="text-sm text-yellow-200">{result.warning}</p>
+          </div>
+        </div>
+      )}
+
       <Button
         onClick={onSave}
         variant="outline"

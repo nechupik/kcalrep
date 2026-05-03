@@ -95,7 +95,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
       if (userProducts.length > 0 && userRecipes.length > 0) {
         results.push({
           id: 'recipes-separator',
-          name: 'Рецепты',
+          name: 'Блюда',
           type: 'recipe' as const,
           calories: 0,
           protein: 0,
@@ -143,7 +143,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
       if (productsInSearch > 0 && matchingRecipes.length > 0) {
         results.push({
           id: 'recipes-separator',
-          name: 'Рецепты',
+          name: 'Блюда',
           type: 'recipe' as const,
           calories: 0,
           protein: 0,
@@ -261,7 +261,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Поиск продуктов и рецептов..."
+            placeholder="Поиск продуктов и блюд..."
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSelected(null); }}
             className="pl-9"
@@ -300,7 +300,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
                       <div className="text-sm font-medium truncate">{item.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {item.type === 'product' && 'Продукт'}
-                        {item.type === 'recipe' && 'Рецепт'}
+                        {item.type === 'recipe' && 'Блюдо'}
                       </div>
                     </div>
                   </div>

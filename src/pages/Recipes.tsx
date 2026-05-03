@@ -26,6 +26,7 @@ const Recipes = () => {
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [servingType, setServingType] = useState<'grams' | 'portion'>('grams');
   const [formData, setFormData] = useState({
     name: "",
     calories: 0,
@@ -96,6 +97,7 @@ const Recipes = () => {
         fat: formData.fat,
         carbs: formData.carbs,
         text: formData.description,
+        servingType,
       }, user.uid);
       
       toast.success(`Добавлено: ${formData.name}`);
@@ -104,12 +106,13 @@ const Recipes = () => {
       loadUserRecipes(); // Refresh list
     } catch (error) {
       console.error("Error saving recipe:", error);
-      toast.error("Ошибка сохранения рецепта");
+      toast.error("Ошибка сохранения блюда");
     }
   };
 
   const handleEditRecipe = async (recipe: Recipe) => {
     setEditingRecipe(recipe);
+    setServingType(recipe.servingType || 'grams');
     setFormData({
       name: recipe.name,
       calories: recipe.calories,
@@ -132,6 +135,7 @@ const Recipes = () => {
         fat: formData.fat,
         carbs: formData.carbs,
         text: formData.description,
+        servingType,
       });
       
       toast.success(`Обновлено: ${formData.name}`);
@@ -141,7 +145,7 @@ const Recipes = () => {
       loadUserRecipes(); // Refresh list
     } catch (error) {
       console.error("Error updating recipe:", error);
-      toast.error("Ошибка обновления рецепта");
+      toast.error("Ошибка обновления блюда");
     }
   };
 
@@ -150,16 +154,17 @@ const Recipes = () => {
     
     try {
       await deleteRecipe(recipeId);
-      toast.success("Рецепт удалён");
+      toast.success("Блюдо удалёно");
       loadUserRecipes(); // Refresh list
     } catch (error) {
       console.error("Error deleting recipe:", error);
-      toast.error("Ошибка удаления рецепта");
+      toast.error("Ошибка удаления блюда");
     }
   };
 
   const handleCancelEdit = () => {
     setEditingRecipe(null);
+    setServingType('grams');
     setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0, description: "" });
     setShowAddForm(false);
   };
@@ -180,7 +185,7 @@ const Recipes = () => {
             <BookOpen className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Рецепты</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Блюда</h1>
                       </div>
         </div>
 
@@ -191,7 +196,7 @@ const Recipes = () => {
               <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
               <Input
                 type="text"
-                placeholder="Поиск рецептов..."
+                placeholder="Поиск блюд..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4"
@@ -213,7 +218,7 @@ const Recipes = () => {
             className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
           >
             <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Добавить рецепт</span>
+            <span className="hidden sm:inline">Добавить блюдо</span>
             <span className="sm:hidden">Добавить</span>
           </Button>
         </Card>
@@ -222,9 +227,9 @@ const Recipes = () => {
         <Card className="bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-8">
           <div className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Рецепты</h2>
+              <h2 className="text-lg font-semibold">Мои блюда</h2>
               <div className="text-sm text-muted-foreground">
-                {pluralize(recipes.length, 'рецепт', 'рецепта', 'рецептов')} · КБЖУ на 100г
+                {pluralize(recipes.length, 'блюдо', 'блюда', 'блюд')} · КБЖУ на 100г
               </div>
             </div>
 
@@ -235,9 +240,9 @@ const Recipes = () => {
             ) : recipes.length === 0 ? (
               <div className="text-center py-8">
                 <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Рецептов пока нет</h3>
+                <h3 className="text-lg font-semibold mb-2">Блюд пока нет</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Добавьте первый рецепт!
+                  Добавьте первое блюдо!
                 </p>
                 <Button
                   onClick={handleAddRecipe}
@@ -245,7 +250,7 @@ const Recipes = () => {
                   className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Добавить рецепт
+                  Добавить блюдо
                 </Button>
               </div>
             ) : (
@@ -316,7 +321,7 @@ const Recipes = () => {
             <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border border-border/50">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">
-                  {editingRecipe ? "Редактировать рецепт" : "Добавить рецепт"}
+                  {editingRecipe ? "Редактировать блюдо" : "Добавить блюдо"}
                 </h2>
                 <Button
                   variant="ghost"
@@ -330,13 +335,13 @@ const Recipes = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Название рецепта</Label>
+                  <Label htmlFor="name">Название блюда</Label>
                   <Input
                     id="name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Название рецепта"
+                    placeholder="Название блюда"
                     required
                   />
                 </div>
@@ -390,12 +395,44 @@ const Recipes = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Текст рецепта</Label>
+                  <Label className="text-sm font-semibold">Тип порции</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setServingType('grams')}
+                      className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
+                        servingType === 'grams'
+                          ? 'border-primary bg-gradient-sunset-soft text-foreground'
+                          : 'border-border bg-background text-muted-foreground'
+                      }`}
+                    >
+                      ⚖️ По граммам
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setServingType('portion')}
+                      className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
+                        servingType === 'portion'
+                          ? 'border-primary bg-gradient-sunset-soft text-foreground'
+                          : 'border-border bg-background text-muted-foreground'
+                      }`}
+                    >
+                      🍽️ Порция
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {servingType === 'grams'
+                      ? 'КБЖУ указывается на 100г. При добавлении в дневник вводите граммовку.'
+                      : 'КБЖУ указывается за одну порцию целиком. При добавлении в дневник граммовка не нужна.'}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Описание блюда</Label>
                   <Textarea
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Напишите рецепт: ингредиенты, шаги, заметки..."
+                    placeholder="Напишите описание: ингредиенты, шаги, заметки..."
                     rows={6}
                   />
                 </div>
@@ -414,7 +451,7 @@ const Recipes = () => {
                   disabled={!formData.name.trim()}
                   className="flex-1 bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
                 >
-                  {editingRecipe ? "Обновить рецепт" : "Сохранить рецепт"}
+                  {editingRecipe ? "Обновить блюдо" : "Сохранить блюдо"}
                 </Button>
               </div>
             </div>

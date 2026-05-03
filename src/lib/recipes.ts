@@ -9,6 +9,11 @@ export interface Recipe {
   fat: number;
   carbs: number;
   text?: string;
+  servingType: 'grams' | 'portion'; // 'grams' = enter weight, 'portion' = fixed serving
+  portionCalories?: number; // only used when servingType = 'portion'
+  portionProtein?: number;
+  portionFat?: number;
+  portionCarbs?: number;
   createdBy?: string;
   createdAt?: any;
 }
