@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, TrendingUp, Activity, Weight } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, Weight, X } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
-import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore } from "@/lib/firestore";
+import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore, loadActivity } from "@/lib/firestore";
 import { recalculateNormWithNewWeight } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
@@ -59,6 +59,10 @@ const Stats = () => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [monthlyDetailEntries, setMonthlyDetailEntries] = useState<DiaryEntry[]>([]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [dayEntries, setDayEntries] = useState<DiaryEntry[]>([]);
+  const [dayActivity, setDayActivity] = useState<any | null>(null);
+  const [loadingDay, setLoadingDay] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -279,6 +283,29 @@ const Stats = () => {
     }), { grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0 });
   }, [productStats]);
 
+  const handleDayClick = async (dayNumber: number) => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+    
+    setSelectedDay(dateStr);
+    setLoadingDay(true);
+    
+    try {
+      const [entries, activity] = await Promise.all([
+        loadDiaryRange(user!.uid, dateStr, dateStr),
+        loadActivity(user!.uid, dateStr),
+      ]);
+      setDayEntries(entries);
+      setDayActivity(activity);
+    } catch (error) {
+      console.error('Error loading day details:', error);
+    } finally {
+      setLoadingDay(false);
+    }
+  };
+
   const handleSaveWeight = async () => {
     if (!user || !weightInput) return;
     
@@ -400,7 +427,8 @@ const Stats = () => {
               {monthlyData.map((day, index) => (
                 <div
                   key={index}
-                  className={`aspect-square rounded ${day.color} flex items-center justify-center text-white font-medium relative`}
+                  onClick={() => handleDayClick(day.date)}
+                  className={`aspect-square rounded cursor-pointer hover:opacity-80 transition-smooth ${day.color} flex items-center justify-center text-white font-medium relative`}
                 >
                   <span className={`text-xs ${day.calories > 0 ? 'text-white font-medium' : 'text-gray-500'}`}>
                     {day.date}
@@ -613,6 +641,152 @@ const Stats = () => {
             </div>
           )}
         </Card>
+
+        {/* Day Detail Modal */}
+        {selectedDay && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div onClick={() => setSelectedDay(null)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="relative w-full sm:max-w-lg bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-xl font-bold">
+                    {new Date(selectedDay + 'T00:00:00').toLocaleDateString('ru-RU', { 
+                      weekday: 'long', day: 'numeric', month: 'long' 
+                    })}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Детальная статистика</p>
+                </div>
+                <button
+                  onClick={() => setSelectedDay(null)}
+                  className="rounded-xl p-2 hover:bg-muted/50 transition-smooth"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {loadingDay ? (
+                <div className="text-center py-8 text-muted-foreground">Загрузка...</div>
+              ) : (
+                <>
+                  {/* Totals */}
+                  {dayEntries.length > 0 ? (
+                    <>
+                      {(() => {
+                        const totals = dayEntries.reduce((acc, e) => ({
+                          calories: acc.calories + e.calories,
+                          protein: acc.protein + e.protein,
+                          fat: acc.fat + e.fat,
+                          carbs: acc.carbs + e.carbs,
+                        }), { calories: 0, protein: 0, fat: 0, carbs: 0 });
+
+                        return (
+                          <>
+                            {/* Summary grid */}
+                            <div className="grid grid-cols-2 gap-3 mb-5">
+                              {[
+                                { label: 'Калории', value: `${totals.calories} ккал`, norm: norm?.calories, icon: '🔥' },
+                                { label: 'Белки', value: `${Math.round(totals.protein)}г`, norm: norm?.protein, icon: '💪' },
+                                { label: 'Жиры', value: `${Math.round(totals.fat)}г`, norm: norm?.fat, icon: '🧈' },
+                                { label: 'Углеводы', value: `${Math.round(totals.carbs)}г`, norm: norm?.carbs, icon: '🌾' },
+                              ].map(stat => (
+                                <div key={stat.label} className="rounded-xl bg-muted/40 p-3">
+                                  <div className="text-lg mb-1">{stat.icon}</div>
+                                  <div className="font-bold">{stat.value}</div>
+                                  <div className="text-xs text-muted-foreground">{stat.label}</div>
+                                  {stat.norm && (
+                                    <div className="text-xs mt-1">
+                                      <span className={
+                                        (stat.label === 'Калории' ? totals.calories : 
+                                         stat.label === 'Белки' ? totals.protein :
+                                         stat.label === 'Жиры' ? totals.fat : totals.carbs) / stat.norm >= 0.9
+                                          ? 'text-green-400' : 'text-yellow-400'
+                                      }>
+                                        {Math.round(
+                                          (stat.label === 'Калории' ? totals.calories : 
+                                           stat.label === 'Белки' ? totals.protein :
+                                           stat.label === 'Жиры' ? totals.fat : totals.carbs) / stat.norm * 100
+                                        )}% от нормы
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Activity */}
+                            {dayActivity && dayActivity.caloriesBurned > 0 && (
+                              <div className="rounded-xl bg-muted/30 px-4 py-3 mb-4 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span>{dayActivity.type === 'calories' ? '⌚' : '👣'}</span>
+                                  <span className="text-sm font-medium">
+                                    {dayActivity.type === 'calories' ? 'Apple Watch' : 
+                                     dayActivity.type === 'steps' ? `${dayActivity.value.toLocaleString()} шагов` : 'Дома'}
+                                  </span>
+                                </div>
+                                <span className="text-sm font-bold text-green-400">+{dayActivity.caloriesBurned} ккал</span>
+                              </div>
+                            )}
+
+                            {/* Deficit */}
+                            {norm && dayActivity !== undefined && (
+                              <div className="rounded-xl bg-muted/30 px-4 py-3 mb-5 grid grid-cols-3 gap-2 text-center">
+                                <div>
+                                  <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
+                                  <div className="font-bold text-sm">{norm.bmr + (dayActivity?.caloriesBurned || 0)} ккал</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground mb-1">Съедено</div>
+                                  <div className="font-bold text-sm">{totals.calories} ккал</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
+                                  <div className={`font-bold text-sm ${
+                                    (norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories > 0 
+                                      ? 'text-green-400' : 'text-red-400'
+                                  }`}>
+                                    {(() => {
+                                      const d = (norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories;
+                                      return `${d > 0 ? '+' : ''}${d} ккал`;
+                                    })()}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Foods list */}
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Съедено</p>
+                              <div className="space-y-2">
+                                {dayEntries.map((entry) => (
+                                  <div key={entry.id} className="rounded-xl bg-muted/30 px-3 py-2.5">
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-sm font-medium">{entry.name}</span>
+                                      <span className="text-xs font-bold text-macro-calories">{entry.calories} ккал</span>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      {entry.grams > 1 ? `${entry.grams}г` : '1 порция'} · Б {entry.protein}г · Ж {entry.fat}г · У {entry.carbs}г
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <div className="text-4xl mb-3">📭</div>
+                      <p className="text-sm">Нет записей за этот день</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </section>
       <div className="h-8" />
     </div>
