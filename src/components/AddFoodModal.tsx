@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { loadProducts, type Product } from '@/lib/products';
+import { loadProducts, saveProduct, type Product } from '@/lib/products';
 import { loadRecipes, type Recipe } from '@/lib/recipes';
 import type { DiaryEntry } from '@/lib/storage';
 
@@ -33,6 +33,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [manualProtein, setManualProtein] = useState('');
   const [manualFat, setManualFat] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
+  const [saveToBase, setSaveToBase] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !user) return;
@@ -102,8 +103,19 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
 
   const handleManualAdd = async () => {
     if (!manualName || !manualCalories) return;
+    
+    if (saveToBase && user) {
+      await saveProduct({
+        name: manualName,
+        calories: Number(manualCalories) || 0,
+        protein: Number(manualProtein) || 0,
+        fat: Number(manualFat) || 0,
+        carbs: Number(manualCarbs) || 0,
+      }, user.uid);
+    }
+
     const entry: Omit<DiaryEntry, 'id' | 'addedAt'> = {
-      foodId: 'manual-' + Date.now(),
+      foodId: saveToBase ? manualName : 'manual-' + Date.now(),
       name: manualName,
       grams: 100,
       calories: Number(manualCalories) || 0,
@@ -112,6 +124,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
       carbs: Number(manualCarbs) || 0,
       date: selectedDate,
     };
+    
     await onAdd(entry);
     resetForm();
     onClose();
@@ -126,6 +139,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     setManualProtein('');
     setManualFat('');
     setManualCarbs('');
+    setSaveToBase(false);
     setActiveTab('product');
   };
 
@@ -283,6 +297,26 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                 <Label>Углеводы (г)</Label>
                 <Input type="number" value={manualCarbs} onChange={e => setManualCarbs(e.target.value)} />
               </div>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Сохранить в базу продуктов</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {saveToBase ? 'Продукт сохранится и будет доступен всем пользователям' : 'Запись только в дневник, без сохранения'}
+                </p>
+              </div>
+              <button
+                onClick={() => setSaveToBase(!saveToBase)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-3 ${
+                  saveToBase ? 'bg-gradient-sunset' : 'bg-muted'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    saveToBase ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
             <Button
               onClick={handleManualAdd}
