@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Calculator, ChevronLeft, ChevronRight, Calendar, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Plus, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Diary } from "@/components/Diary";
 import { MacroRing } from "@/components/MacroRing";
 import { AppHeader } from "@/components/AppHeader";
 import { AddFoodModal } from "@/components/AddFoodModal";
@@ -460,50 +459,39 @@ const Index = () => {
           </section>
         )}
 
-        {/* Diary */}
-        <section className="container max-w-5xl pb-20">
-          <Card className="p-6 md:p-8 shadow-card border-border/50 backdrop-blur-sm bg-card/80 mb-6">
-            {/* Date Navigation */}
-            <div className="flex items-center justify-between mb-6">
-              <Button
-                onClick={() => navigateDate('prev')}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <div className="text-center">
-                <h3 className="text-lg font-semibold">{formatDate(selectedDate)}</h3>
-                {isToday && <p className="text-sm text-muted-foreground">Сегодня</p>}
-              </div>
-              
-              <Button
-                onClick={() => navigateDate('next')}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+        {/* Eaten Foods List */}
+        {entries.length > 0 && (
+          <Card className="p-5 md:p-6 shadow-card border-border/50 backdrop-blur-sm bg-card/80">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
+              <span className="text-xs text-muted-foreground">{entries.length} шт.</span>
             </div>
-            {isToday && entries.length === 0 && (
-              <div className="flex justify-center mt-3">
-                <Button
-                  onClick={handleRepeatYesterday}
-                  variant="outline"
-                  size="sm"
-                  className="text-sm gap-2"
+            <div className="space-y-2">
+              {entries.slice().reverse().map((e) => (
+                <div
+                  key={e.id}
+                  className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5 group hover:bg-muted/70 transition-smooth"
                 >
-                  🔁 Повторить вчера
-                </Button>
-              </div>
-            )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{e.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {e.grams > 1 ? `${e.grams}г · ` : '1 порция · '}
+                      <span className="text-macro-calories font-semibold">{e.calories}</span> ккал ·
+                      Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => await handleRemoveEntry(e.id)}
+                    className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1 shrink-0"
+                    aria-label="Удалить"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </Card>
-          
-          <Diary entries={entries} onAdd={handleAddEntry} onRemove={handleRemoveEntry} />
-        </section>
+        )}
 
               <div className="h-8" />
       </div>
