@@ -95,6 +95,17 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      backgroundImage: {
+        'gradient-sunset': 'linear-gradient(135deg, #4C1D95 0%, #7C3AED 100%)',
+      },
+      backgroundColor: {
+        'gradient-sunset-soft': 'rgba(124, 58, 237, 0.15)',
+      },
+      boxShadow: {
+        'glow': '0 0 20px rgba(124, 58, 237, 0.4)',
+        'soft': '0 4px 24px rgba(10, 8, 20, 0.6)',
+        'card': '0 2px 12px rgba(10, 8, 20, 0.4)',
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

@@ -8,137 +8,53 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 30 50% 98%;
-    --foreground: 250 30% 12%;
+    --background: 232 20% 5%;
+    --foreground: 240 100% 97%;
+    --card: 240 20% 8%;
+    --card-foreground: 240 100% 97%;
+    --popover: 240 20% 8%;
+    --popover-foreground: 240 100% 97%;
+    --primary: 263 72% 54%;
+    --primary-foreground: 240 100% 97%;
+    --secondary: 240 20% 12%;
+    --secondary-foreground: 240 100% 97%;
+    --muted: 240 15% 14%;
+    --muted-foreground: 240 10% 50%;
+    --accent: 263 60% 35%;
+    --accent-foreground: 240 100% 97%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 240 100% 97%;
+    --border: 240 15% 18%;
+    --input: 240 20% 12%;
+    --ring: 263 72% 54%;
+    --radius: 0.75rem;
 
-    --card: 0 0% 100%;
-    --card-foreground: 250 30% 12%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 250 30% 12%;
-
-    /* Sunset orange */
-    --primary: 16 100% 60%;
-    --primary-foreground: 0 0% 100%;
-
-    /* Warm amber */
-    --secondary: 35 95% 55%;
-    --secondary-foreground: 250 30% 12%;
-
-    --muted: 30 30% 94%;
-    --muted-foreground: 250 10% 40%;
-
-    /* Magenta accent */
-    --accent: 330 80% 58%;
-    --accent-foreground: 0 0% 100%;
-
-    /* Violet for proteins/etc */
-    --tertiary: 252 75% 60%;
-    --tertiary-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 30 25% 88%;
-    --input: 30 25% 90%;
-    --ring: 16 100% 60%;
-
-    --radius: 1rem;
-
-    /* Macro colors */
-    --macro-protein: 252 75% 60%;
-    --macro-fat: 35 95% 55%;
-    --macro-carbs: 16 100% 60%;
-    --macro-calories: 330 80% 58%;
-
-    /* Gradients */
-    --gradient-sunset: linear-gradient(135deg, hsl(16 100% 60%), hsl(35 95% 55%) 45%, hsl(330 80% 58%) 100%);
-    --gradient-sunset-soft: linear-gradient(135deg, hsl(16 100% 60% / 0.12), hsl(330 80% 58% / 0.12));
-    --gradient-violet: linear-gradient(135deg, hsl(252 75% 60%), hsl(330 80% 58%));
-    --gradient-radial: radial-gradient(ellipse at top, hsl(35 95% 55% / 0.25), transparent 60%);
-
-    /* Shadows */
-    --shadow-glow: 0 20px 60px -20px hsl(16 100% 60% / 0.45);
-    --shadow-soft: 0 10px 40px -15px hsl(330 80% 58% / 0.25);
-    --shadow-card: 0 4px 20px -8px hsl(250 30% 12% / 0.08);
-
-    /* Transitions */
-    --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --macro-calories: #7C3AED;
+    --macro-protein: #5B21B6;
+    --macro-fat: #6D28D9;
+    --macro-carbs: #4C1D95;
   }
 
   .dark {
-    --background: 250 30% 6%;
-    --foreground: 30 30% 96%;
-
-    --card: 250 25% 10%;
-    --card-foreground: 30 30% 96%;
-
-    --popover: 250 25% 10%;
-    --popover-foreground: 30 30% 96%;
-
-    /* Sunset orange */
-    --primary: 16 100% 60%;
-    --primary-foreground: 0 0% 100%;
-
-    /* Warm amber */
-    --secondary: 35 95% 55%;
-    --secondary-foreground: 250 30% 6%;
-
-    --muted: 250 20% 14%;
-    --muted-foreground: 30 15% 65%;
-
-    /* Magenta accent */
-    --accent: 330 80% 58%;
-    --accent-foreground: 0 0% 100%;
-
-    --tertiary: 252 75% 65%;
-    --tertiary-foreground: 0 0% 100%;
-
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 250 20% 18%;
-    --input: 250 20% 16%;
-    --ring: 16 100% 60%;
-
-    --macro-protein: 252 75% 65%;
-    --macro-fat: 35 95% 60%;
-    --macro-carbs: 16 100% 62%;
-    --macro-calories: 330 80% 62%;
-
-    --gradient-sunset: linear-gradient(135deg, hsl(16 100% 60%), hsl(35 95% 55%) 45%, hsl(330 80% 58%) 100%);
-    --gradient-sunset-soft: linear-gradient(135deg, hsl(16 100% 60% / 0.18), hsl(330 80% 58% / 0.18));
-    --gradient-violet: linear-gradient(135deg, hsl(252 75% 60%), hsl(330 80% 58%));
-    --gradient-radial: radial-gradient(ellipse at top, hsl(35 95% 55% / 0.18), transparent 60%);
-
-    --shadow-glow: 0 20px 60px -20px hsl(16 100% 60% / 0.55);
-    --shadow-soft: 0 10px 40px -15px hsl(330 80% 58% / 0.35);
-    --shadow-card: 0 4px 20px -8px hsl(0 0% 0% / 0.4);
-
-    --sidebar-background: 250 28% 8%;
-    --sidebar-foreground: 30 20% 88%;
-    --sidebar-primary: 16 100% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 250 22% 14%;
-    --sidebar-accent-foreground: 30 30% 96%;
-    --sidebar-border: 250 20% 16%;
-    --sidebar-ring: 16 100% 60%;
+    --background: 232 20% 5%;
+    --foreground: 240 100% 97%;
+    --card: 240 20% 8%;
+    --card-foreground: 240 100% 97%;
+    --popover: 240 20% 8%;
+    --popover-foreground: 240 100% 97%;
+    --primary: 263 72% 54%;
+    --primary-foreground: 240 100% 97%;
+    --secondary: 240 20% 12%;
+    --secondary-foreground: 240 100% 97%;
+    --muted: 240 15% 14%;
+    --muted-foreground: 240 10% 50%;
+    --accent: 263 60% 35%;
+    --accent-foreground: 240 100% 97%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 240 100% 97%;
+    --border: 240 15% 18%;
+    --input: 240 20% 12%;
+    --ring: 263 72% 54%;
   }
 }
 
@@ -148,10 +64,9 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    background-color: #080810;
+    color: #F0F0FF;
     font-family: 'DM Sans', system-ui, sans-serif;
-    background-image: var(--gradient-radial);
-    background-attachment: fixed;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -205,3 +120,7 @@ input[type='number']::-webkit-outer-spin-button {
 input[type='number'] {
   -moz-appearance: textfield;
 }
+
+/* Scrollbar colors */
+::-webkit-scrollbar-thumb { background: #4C1D95; }
+::-webkit-scrollbar-track { background: #12121F; }
