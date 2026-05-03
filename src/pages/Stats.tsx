@@ -347,6 +347,8 @@ const Stats = () => {
 
   const currentMonth = MONTHS[new Date().getMonth()];
   const currentYear = new Date().getFullYear();
+  const firstDayOfMonth = new Date(currentYear, new Date().getMonth(), 1).getDay();
+  const calendarOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
 
   if (loading) {
     return (
@@ -424,11 +426,16 @@ const Stats = () => {
                   {day}
                 </div>
               ))}
+              {/* Empty offset cells */}
+              {Array.from({ length: calendarOffset }).map((_, i) => (
+                <div key={`empty-${i}`} className="aspect-square" />
+              ))}
+              {/* Day cells */}
               {monthlyData.map((day, index) => (
                 <div
                   key={index}
                   onClick={() => handleDayClick(day.date)}
-                  className={`aspect-square rounded cursor-pointer hover:opacity-80 transition-smooth ${day.color} flex items-center justify-center text-white font-medium relative`}
+                  className={`aspect-square rounded cursor-pointer hover:opacity-80 transition-smooth ${day.color} flex items-center justify-center font-medium relative`}
                 >
                   <span className={`text-xs ${day.calories > 0 ? 'text-white font-medium' : 'text-gray-500'}`}>
                     {day.date}
