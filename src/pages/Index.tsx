@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Calculator, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Flame, Calculator, ChevronLeft, ChevronRight, Calendar, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Diary } from "@/components/Diary";
 import { MacroRing } from "@/components/MacroRing";
 import { AppHeader } from "@/components/AppHeader";
+import { AddFoodModal } from "@/components/AddFoodModal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ const Index = () => {
   const [savingActivity, setSavingActivity] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [showWeightReminder, setShowWeightReminder] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -259,238 +261,260 @@ const Index = () => {
   })();
 
   return (
-    <div className="min-h-screen">
-      <AppHeader />
+    <>
+      <div className="min-h-screen">
+        <AppHeader />
 
-      {/* Пустой "герой" */}
-      <section className="container pt-2 pb-6 max-w-5xl" aria-hidden />
+        {/* Пустой "герой" */}
+        <section className="container pt-2 pb-6 max-w-5xl" aria-hidden />
 
-      {/* Weight Reminder */}
-      {showWeightReminder && (
-        <section className="container max-w-5xl mb-6">
-          <Card className="p-4 border-yellow-500/50 bg-yellow-500/10 backdrop-blur-sm shadow-soft">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⚖️</span>
+        {/* Weight Reminder */}
+        {showWeightReminder && (
+          <section className="container max-w-5xl mb-6">
+            <Card className="p-4 border-yellow-500/50 bg-yellow-500/10 backdrop-blur-sm shadow-soft">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⚖️</span>
+                  <div>
+                    <p className="text-sm font-semibold">Не забудь внести вес!</p>
+                    <p className="text-xs text-muted-foreground">
+                      Обновляй вес раз в неделю — это помогает точнее считать норму КБЖУ.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20 shrink-0"
+                >
+                  <Link to="/stats">Внести</Link>
+                </Button>
+              </div>
+            </Card>
+          </section>
+        )}
+
+        {/* Daily progress */}
+        <section className="container max-w-5xl mb-8">
+          {norm ? (
+            <Card className="p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
+              <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                 <div>
-                  <p className="text-sm font-semibold">Не забудь внести вес!</p>
-                  <p className="text-xs text-muted-foreground">
-                    Обновляй вес раз в неделю — это помогает точнее считать норму КБЖУ.
+                  <h2 className="text-xl font-bold">{isToday ? 'Сегодня' : formatDate(selectedDate)}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedDateTotals.calories} из {norm.calories} ккал · осталось{" "}
+                    <span className="font-semibold text-foreground">
+                      {Math.max(0, norm.calories - selectedDateTotals.calories)}
+                    </span>{" "}
+                    ккал
                   </p>
                 </div>
+                {!isToday && (
+                  <Button onClick={goToToday} variant="outline" size="sm">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Сегодня
+                  </Button>
+                )}
               </div>
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20 shrink-0"
-              >
-                <Link to="/stats">Внести</Link>
-              </Button>
-            </div>
-          </Card>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
+                <MacroRing consumed={selectedDateTotals.calories} total={norm.calories} label="Калории" unit=" ккал" colorVar="--macro-calories" />
+                <MacroRing consumed={selectedDateTotals.protein} total={norm.protein} label="Белки" colorVar="--macro-protein" />
+                <MacroRing consumed={selectedDateTotals.fat} total={norm.fat} label="Жиры" colorVar="--macro-fat" />
+                <MacroRing consumed={selectedDateTotals.carbs} total={norm.carbs} label="Углеводы" colorVar="--macro-carbs" />
+              </div>
+            </Card>
+          ) : null}
         </section>
-      )}
 
-      {/* Daily progress */}
-      <section className="container max-w-5xl mb-8">
-        {norm ? (
-          <Card className="p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
-            <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-              <div>
-                <h2 className="text-xl font-bold">{isToday ? 'Сегодня' : formatDate(selectedDate)}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {selectedDateTotals.calories} из {norm.calories} ккал · осталось{" "}
-                  <span className="font-semibold text-foreground">
-                    {Math.max(0, norm.calories - selectedDateTotals.calories)}
-                  </span>{" "}
-                  ккал
-                </p>
-              </div>
-              {!isToday && (
-                <Button onClick={goToToday} variant="outline" size="sm">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Сегодня
-                </Button>
+        {/* Add Food Button */}
+        <section className="container max-w-5xl mb-6">
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-3 rounded-2xl bg-gradient-sunset px-8 py-4 text-primary-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+            >
+              <Plus className="h-6 w-6" />
+              Добавить еду
+            </button>
+          </div>
+        </section>
+
+        {/* Activity Tracking */}
+        {norm && (user?.uid === ADMIN_UID || activityEnabled) && (
+          <Card className="p-5 md:p-6 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">{user?.uid === ADMIN_UID ? '⌚' : '👣'}</span>
+              <h3 className="font-semibold">Активность за день</h3>
+              {activity && (
+                <span className="ml-auto text-sm font-semibold text-green-400">
+                  +{activity.caloriesBurned} ккал
+                </span>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
-              <MacroRing consumed={selectedDateTotals.calories} total={norm.calories} label="Калории" unit=" ккал" colorVar="--macro-calories" />
-              <MacroRing consumed={selectedDateTotals.protein} total={norm.protein} label="Белки" colorVar="--macro-protein" />
-              <MacroRing consumed={selectedDateTotals.fat} total={norm.fat} label="Жиры" colorVar="--macro-fat" />
-              <MacroRing consumed={selectedDateTotals.carbs} total={norm.carbs} label="Углеводы" colorVar="--macro-carbs" />
-            </div>
-          </Card>
-        ) : null}
-      </section>
 
-      {/* Activity Tracking */}
-      {norm && (user?.uid === ADMIN_UID || activityEnabled) && (
-        <Card className="p-5 md:p-6 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-lg">{user?.uid === ADMIN_UID ? '⌚' : '👣'}</span>
-            <h3 className="font-semibold">Активность за день</h3>
-            {activity && (
-              <span className="ml-auto text-sm font-semibold text-green-400">
-                +{activity.caloriesBurned} ккал
-              </span>
-            )}
-          </div>
-
-          {/* ADMIN: Apple Watch calories input */}
-          {user?.uid === ADMIN_UID && (
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="Калории из Apple Watch"
-                value={activityInput}
-                onChange={e => setActivityInput(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleSaveActivity}
-                disabled={savingActivity || !activityInput}
-                className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
-              >
-                Сохранить
-              </Button>
-            </div>
-          )}
-
-          {/* WIFE: Home or Steps toggle */}
-          {user?.uid !== ADMIN_UID && (
-            <div className="space-y-3">
+            {/* ADMIN: Apple Watch calories input */}
+            {user?.uid === ADMIN_UID && (
               <div className="flex gap-2">
-                <button
-                  onClick={() => setActivityMode('home')}
-                  className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
-                    activityMode === 'home'
-                      ? 'bg-gradient-sunset text-primary-foreground border-transparent'
-                      : 'border-border/50 text-muted-foreground'
-                  }`}
-                >
-                  🏠 Дома
-                </button>
-                <button
-                  onClick={() => setActivityMode('steps')}
-                  className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
-                    activityMode === 'steps'
-                      ? 'bg-gradient-sunset text-primary-foreground border-transparent'
-                      : 'border-border/50 text-muted-foreground'
-                  }`}
-                >
-                  👣 Выходила
-                </button>
-              </div>
-
-              {activityMode === 'steps' && (
                 <Input
                   type="number"
-                  placeholder="Количество шагов"
+                  placeholder="Калории из Apple Watch"
                   value={activityInput}
                   onChange={e => setActivityInput(e.target.value)}
+                  className="flex-1"
                 />
-              )}
-
-              <Button
-                onClick={handleSaveActivity}
-                disabled={savingActivity || (activityMode === 'steps' && !activityInput)}
-                className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
-              >
-                Сохранить активность
-              </Button>
-            </div>
-          )}
-
-          {/* Deficit summary */}
-          {deficitData && (
-            <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-3 gap-2 text-center">
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
-                <div className="font-bold text-sm">{deficitData.burned} ккал</div>
+                <Button
+                  onClick={handleSaveActivity}
+                  disabled={savingActivity || !activityInput}
+                  className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+                >
+                  Сохранить
+                </Button>
               </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Съедено</div>
-                <div className="font-bold text-sm">{selectedDateTotals.calories} ккал</div>
+            )}
+
+            {/* WIFE: Home or Steps toggle */}
+            {user?.uid !== ADMIN_UID && (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActivityMode('home')}
+                    className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
+                      activityMode === 'home'
+                        ? 'bg-gradient-sunset text-primary-foreground border-transparent'
+                        : 'border-border/50 text-muted-foreground'
+                    }`}
+                  >
+                    🏠 Дома
+                  </button>
+                  <button
+                    onClick={() => setActivityMode('steps')}
+                    className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
+                      activityMode === 'steps'
+                        ? 'bg-gradient-sunset text-primary-foreground border-transparent'
+                        : 'border-border/50 text-muted-foreground'
+                    }`}
+                  >
+                    👣 Выходила
+                  </button>
+                </div>
+
+                {activityMode === 'steps' && (
+                  <Input
+                    type="number"
+                    placeholder="Количество шагов"
+                    value={activityInput}
+                    onChange={e => setActivityInput(e.target.value)}
+                  />
+                )}
+
+                <Button
+                  onClick={handleSaveActivity}
+                  disabled={savingActivity || (activityMode === 'steps' && !activityInput)}
+                  className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+                >
+                  Сохранить активность
+                </Button>
               </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
-                <div className={`font-bold text-sm ${deficitData.deficit > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {deficitData.deficit > 0 ? '+' : ''}{deficitData.deficit} ккал
+            )}
+
+            {/* Deficit summary */}
+            {deficitData && (
+              <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
+                  <div className="font-bold text-sm">{deficitData.burned} ккал</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Съедено</div>
+                  <div className="font-bold text-sm">{selectedDateTotals.calories} ккал</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
+                  <div className={`font-bold text-sm ${deficitData.deficit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {deficitData.deficit > 0 ? '+' : ''}{deficitData.deficit} ккал
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Suggestions */}
-      {suggestions.length > 0 && (
-        <section className="container max-w-5xl mb-8">
-          <Card className="p-4 md:p-5 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">💡</span>
-              <h3 className="text-sm font-semibold">Рекомендации на сегодня</h3>
-            </div>
-            <div className="space-y-1.5">
-              {suggestions.map((tip, i) => (
-                <div key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                  <span className="mt-0.5">•</span>
-                  <span>{tip}</span>
-                </div>
-              ))}
-            </div>
+            )}
           </Card>
-        </section>
-      )}
+        )}
 
-      {/* Diary */}
-      <section className="container max-w-5xl pb-20">
-        <Card className="p-6 md:p-8 shadow-card border-border/50 backdrop-blur-sm bg-card/80 mb-6">
-          {/* Date Navigation */}
-          <div className="flex items-center justify-between mb-6">
-            <Button
-              onClick={() => navigateDate('prev')}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            <div className="text-center">
-              <h3 className="text-lg font-semibold">{formatDate(selectedDate)}</h3>
-              {isToday && <p className="text-sm text-muted-foreground">Сегодня</p>}
-            </div>
-            
-            <Button
-              onClick={() => navigateDate('next')}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          {isToday && entries.length === 0 && (
-            <div className="flex justify-center mt-3">
+        {/* Suggestions */}
+        {suggestions.length > 0 && (
+          <section className="container max-w-5xl mb-8">
+            <Card className="p-4 md:p-5 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">💡</span>
+                <h3 className="text-sm font-semibold">Рекомендации на сегодня</h3>
+              </div>
+              <div className="space-y-1.5">
+                {suggestions.map((tip, i) => (
+                  <div key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                    <span className="mt-0.5">•</span>
+                    <span>{tip}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </section>
+        )}
+
+        {/* Diary */}
+        <section className="container max-w-5xl pb-20">
+          <Card className="p-6 md:p-8 shadow-card border-border/50 backdrop-blur-sm bg-card/80 mb-6">
+            {/* Date Navigation */}
+            <div className="flex items-center justify-between mb-6">
               <Button
-                onClick={handleRepeatYesterday}
+                onClick={() => navigateDate('prev')}
                 variant="outline"
                 size="sm"
-                className="text-sm gap-2"
+                className="flex items-center gap-2"
               >
-                🔁 Повторить вчера
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <div className="text-center">
+                <h3 className="text-lg font-semibold">{formatDate(selectedDate)}</h3>
+                {isToday && <p className="text-sm text-muted-foreground">Сегодня</p>}
+              </div>
+              
+              <Button
+                onClick={() => navigateDate('next')}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-          )}
-        </Card>
-        
-        <Diary entries={entries} onAdd={handleAddEntry} onRemove={handleRemoveEntry} />
-      </section>
+            {isToday && entries.length === 0 && (
+              <div className="flex justify-center mt-3">
+                <Button
+                  onClick={handleRepeatYesterday}
+                  variant="outline"
+                  size="sm"
+                  className="text-sm gap-2"
+                >
+                  🔁 Повторить вчера
+                </Button>
+              </div>
+            )}
+          </Card>
+          
+          <Diary entries={entries} onAdd={handleAddEntry} onRemove={handleRemoveEntry} />
+        </section>
 
-            <div className="h-8" />
-    </div>
+              <div className="h-8" />
+      </div>
+
+      <AddFoodModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAdd={handleAddEntry}
+        selectedDate={selectedDate}
+      />
+    </>
   );
 };
 
