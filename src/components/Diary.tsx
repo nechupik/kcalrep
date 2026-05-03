@@ -45,8 +45,8 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
       
       try {
         const [products, recipes, stats] = await Promise.all([
-          loadProducts(user.uid),
-          loadRecipes(user.uid),
+          loadProducts(),
+          loadRecipes(),
           loadUsageStats(user.uid)
         ]);
         setUserProducts(products);
@@ -299,8 +299,8 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">{item.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {item.type === 'product' && 'Мой продукт'}
-                        {item.type === 'recipe' && 'Мой рецепт'}
+                        {item.type === 'product' && 'Продукт'}
+                        {item.type === 'recipe' && 'Рецепт'}
                       </div>
                     </div>
                   </div>

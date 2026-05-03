@@ -18,11 +18,11 @@ export interface DiaryEntry {
   addedAt: number;
 }
 
-export async function saveNorm(norm: MacroResult) {
+export async function saveNorm(norm: MacroResult, params?: { gender: 'male' | 'female'; height: number; age: number; goal: string }) {
   const user = getCurrentUser();
   if (user) {
     try {
-      await saveNormToFirestore(user.uid, norm);
+      await saveNormToFirestore(user.uid, norm, params);
     } catch (error) {
       console.error("Failed to save norm to Firestore:", error);
       // Fallback to localStorage

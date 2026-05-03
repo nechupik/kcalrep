@@ -6,6 +6,7 @@ import { MacroRing } from "@/components/MacroRing";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -15,12 +16,20 @@ import {
   removeDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
+import { saveActivity, loadActivity, loadWeight, loadFullNormData, loadUserSettings, wasWeightEnteredThisWeek, type ActivityEntry } from "@/lib/firestore";
 import type { MacroResult } from "@/lib/nutrition";
 
 const Index = () => {
   const { user } = useAuth();
+  const ADMIN_UID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [activity, setActivity] = useState<ActivityEntry | null>(null);
+  const [activityInput, setActivityInput] = useState('');
+  const [activityMode, setActivityMode] = useState<'home' | 'steps'>('home');
+  const [savingActivity, setSavingActivity] = useState(false);
+  const [activityEnabled, setActivityEnabled] = useState(true);
+  const [showWeightReminder, setShowWeightReminder] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -51,14 +60,36 @@ const Index = () => {
     setSelectedDate(todayString);
   };
 
+  const getLastWeight = async (): Promise<number> => {
+    if (!user) return 70;
+    const weights = await loadWeight(user.uid, 1);
+    if (weights.length > 0) return weights[0].weight;
+    // Fallback to weight from norm
+    const normData = await loadFullNormData(user.uid);
+    return 70; // default fallback
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (!user) return;
       
       const normData = await loadNorm();
       const diaryData = await loadDiary(selectedDate);
+      const activityData = await loadActivity(user.uid, selectedDate);
+      const settings = await loadUserSettings(user.uid);
+      
       setNorm(normData);
       setEntries(Array.isArray(diaryData) ? diaryData : []);
+      setActivity(activityData);
+      if (settings) setActivityEnabled(settings.activityTrackingEnabled);
+      if (activityData) {
+        if (activityData.type === 'calories') setActivityInput(String(activityData.value));
+        if (activityData.type === 'steps') setActivityInput(String(activityData.value));
+      }
+      
+      // Check if weight reminder should be shown
+      const weightEnteredThisWeek = await wasWeightEnteredThisWeek(user.uid);
+      setShowWeightReminder(!weightEnteredThisWeek);
     };
     
     loadData();
@@ -115,6 +146,50 @@ const Index = () => {
     toast.success(`Скопировано ${yesterdayEntries.length} записей из вчера`);
   };
 
+  const handleSaveActivity = async () => {
+    if (!user) return;
+    setSavingActivity(true);
+    try {
+      let caloriesBurned = 0;
+      let type: ActivityEntry['type'] = 'home';
+      let value = 0;
+
+      if (user.uid === ADMIN_UID) {
+        // Admin: direct calorie input from Apple Watch
+        caloriesBurned = Number(activityInput) || 0;
+        type = 'calories';
+        value = caloriesBurned;
+      } else {
+        if (activityMode === 'home') {
+          caloriesBurned = 0;
+          type = 'home';
+          value = 0;
+        } else {
+          const steps = Number(activityInput) || 0;
+          const lastWeight = await getLastWeight();
+          caloriesBurned = Math.round(steps * lastWeight * 0.00065);
+          type = 'steps';
+          value = steps;
+        }
+      }
+
+      await saveActivity(user.uid, {
+        date: selectedDate,
+        type,
+        value,
+        caloriesBurned,
+      });
+
+      const updated = await loadActivity(user.uid, selectedDate);
+      setActivity(updated);
+      toast.success('Активность сохранена');
+    } catch (error) {
+      toast.error('Ошибка сохранения активности');
+    } finally {
+      setSavingActivity(false);
+    }
+  };
+
   const selectedDateTotals = useMemo(() => {
     return entries.reduce(
       (acc, e) => ({
@@ -126,6 +201,18 @@ const Index = () => {
       { calories: 0, protein: 0, fat: 0, carbs: 0 },
     );
   }, [entries]);
+
+  const deficitData = useMemo(() => {
+    if (!norm) return null;
+    const activityCalories = (activityEnabled && activity?.caloriesBurned) ? activity.caloriesBurned : 0;
+    const burned = norm.bmr + activityCalories;
+    const deficit = burned - selectedDateTotals.calories;
+    return {
+      burned,
+      deficit,
+      activityCalories,
+    };
+  }, [norm, selectedDateTotals, activity, activityEnabled]);
 
   const suggestions = useMemo(() => {
     if (!norm || entries.length === 0) return [];
@@ -178,6 +265,33 @@ const Index = () => {
       {/* Пустой "герой" */}
       <section className="container pt-2 pb-6 max-w-5xl" aria-hidden />
 
+      {/* Weight Reminder */}
+      {showWeightReminder && (
+        <section className="container max-w-5xl mb-6">
+          <Card className="p-4 border-yellow-500/50 bg-yellow-500/10 backdrop-blur-sm shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⚖️</span>
+                <div>
+                  <p className="text-sm font-semibold">Не забудь внести вес!</p>
+                  <p className="text-xs text-muted-foreground">
+                    Обновляй вес раз в неделю — это помогает точнее считать норму КБЖУ.
+                  </p>
+                </div>
+              </div>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20 shrink-0"
+              >
+                <Link to="/stats">Внести</Link>
+              </Button>
+            </div>
+          </Card>
+        </section>
+      )}
+
       {/* Daily progress */}
       <section className="container max-w-5xl mb-8">
         {norm ? (
@@ -207,24 +321,108 @@ const Index = () => {
               <MacroRing consumed={selectedDateTotals.carbs} total={norm.carbs} label="Углеводы" colorVar="--macro-carbs" />
             </div>
           </Card>
-        ) : (
-          <Card className="p-8 md:p-10 flex flex-col items-center text-center bg-gradient-sunset-soft border-dashed border-2 border-primary/30">
-            <div className="rounded-2xl bg-gradient-sunset p-4 shadow-glow mb-4">
-              <Flame className="h-8 w-8 text-primary-foreground" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Сначала рассчитайте норму</h3>
-            <p className="text-sm text-muted-foreground max-w-md mb-5">
-              Норму КБЖУ задают один раз — при регистрации или в профиле. Дневник начнёт показывать прогресс после расчёта.
-            </p>
-            <Button asChild size="lg" className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow">
-              <Link to="/profile">
-                <Calculator className="h-4 w-4 mr-2" />
-                Перейти в профиль
-              </Link>
-            </Button>
-          </Card>
-        )}
+        ) : null}
       </section>
+
+      {/* Activity Tracking */}
+      {norm && (user?.uid === ADMIN_UID || activityEnabled) && (
+        <Card className="p-5 md:p-6 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">{user?.uid === ADMIN_UID ? '⌚' : '👣'}</span>
+            <h3 className="font-semibold">Активность за день</h3>
+            {activity && (
+              <span className="ml-auto text-sm font-semibold text-green-400">
+                +{activity.caloriesBurned} ккал
+              </span>
+            )}
+          </div>
+
+          {/* ADMIN: Apple Watch calories input */}
+          {user?.uid === ADMIN_UID && (
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Калории из Apple Watch"
+                value={activityInput}
+                onChange={e => setActivityInput(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                onClick={handleSaveActivity}
+                disabled={savingActivity || !activityInput}
+                className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+              >
+                Сохранить
+              </Button>
+            </div>
+          )}
+
+          {/* WIFE: Home or Steps toggle */}
+          {user?.uid !== ADMIN_UID && (
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActivityMode('home')}
+                  className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
+                    activityMode === 'home'
+                      ? 'bg-gradient-sunset text-primary-foreground border-transparent'
+                      : 'border-border/50 text-muted-foreground'
+                  }`}
+                >
+                  🏠 Дома
+                </button>
+                <button
+                  onClick={() => setActivityMode('steps')}
+                  className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
+                    activityMode === 'steps'
+                      ? 'bg-gradient-sunset text-primary-foreground border-transparent'
+                      : 'border-border/50 text-muted-foreground'
+                  }`}
+                >
+                  👣 Выходила
+                </button>
+              </div>
+
+              {activityMode === 'steps' && (
+                <Input
+                  type="number"
+                  placeholder="Количество шагов"
+                  value={activityInput}
+                  onChange={e => setActivityInput(e.target.value)}
+                />
+              )}
+
+              <Button
+                onClick={handleSaveActivity}
+                disabled={savingActivity || (activityMode === 'steps' && !activityInput)}
+                className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+              >
+                Сохранить активность
+              </Button>
+            </div>
+          )}
+
+          {/* Deficit summary */}
+          {deficitData && (
+            <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
+                <div className="font-bold text-sm">{deficitData.burned} ккал</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Съедено</div>
+                <div className="font-bold text-sm">{selectedDateTotals.calories} ккал</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
+                <div className={`font-bold text-sm ${deficitData.deficit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {deficitData.deficit > 0 ? '+' : ''}{deficitData.deficit} ккал
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Suggestions */}
       {suggestions.length > 0 && (
@@ -291,10 +489,7 @@ const Index = () => {
         <Diary entries={entries} onAdd={handleAddEntry} onRemove={handleRemoveEntry} />
       </section>
 
-      <footer className="container py-8 text-center text-xs text-muted-foreground border-t border-border/40">
-        Данные синхронизируются через Firebase
-      </footer>
-      <div className="h-8" />
+            <div className="h-8" />
     </div>
   );
 };

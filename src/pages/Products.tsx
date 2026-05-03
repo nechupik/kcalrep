@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { loadProducts, saveProduct, searchProducts, deleteProduct, type Product } from "@/lib/products";
+import { loadProducts, saveProduct, updateProduct, deleteProduct, type Product } from "@/lib/products";
 import { Package, Search, Plus, Edit, Trash2 } from "lucide-react";
 
 function pluralize(n: number, one: string, few: string, many: string): string {
@@ -59,7 +59,7 @@ const Products = () => {
     }, 8000);
     
     try {
-      const userProducts = await loadProducts(user.uid);
+      const userProducts = await loadProducts();
       clearTimeout(timeoutId);
       setProducts(userProducts);
       setLoadingError(null);
@@ -74,13 +74,16 @@ const Products = () => {
   };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim() || !user) return;
+    if (!searchQuery.trim()) return;
 
     setLoading(true);
     try {
-      // Search in user's products only
-      const userProducts = await searchProducts(user.uid, searchQuery);
-      setProducts(userProducts);
+      // Load all products and filter client-side
+      const allProducts = await loadProducts();
+      const filteredProducts = allProducts.filter(product => 
+        product.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setProducts(filteredProducts);
     } catch (error) {
       console.error("Error searching:", error);
       toast.error("Ошибка поиска");
@@ -100,16 +103,13 @@ const Products = () => {
     if (!user || !formData.name.trim()) return;
     
     try {
-      await saveProduct(user.uid, {
-        id: undefined, // Let Firestore generate ID
+      await saveProduct({
         name: formData.name,
         calories: formData.calories,
         protein: formData.protein,
         fat: formData.fat,
         carbs: formData.carbs,
-        source: 'manual',
-        verified: false,
-      });
+      }, user.uid);
       
       toast.success(`Добавлено: ${formData.name}`);
       setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0 });
@@ -125,17 +125,13 @@ const Products = () => {
     // If product doesn't have an ID (came from OFF API), save it first
     if (!product.id && user) {
       try {
-        const productId = await saveProduct(user.uid, {
-          id: undefined, // Let Firestore generate ID
+        const productId = await saveProduct({
           name: product.name,
-          brand: product.brand,
           calories: product.calories,
           protein: product.protein,
           fat: product.fat,
           carbs: product.carbs,
-          source: 'manual',
-          verified: false,
-        });
+        }, user.uid);
         
         // Update product with the new ID
         product = { ...product, id: productId };
@@ -161,19 +157,25 @@ const Products = () => {
     if (!user || !editingProduct || !formData.name.trim()) return;
     
     try {
-      // Generate ID if product doesn't have one (came from OFF API)
-      const productId = editingProduct.id || crypto.randomUUID();
-      
-      await saveProduct(user.uid, {
-        id: productId,
-        name: formData.name,
-        calories: formData.calories,
-        protein: formData.protein,
-        fat: formData.fat,
-        carbs: formData.carbs,
-        source: 'edited',
-        verified: false,
-      });
+      // Update existing product
+      if (editingProduct.id) {
+        await updateProduct(editingProduct.id, {
+          name: formData.name,
+          calories: formData.calories,
+          protein: formData.protein,
+          fat: formData.fat,
+          carbs: formData.carbs,
+        });
+      } else {
+        // Create new product if no ID exists
+        await saveProduct({
+          name: formData.name,
+          calories: formData.calories,
+          protein: formData.protein,
+          fat: formData.fat,
+          carbs: formData.carbs,
+        }, user.uid);
+      }
       
       toast.success(`Обновлено: ${formData.name}`);
       setEditingProduct(null);
@@ -190,7 +192,7 @@ const Products = () => {
     if (!user) return;
     
     try {
-      await deleteProduct(user.uid, productId);
+      await deleteProduct(productId);
       toast.success("Продукт удалён");
       loadUserProducts(); // Refresh list
     } catch (error) {
@@ -215,11 +217,8 @@ const Products = () => {
             <Package className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Мои продукты</h1>
-            <p className="text-sm text-muted-foreground">
-              Управляйте базой продуктов
-            </p>
-          </div>
+            <h1 className="text-2xl md:text-3xl font-bold">Продукты</h1>
+                      </div>
         </div>
 
         {/* Search bar */}
@@ -262,7 +261,7 @@ const Products = () => {
         <Card className="bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-8">
           <div className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Мои продукты</h2>
+              <h2 className="text-lg font-semibold">Продукты</h2>
               <div className="text-sm text-muted-foreground">
                 {pluralize(products.length, 'продукт', 'продукта', 'продуктов')} · КБЖУ на 100г
               </div>

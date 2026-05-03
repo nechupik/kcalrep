@@ -18,9 +18,11 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
-import { loadDiaryRange, saveWeight, loadWeight } from "@/lib/firestore";
+import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore } from "@/lib/firestore";
+import { recalculateNormWithNewWeight } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
+import { toast } from "sonner";
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MONTHS = [
@@ -51,6 +53,12 @@ const Stats = () => {
   const [weightEntries, setWeightEntries] = useState<WeightData[]>([]);
   const [weightInput, setWeightInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isInterestingOpen, setIsInterestingOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [monthlyDetailEntries, setMonthlyDetailEntries] = useState<DiaryEntry[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -86,6 +94,19 @@ const Stats = () => {
 
     loadData();
   }, [user]);
+
+  useEffect(() => {
+    const loadMonthlyDetail = async () => {
+      if (!user || !isInterestingOpen) return;
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+      const entries = await loadDiaryRange(user.uid, startDate, endDate);
+      setMonthlyDetailEntries(entries);
+    };
+    loadMonthlyDetail();
+  }, [user, isInterestingOpen, selectedMonth]);
 
   // Aggregate entries by day for the last 7 days
   const weeklyData = useMemo(() => {
@@ -210,6 +231,54 @@ const Stats = () => {
       }));
   }, [weightEntries]);
 
+  // Product statistics for interesting stats section
+  const productStats = useMemo(() => {
+    const map = new Map<string, {
+      name: string;
+      totalGrams: number;
+      totalCalories: number;
+      totalProtein: number;
+      totalCarbs: number;
+      totalFat: number;
+      count: number;
+    }>();
+
+    monthlyDetailEntries.forEach(entry => {
+      const existing = map.get(entry.name);
+      if (existing) {
+        existing.totalGrams += entry.grams;
+        existing.totalCalories += entry.calories;
+        existing.totalProtein += entry.protein;
+        existing.totalCarbs += entry.carbs;
+        existing.totalFat += entry.fat;
+        existing.count += 1;
+      } else {
+        map.set(entry.name, {
+          name: entry.name,
+          totalGrams: entry.grams,
+          totalCalories: entry.calories,
+          totalProtein: entry.protein,
+          totalCarbs: entry.carbs,
+          totalFat: entry.fat,
+          count: 1,
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.totalCalories - a.totalCalories);
+  }, [monthlyDetailEntries]);
+
+  // Monthly totals summary
+  const monthlyTotals = useMemo(() => {
+    return productStats.reduce((acc, p) => ({
+      grams: acc.grams + p.totalGrams,
+      calories: acc.calories + p.totalCalories,
+      protein: acc.protein + p.totalProtein,
+      carbs: acc.carbs + p.totalCarbs,
+      fat: acc.fat + p.totalFat,
+    }), { grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0 });
+  }, [productStats]);
+
   const handleSaveWeight = async () => {
     if (!user || !weightInput) return;
     
@@ -224,8 +293,28 @@ const Stats = () => {
       const weights = await loadWeight(user.uid, 10);
       setWeightEntries(weights);
       setWeightInput("");
+      
+      // Auto-recalculate norm with new weight
+      const currentNormData = await loadFullNormData(user.uid);
+      if (currentNormData && currentNormData.gender) {
+        const newNormResult = recalculateNormWithNewWeight(currentNormData, weight);
+        await saveNormToFirestore(user.uid, newNormResult, {
+          gender: currentNormData.gender,
+          height: currentNormData.height,
+          age: currentNormData.age,
+          goal: currentNormData.goal,
+        });
+        
+        // Update local norm state
+        setNorm(newNormResult);
+        
+        toast.success(`Вес сохранён. Норма КБЖУ пересчитана: ${newNormResult.calories} ккал`);
+      } else {
+        toast.success('Вес сохранён');
+      }
     } catch (error) {
       console.error("Failed to save weight:", error);
+      toast.error('Ошибка сохранения веса');
     }
   };
 
@@ -254,8 +343,7 @@ const Stats = () => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Статистика</h1>
-            <p className="text-sm text-muted-foreground">Анализ вашего питания и прогресса</p>
-          </div>
+                      </div>
         </div>
 
         {/* SECTION 1 - Weekly Chart */}
@@ -454,11 +542,81 @@ const Stats = () => {
             </div>
           </div>
         </Card>
+
+        {/* SECTION 5 - Interesting Statistics */}
+        <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+          <button
+            onClick={() => setIsInterestingOpen(!isInterestingOpen)}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔍</span>
+              <h2 className="font-semibold">Интересная статистика</h2>
+            </div>
+            <span className="text-muted-foreground text-sm">{isInterestingOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {isInterestingOpen && (
+            <div className="mt-4 space-y-4">
+              {/* Month selector */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-muted-foreground">Месяц:</label>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={e => setSelectedMonth(e.target.value)}
+                  className="bg-muted/40 border border-border/50 rounded-lg px-3 py-1.5 text-sm"
+                />
+              </div>
+
+              {/* Monthly totals summary */}
+              {productStats.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Всего съедено', value: `${monthlyTotals.grams.toLocaleString()}г`, icon: '⚖️' },
+                    { label: 'Калорий', value: `${monthlyTotals.calories.toLocaleString()} ккал`, icon: '🔥' },
+                    { label: 'Белков', value: `${Math.round(monthlyTotals.protein)}г`, icon: '💪' },
+                    { label: 'Углеводов', value: `${Math.round(monthlyTotals.carbs)}г`, icon: '🌾' },
+                  ].map(stat => (
+                    <div key={stat.label} className="rounded-xl bg-muted/40 p-3">
+                      <div className="text-lg">{stat.icon}</div>
+                      <div className="font-bold">{stat.value}</div>
+                      <div className="text-xs text-muted-foreground">{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Per product breakdown */}
+              {productStats.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Нет данных за этот месяц</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">По продуктам</p>
+                  {productStats.map(p => (
+                    <div key={p.name} className="rounded-xl bg-muted/30 px-4 py-3">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-medium text-sm">{p.name}</span>
+                        <span className="text-xs text-muted-foreground">{p.count} раз</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>⚖️ {p.totalGrams.toLocaleString()}г</span>
+                        <span>🔥 {p.totalCalories.toLocaleString()} ккал</span>
+                        <span>💪 Б {Math.round(p.totalProtein)}г</span>
+                        <span>🌾 У {Math.round(p.totalCarbs)}г</span>
+                        <span>🧈 Ж {Math.round(p.totalFat)}г</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
       </section>
       <div className="h-8" />
     </div>
   );
 };
-
 
 export default Stats;

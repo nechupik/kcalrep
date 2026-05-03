@@ -15,6 +15,16 @@ import { db } from "./firebase";
 import type { MacroResult } from "./nutrition";
 import type { DiaryEntry } from "./storage";
 
+// IMPORTANT: Add these Firestore rules in Firebase Console:
+// match /shared_products/{productId} {
+//   allow read: if request.auth != null;
+//   allow write: if request.auth != null && request.auth.uid == "irXSByiUKYg9S5g3UXF5xSXHijC3";
+// }
+// match /shared_recipes/{recipeId} {
+//   allow read: if request.auth != null;
+//   allow write: if request.auth != null && request.auth.uid == "irXSByiUKYg9S5g3UXF5xSXHijC3";
+// }
+
 export interface UserProfile {
   name: string;
   email: string;
@@ -30,6 +40,12 @@ export interface NormData {
   tdee: number;
   activityFactor: number;
   activityLabel: string;
+  // Parameters for recalculation
+  gender: 'male' | 'female';
+  height: number;
+  age: number;
+  goal: string;
+  goalMultiplier: number;
   updatedAt: Timestamp;
 }
 
@@ -37,6 +53,19 @@ export interface WeightEntry {
   weight: number;
   date: string; // YYYY-MM-DD
   createdAt: Timestamp;
+}
+
+export interface ActivityEntry {
+  date: string; // YYYY-MM-DD
+  type: 'calories' | 'steps' | 'home';
+  value: number; // calories for admin, steps for wife, 0 for home
+  caloriesBurned: number; // calculated calories burned
+  updatedAt: Timestamp;
+}
+
+export interface UserSettings {
+  activityTrackingEnabled: boolean;
+  updatedAt: Timestamp;
 }
 
 // Profile functions
@@ -60,7 +89,7 @@ export async function loadUserProfile(userId: string): Promise<UserProfile | nul
 }
 
 // Norm functions
-export async function saveNorm(userId: string, norm: MacroResult) {
+export async function saveNorm(userId: string, norm: MacroResult, params?: { gender: 'male' | 'female'; height: number; age: number; goal: string }) {
   const normDoc = doc(db, "users", userId, "norm", "main");
   const normData: NormData = {
     calories: norm.calories,
@@ -71,6 +100,11 @@ export async function saveNorm(userId: string, norm: MacroResult) {
     tdee: norm.tdee,
     activityFactor: norm.activityFactor,
     activityLabel: norm.activityLabel,
+    gender: params?.gender || 'male',
+    height: params?.height || 170,
+    age: params?.age || 25,
+    goal: params?.goal || 'maintain',
+    goalMultiplier: norm.goalMultiplier,
     updatedAt: Timestamp.now(),
   };
   await setDoc(normDoc, normData);
@@ -91,7 +125,17 @@ export async function loadNorm(userId: string): Promise<MacroResult | null> {
       tdee: data.tdee,
       activityFactor: data.activityFactor,
       activityLabel: data.activityLabel as any, // Convert string back to ActivityLevel
+      goalMultiplier: data.goalMultiplier,
     };
+  }
+  return null;
+}
+
+export async function loadFullNormData(userId: string): Promise<NormData | null> {
+  const normDoc = doc(db, 'users', userId, 'norm', 'main');
+  const docSnap = await getDoc(normDoc);
+  if (docSnap.exists()) {
+    return docSnap.data() as NormData;
   }
   return null;
 }
@@ -191,6 +235,24 @@ export async function loadWeight(userId: string, limit?: number): Promise<Array<
   return limit ? entries.slice(0, limit) : entries;
 }
 
+export async function wasWeightEnteredThisWeek(userId: string): Promise<boolean> {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday...
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  const mondayStr = monday.toISOString().split('T')[0];
+  const todayStr = today.toISOString().split('T')[0];
+
+  const weightCol = collection(db, 'users', userId, 'weight');
+  const q = query(
+    weightCol,
+    where('date', '>=', mondayStr),
+    where('date', '<=', todayStr)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.size > 0;
+}
+
 // Diary range loading function
 export async function loadDiaryRange(userId: string, startDate: string, endDate: string): Promise<DiaryEntry[]> {
   const diaryCollection = collection(db, "users", userId, "diary");
@@ -279,5 +341,90 @@ export async function getLastAmount(userId: string, productId: string): Promise<
   if (snap.exists()) {
     return (snap.data() as UsageStat).lastAmount;
   }
+  return null;
+}
+
+// Shared products (readable by all users)
+export async function loadSharedProducts(): Promise<any[]> {
+  const sharedCol = collection(db, "shared_products");
+  const q = query(sharedCol, orderBy("name", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+}
+
+export async function loadSharedRecipes(): Promise<any[]> {
+  const sharedCol = collection(db, "shared_recipes");
+  const q = query(sharedCol, orderBy("name", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+}
+
+export async function saveSharedProduct(product: any): Promise<string> {
+  const sharedCol = collection(db, "shared_products");
+  const docRef = await addDoc(sharedCol, {
+    ...product,
+    createdAt: Timestamp.now(),
+  });
+  return docRef.id;
+}
+
+export async function saveSharedRecipe(recipe: any): Promise<string> {
+  const sharedCol = collection(db, "shared_recipes");
+  const docRef = await addDoc(sharedCol, {
+    ...recipe,
+    createdAt: Timestamp.now(),
+  });
+  return docRef.id;
+}
+
+export async function deleteSharedProduct(productId: string): Promise<void> {
+  await deleteDoc(doc(db, "shared_products", productId));
+}
+
+export async function deleteSharedRecipe(recipeId: string): Promise<void> {
+  await deleteDoc(doc(db, "shared_recipes", recipeId));
+}
+
+// Activity tracking functions
+export async function saveActivity(userId: string, entry: Omit<ActivityEntry, 'updatedAt'>): Promise<void> {
+  const activityDoc = doc(db, 'users', userId, 'activity', entry.date);
+  await setDoc(activityDoc, {
+    ...entry,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function loadActivity(userId: string, date: string): Promise<ActivityEntry | null> {
+  const activityDoc = doc(db, 'users', userId, 'activity', date);
+  const snap = await getDoc(activityDoc);
+  if (snap.exists()) return snap.data() as ActivityEntry;
+  return null;
+}
+
+export async function loadActivityRange(userId: string, startDate: string, endDate: string): Promise<ActivityEntry[]> {
+  const activityCol = collection(db, 'users', userId, 'activity');
+  const q = query(activityCol, where('date', '>=', startDate), where('date', '<=', endDate));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as ActivityEntry);
+}
+
+export async function saveUserSettings(userId: string, settings: Omit<UserSettings, 'updatedAt'>): Promise<void> {
+  const settingsDoc = doc(db, 'users', userId, 'settings', 'main');
+  await setDoc(settingsDoc, {
+    ...settings,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function loadUserSettings(userId: string): Promise<UserSettings | null> {
+  const settingsDoc = doc(db, 'users', userId, 'settings', 'main');
+  const snap = await getDoc(settingsDoc);
+  if (snap.exists()) return snap.data() as UserSettings;
   return null;
 }

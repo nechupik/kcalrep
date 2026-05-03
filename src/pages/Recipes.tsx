@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { loadRecipes, saveRecipe, searchRecipes, deleteRecipe, updateRecipe, type Recipe } from "@/lib/recipes";
+import { loadRecipes, saveRecipe, deleteRecipe, updateRecipe, type Recipe } from "@/lib/recipes";
 import { BookOpen, Search, Plus, Edit, Trash2 } from "lucide-react";
 
 function pluralize(n: number, one: string, few: string, many: string): string {
@@ -50,7 +50,7 @@ const Recipes = () => {
   const loadUserRecipes = async () => {
     setLoading(true);
     try {
-      const userRecipes = await loadRecipes(user.uid);
+      const userRecipes = await loadRecipes();
       setRecipes(userRecipes);
     } catch (error) {
       console.error("Error loading recipes:", error);
@@ -61,12 +61,16 @@ const Recipes = () => {
   };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim() || !user) return;
+    if (!searchQuery.trim()) return;
 
     setLoading(true);
     try {
-      const searchResults = await searchRecipes(user.uid, searchQuery);
-      setRecipes(searchResults);
+      // Load all recipes and filter client-side
+      const allRecipes = await loadRecipes();
+      const filteredRecipes = allRecipes.filter(recipe => 
+        recipe.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setRecipes(filteredRecipes);
     } catch (error) {
       console.error("Error searching:", error);
       toast.error("Ошибка поиска");
@@ -85,14 +89,14 @@ const Recipes = () => {
     if (!user || !formData.name.trim()) return;
     
     try {
-      await saveRecipe(user.uid, {
+      await saveRecipe({
         name: formData.name,
         calories: formData.calories,
         protein: formData.protein,
         fat: formData.fat,
         carbs: formData.carbs,
-        description: formData.description,
-      });
+        text: formData.description,
+      }, user.uid);
       
       toast.success(`Добавлено: ${formData.name}`);
       setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0, description: "" });
@@ -112,7 +116,7 @@ const Recipes = () => {
       protein: recipe.protein,
       fat: recipe.fat,
       carbs: recipe.carbs,
-      description: recipe.description,
+      description: recipe.text || "",
     });
     setShowAddForm(true);
   };
@@ -121,14 +125,13 @@ const Recipes = () => {
     if (!user || !editingRecipe || !formData.name.trim()) return;
     
     try {
-      await updateRecipe(user.uid, editingRecipe.id!, {
+      await updateRecipe(editingRecipe.id!, {
         name: formData.name,
         calories: formData.calories,
         protein: formData.protein,
         fat: formData.fat,
         carbs: formData.carbs,
-        description: formData.description,
-        updatedAt: Date.now(),
+        text: formData.description,
       });
       
       toast.success(`Обновлено: ${formData.name}`);
@@ -146,7 +149,7 @@ const Recipes = () => {
     if (!user) return;
     
     try {
-      await deleteRecipe(user.uid, recipeId);
+      await deleteRecipe(recipeId);
       toast.success("Рецепт удалён");
       loadUserRecipes(); // Refresh list
     } catch (error) {
@@ -177,11 +180,8 @@ const Recipes = () => {
             <BookOpen className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Мои рецепты</h1>
-            <p className="text-sm text-muted-foreground">
-              Сохраняйте рецепты с КБЖУ
-            </p>
-          </div>
+            <h1 className="text-2xl md:text-3xl font-bold">Рецепты</h1>
+                      </div>
         </div>
 
         {/* Search bar */}
@@ -222,7 +222,7 @@ const Recipes = () => {
         <Card className="bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-8">
           <div className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Мои рецепты</h2>
+              <h2 className="text-lg font-semibold">Рецепты</h2>
               <div className="text-sm text-muted-foreground">
                 {pluralize(recipes.length, 'рецепт', 'рецепта', 'рецептов')} · КБЖУ на 100г
               </div>
@@ -277,9 +277,9 @@ const Recipes = () => {
                         </div>
 
                         {/* Description preview */}
-                        {recipe.description && (
+                        {recipe.text && (
                           <div className="text-sm text-muted-foreground">
-                            {truncateDescription(recipe.description)}
+                            {truncateDescription(recipe.text)}
                           </div>
                         )}
                       </div>

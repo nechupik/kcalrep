@@ -64,7 +64,8 @@ const Admin = () => {
     }
   };
 
-  if (!user || user.uid !== ADMIN_UID) return null;
+
+if (!user || user.uid !== ADMIN_UID) return null;
 
   return (
     <div className="min-h-screen">

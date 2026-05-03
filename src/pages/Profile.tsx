@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,14 +16,19 @@ import {
   Calculator,
   CheckCircle2,
   RotateCcw,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm, saveNorm } from "@/lib/storage";
+import { loadUserSettings, saveUserSettings } from "@/lib/firestore";
 import type { CalcInput, MacroResult } from "@/lib/nutrition";
+
+const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 
 const Profile = () => {
   const { user, loading, signInWithEmail, signUpWithEmail, signInWithGoogle, signOut } = useAuth();
+  const navigate = useNavigate();
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
@@ -32,6 +38,8 @@ const Profile = () => {
   const [draftResult, setDraftResult] = useState<MacroResult | null>(null);
   const [showCalculator, setShowCalculator] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activityEnabled, setActivityEnabled] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     const loadNormData = async () => {
@@ -39,6 +47,12 @@ const Profile = () => {
       setNorm(n);
       // Si no hay norma pero hay usuario, mostrar calculadora
       if (user && !n) setShowCalculator(true);
+      
+      // Load user settings
+      if (user) {
+        const settings = await loadUserSettings(user.uid);
+        if (settings) setActivityEnabled(settings.activityTrackingEnabled);
+      }
     };
     
     loadNormData();
@@ -116,6 +130,21 @@ const Profile = () => {
     toast.success("Norm saved");
   };
 
+  const handleSaveSettings = async () => {
+    if (!user) return;
+    setSavingSettings(true);
+    try {
+      await saveUserSettings(user.uid, {
+        activityTrackingEnabled: activityEnabled,
+      });
+      toast.success('Настройки сохранены');
+    } catch (error) {
+      toast.error('Ошибка сохранения настроек');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -140,10 +169,7 @@ const Profile = () => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Профиль</h1>
-            <p className="text-sm text-muted-foreground">
-              Управление аккаунтом и нормой КБЖУ
-            </p>
-          </div>
+                      </div>
         </div>
 
         {/* Profile card */}
@@ -159,15 +185,28 @@ const Profile = () => {
                   {user.email || "Not logged in"}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="ml-auto text-muted-foreground hover:text-destructive"
-              >
-                <LogOut className="h-4 w-4 mr-1" />
-                Выйти
-              </Button>
+              <div className="ml-auto flex gap-2">
+                {user && user.uid === ADMIN_UID && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate("/admin")}
+                    className="text-muted-foreground hover:text-primary"
+                  >
+                    <Shield className="h-4 w-4 mr-1" />
+                    Админ
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Выйти
+                </Button>
+              </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -192,10 +231,7 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className="text-sm text-muted-foreground">
-              Профиль управляется через Firebase Auth
-            </div>
-          </Card>
+                      </Card>
         )}
 
         {/* KBJU norm section */}
@@ -205,9 +241,11 @@ const Profile = () => {
               <Calculator className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-bold">Моя норма КБЖУ</h2>
             </div>
-            <p className="text-sm text-muted-foreground mb-5">
-              Норма задаётся один раз при регистрации. Пересчитайте, если изменился вес, активность или цель.
-            </p>
+            {!norm && (
+              <p className="text-sm text-muted-foreground mb-5">
+                Норма задаётся один раз при регистрации. Пересчитайте, если изменился вес, активность или цель.
+              </p>
+            )}
 
             {norm && !showCalculator && (
               <div className="rounded-2xl bg-gradient-sunset-soft border border-primary/20 p-5 mb-4">
@@ -259,6 +297,43 @@ const Profile = () => {
                 )}
               </div>
             )}
+          </Card>
+        )}
+
+        {/* Activity tracking settings for non-admin users */}
+        {user && user.uid !== 'irXSByiUKYg9S5g3UXF5xSXHijC3' && (
+          <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">⚙️</span>
+              <h2 className="font-semibold">Настройки активности</h2>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm font-medium">Учитывать активность</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Если включено — дефицит считается с учётом шагов. Если выключено — только по съеденным калориям.
+                </p>
+              </div>
+              <button
+                onClick={() => setActivityEnabled(!activityEnabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  activityEnabled ? 'bg-gradient-sunset' : 'bg-muted'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    activityEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <Button
+              onClick={handleSaveSettings}
+              disabled={savingSettings}
+              className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+            >
+              Сохранить настройки
+            </Button>
           </Card>
         )}
 
@@ -366,16 +441,7 @@ const Profile = () => {
           </Card>
         )}
 
-        <div className="mt-6 flex items-start gap-3 rounded-xl border border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 mt-0.5 text-tertiary shrink-0" />
-          <p>
-            {user 
-              ? "Данные синхронизируются через Firebase и доступны на всех устройствах."
-              : "Data is stored locally. Log in to sync between devices."
-            }
-          </p>
-        </div>
-      </section>
+              </section>
       <div className="h-8" />
     </div>
   );

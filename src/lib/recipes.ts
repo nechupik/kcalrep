@@ -1,67 +1,40 @@
-// Recipes Firestore functions
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "./firebase";
-import { collection, doc, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
 
 export interface Recipe {
-  id?: string;
+  id: string;
   name: string;
-  calories: number;    // per 100g
-  protein: number;     // per 100g
-  fat: number;         // per 100g
-  carbs: number;       // per 100g
-  description: string; // recipe instructions
-  createdAt: number;
-  updatedAt: number;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  text?: string;
+  createdBy?: string;
+  createdAt?: any;
 }
 
-// Save a recipe to Firestore
-export async function saveRecipe(userId: string, recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-  const now = Date.now();
-  const recipeWithTimestamp = {
-    ...recipe,
-    createdAt: now,
-    updatedAt: now,
-  };
+export async function loadRecipes(): Promise<Recipe[]> {
+  const col = collection(db, "shared_recipes");
+  const q = query(col, orderBy("name", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recipe));
+}
 
-  const docRef = await addDoc(collection(db, `users/${userId}/recipes`), recipeWithTimestamp);
+export async function saveRecipe(recipe: Omit<Recipe, 'id'>, userId: string): Promise<string> {
+  const col = collection(db, "shared_recipes");
+  const docRef = await addDoc(col, {
+    ...recipe,
+    createdBy: userId,
+    createdAt: Timestamp.now(),
+  });
   return docRef.id;
 }
 
-// Load all recipes for a user
-export async function loadRecipes(userId: string): Promise<Recipe[]> {
-  const q = query(
-    collection(db, `users/${userId}/recipes`),
-    orderBy('updatedAt', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Recipe[];
+export async function updateRecipe(recipeId: string, recipe: Omit<Recipe, 'id'>): Promise<void> {
+  const docRef = doc(db, "shared_recipes", recipeId);
+  await updateDoc(docRef, { ...recipe });
 }
 
-// Delete a recipe
-export async function deleteRecipe(userId: string, recipeId: string): Promise<void> {
-  await deleteDoc(doc(db, `users/${userId}/recipes/${recipeId}`));
-}
-
-// Update a recipe
-export async function updateRecipe(userId: string, recipeId: string, recipe: Omit<Recipe, 'id' | 'createdAt'>): Promise<void> {
-  const recipeWithTimestamp = {
-    ...recipe,
-    updatedAt: Date.now(),
-  };
-  
-  await updateDoc(doc(db, `users/${userId}/recipes/${recipeId}`), recipeWithTimestamp);
-}
-
-// Search recipes by name
-export async function searchRecipes(userId: string, query: string): Promise<Recipe[]> {
-  const recipes = await loadRecipes(userId);
-  const lowerQuery = query.toLowerCase();
-  
-  return recipes.filter(recipe => 
-    recipe.name.toLowerCase().includes(lowerQuery)
-  );
+export async function deleteRecipe(recipeId: string): Promise<void> {
+  await deleteDoc(doc(db, "shared_recipes", recipeId));
 }

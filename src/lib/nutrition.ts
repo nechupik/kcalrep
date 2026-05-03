@@ -30,6 +30,7 @@ export interface MacroResult {
   tdee: number;
   activityFactor: number;
   activityLabel: ActivityLevel;
+  goalMultiplier: number;
 }
 
 const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
@@ -116,7 +117,8 @@ export function calculateMacros(input: CalcInput): MacroResult {
   const level = resolveActivityLevel(input);
   const factor = ACTIVITY_FACTOR[level];
   const tdee = bmr * factor;
-  const calories = Math.round(tdee * (1 + GOAL_ADJUSTMENT[goal]));
+  const goalMultiplier = 1 + GOAL_ADJUSTMENT[goal];
+  const calories = Math.round(tdee * goalMultiplier);
 
   const proteinPerKg = goal === "maintain" ? 1.6 : 2.0;
   const protein = Math.round(weight * proteinPerKg);
@@ -132,6 +134,41 @@ export function calculateMacros(input: CalcInput): MacroResult {
     tdee: Math.round(tdee),
     activityFactor: factor,
     activityLabel: level,
+    goalMultiplier,
+  };
+}
+
+export function recalculateNormWithNewWeight(
+  currentNorm: any, // Using any since NormData is in firestore.ts
+  newWeight: number
+): MacroResult {
+  // Recalculate BMR with new weight, keeping same gender/height/age/activity
+  let newBmr: number;
+  if (currentNorm.gender === 'male') {
+    newBmr = (10 * newWeight) + (6.25 * currentNorm.height) - (5 * currentNorm.age) + 5;
+  } else {
+    newBmr = (10 * newWeight) + (6.25 * currentNorm.height) - (5 * currentNorm.age) - 161;
+  }
+  
+  const newTdee = newBmr * currentNorm.activityFactor;
+  const newCalories = Math.round(newTdee * currentNorm.goalMultiplier);
+  
+  // Recalculate macros based on new weight and calories
+  const protein = Math.round(newWeight * 1.6);
+  const fat = Math.round(newWeight * 1.0);
+  const carbsCalories = newCalories - (protein * 4) - (fat * 9);
+  const carbs = Math.round(Math.max(carbsCalories, 0) / 4);
+  
+  return {
+    calories: newCalories,
+    protein,
+    fat,
+    carbs,
+    bmr: Math.round(newBmr),
+    tdee: Math.round(newTdee),
+    activityFactor: currentNorm.activityFactor,
+    activityLabel: currentNorm.activityLabel as any,
+    goalMultiplier: currentNorm.goalMultiplier,
   };
 }
 
