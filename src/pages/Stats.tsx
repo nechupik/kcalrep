@@ -80,8 +80,8 @@ const Stats = () => {
         const startDate = new Date(today);
         startDate.setDate(today.getDate() - 6);
         
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = today.toISOString().split('T')[0];
+        const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+        const endDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         
         const diaryEntries = await loadDiaryRange(user.uid, startDateStr, endDateStr);
         setEntries(diaryEntries);
@@ -120,7 +120,7 @@ const Stats = () => {
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       const dayOfWeek = date.getDay();
       const weekdayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Monday=0 index
       
@@ -160,7 +160,7 @@ const Stats = () => {
     
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const date = new Date(year, month, day);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayEntries = entries.filter(entry => entry.date === dateStr);
       
       const calories = dayEntries.reduce((sum, entry) => sum + entry.calories, 0);
