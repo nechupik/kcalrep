@@ -312,19 +312,19 @@ const Products = () => {
                         
                         {/* Macro badges row */}
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))' }}>
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))', color: '#7b6284' }}>
                             <span>🔥</span>
                             <span>{product.calories} ккал</span>
                           </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))' }}>
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))', color: '#7b6284' }}>
                             <span>Б</span>
                             <span>{product.protein}г</span>
                           </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))' }}>
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))', color: '#7b6284' }}>
                             <span>Ж</span>
                             <span>{product.fat}г</span>
                           </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-white text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))' }}>
+                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))', color: '#7b6284' }}>
                             <span>У</span>
                             <span>{product.carbs}г</span>
                           </div>
