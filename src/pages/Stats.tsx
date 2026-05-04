@@ -405,7 +405,7 @@ const Stats = () => {
                 )}
                 <Bar
                   dataKey="calories"
-                  fill="hsl(var(--macro-calories))"
+                  fill="hsl(var(--foreground))"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
