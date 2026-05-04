@@ -9,49 +9,49 @@ All colors MUST be HSL.
 @layer base {
   :root {
     --background: 232 20% 5%;
-    --foreground: 240 100% 97%;
+    --foreground: 240 20% 47%;
     --card: 240 20% 8%;
-    --card-foreground: 240 100% 97%;
+    --card-foreground: 240 20% 47%;
     --popover: 240 20% 8%;
-    --popover-foreground: 240 100% 97%;
+    --popover-foreground: 240 20% 47%;
     --primary: 263 72% 54%;
-    --primary-foreground: 240 100% 97%;
+    --primary-foreground: 240 20% 47%;
     --secondary: 240 20% 12%;
-    --secondary-foreground: 240 100% 97%;
+    --secondary-foreground: 240 20% 47%;
     --muted: 240 15% 14%;
-    --muted-foreground: 240 10% 50%;
+    --muted-foreground: 240 15% 40%;
     --accent: 263 60% 35%;
-    --accent-foreground: 240 100% 97%;
+    --accent-foreground: 240 20% 47%;
     --destructive: 0 72% 51%;
-    --destructive-foreground: 240 100% 97%;
+    --destructive-foreground: 240 20% 47%;
     --border: 240 15% 18%;
     --input: 240 20% 12%;
     --ring: 263 72% 54%;
     --radius: 0.75rem;
 
-    --macro-calories: #7C3AED;
+    --macro-calories: #947dbb;
     --macro-protein: #5B21B6;
     --macro-fat: #6D28D9;
-    --macro-carbs: #4C1D95;
+    --macro-carbs: #7b6284;
   }
 
   .dark {
     --background: 232 20% 5%;
-    --foreground: 240 100% 97%;
+    --foreground: 240 20% 47%;
     --card: 240 20% 8%;
-    --card-foreground: 240 100% 97%;
+    --card-foreground: 240 20% 47%;
     --popover: 240 20% 8%;
-    --popover-foreground: 240 100% 97%;
+    --popover-foreground: 240 20% 47%;
     --primary: 263 72% 54%;
-    --primary-foreground: 240 100% 97%;
+    --primary-foreground: 240 20% 47%;
     --secondary: 240 20% 12%;
-    --secondary-foreground: 240 100% 97%;
+    --secondary-foreground: 240 20% 47%;
     --muted: 240 15% 14%;
-    --muted-foreground: 240 10% 50%;
+    --muted-foreground: 240 15% 40%;
     --accent: 263 60% 35%;
-    --accent-foreground: 240 100% 97%;
+    --accent-foreground: 240 20% 47%;
     --destructive: 0 72% 51%;
-    --destructive-foreground: 240 100% 97%;
+    --destructive-foreground: 240 20% 47%;
     --border: 240 15% 18%;
     --input: 240 20% 12%;
     --ring: 263 72% 54%;
@@ -64,8 +64,8 @@ All colors MUST be HSL.
   }
 
   body {
-    background-color: #080810;
-    color: #F0F0FF;
+    background-color: #0c080d;
+    color: #7b6284;
     font-family: 'DM Sans', system-ui, sans-serif;
   }
 
@@ -122,5 +122,5 @@ input[type='number'] {
 }
 
 /* Scrollbar colors */
-::-webkit-scrollbar-thumb { background: #4C1D95; }
-::-webkit-scrollbar-track { background: #12121F; }
+::-webkit-scrollbar-thumb { background: #7b6284; }
+::-webkit-scrollbar-track { background: #7b6284; }
