@@ -416,9 +416,8 @@ const Stats = () => {
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           {/* SECTION 2 - Monthly Overview */}
           <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
-            <div className="flex items-center gap-2 mb-4 justify-start w-full">
-              <Activity className="h-4 w-4 text-secondary flex-shrink-0" />
-              <h2 className="font-semibold text-left flex-1">{currentMonth} {currentYear}</h2>
+            <div className="mb-4 text-left">
+              <h2 className="font-semibold">{currentMonth} {currentYear}</h2>
             </div>
             <div className="grid grid-cols-7 gap-1 text-xs">
               {WEEKDAYS.map(day => (
