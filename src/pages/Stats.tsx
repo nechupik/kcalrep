@@ -407,12 +407,27 @@ const Stats = () => {
                   dataKey="calories"
                   fill="hsl(var(--foreground))"
                   radius={[4, 4, 0, 0]}
-                  activeBar={{
-                    fill: "hsl(var(--foreground))",
-                    stroke: "transparent",
-                    strokeWidth: 0,
-                    transform: "scale(1.08)",
-                    transformOrigin: "center"
+                  activeBar={(props: any) => {
+                    const { fill, x, y, width, height } = props;
+                    const scale = 1.03;
+                    const scaledWidth = width * scale;
+                    const scaledHeight = height * scale;
+                    const offsetX = x - (scaledWidth - width) / 2;
+                    const offsetY = y - (scaledHeight - height) / 2;
+                    
+                    return (
+                      <rect
+                        x={offsetX}
+                        y={offsetY}
+                        width={scaledWidth}
+                        height={scaledHeight}
+                        fill={fill}
+                        stroke="transparent"
+                        strokeWidth={0}
+                        rx={4}
+                        ry={0}
+                      />
+                    );
                   }}
                   onClick={(data) => {
                     // Handle bar click if needed
