@@ -412,8 +412,9 @@ const Stats = () => {
                     const scale = 1.03;
                     const scaledWidth = width * scale;
                     const scaledHeight = height * scale;
+                    // Scale only upwards - keep bottom edge at same position
                     const offsetX = x - (scaledWidth - width) / 2;
-                    const offsetY = y - (scaledHeight - height) / 2;
+                    const offsetY = y - (scaledHeight - height);
                     
                     return (
                       <rect
@@ -422,8 +423,8 @@ const Stats = () => {
                         width={scaledWidth}
                         height={scaledHeight}
                         fill={fill}
-                        stroke="transparent"
-                        strokeWidth={0}
+                        stroke="none"
+                        fillOpacity={1}
                         rx={4}
                         ry={0}
                       />
