@@ -416,9 +416,9 @@ const Stats = () => {
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           {/* SECTION 2 - Monthly Overview */}
           <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
-            <div className="flex items-center gap-2 mb-4 justify-start">
-              <Activity className="h-4 w-4 text-secondary" />
-              <h2 className="font-semibold text-left">{currentMonth} {currentYear}</h2>
+            <div className="flex items-center gap-2 mb-4 justify-start w-full">
+              <Activity className="h-4 w-4 text-secondary flex-shrink-0" />
+              <h2 className="font-semibold text-left flex-1">{currentMonth} {currentYear}</h2>
             </div>
             <div className="grid grid-cols-7 gap-1 text-xs">
               {WEEKDAYS.map(day => (
@@ -445,19 +445,19 @@ const Stats = () => {
             </div>
             <div className="flex gap-4 mt-4 text-xs">
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span>90-110%</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span>70-90% / 110-130%</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-red-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span>&lt;70% / &gt;130%</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-gray-200 rounded-full"></div>
+                <div className="w-3 h-3 bg-gray-200 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span>Нет данных</span>
               </div>
             </div>
