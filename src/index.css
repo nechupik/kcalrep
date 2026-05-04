@@ -9,21 +9,21 @@ All colors MUST be HSL.
 @layer base {
   :root {
     --background: 232 20% 5%;
-    --foreground: 240 20% 47%;
-    --card: 240 20% 8%;
-    --card-foreground: 240 20% 47%;
-    --popover: 240 20% 8%;
-    --popover-foreground: 240 20% 47%;
+    --foreground: 240 20% 57%;
+    --card: 268 22% 20%;
+    --card-foreground: 240 20% 57%;
+    --popover: 268 22% 20%;
+    --popover-foreground: 240 20% 57%;
     --primary: 263 72% 54%;
-    --primary-foreground: 240 20% 47%;
+    --primary-foreground: 240 20% 57%;
     --secondary: 240 20% 12%;
-    --secondary-foreground: 240 20% 47%;
+    --secondary-foreground: 240 20% 57%;
     --muted: 240 15% 14%;
-    --muted-foreground: 240 15% 40%;
+    --muted-foreground: 240 15% 50%;
     --accent: 263 60% 35%;
-    --accent-foreground: 240 20% 47%;
+    --accent-foreground: 240 20% 57%;
     --destructive: 0 72% 51%;
-    --destructive-foreground: 240 20% 47%;
+    --destructive-foreground: 240 20% 57%;
     --border: 240 15% 18%;
     --input: 240 20% 12%;
     --ring: 263 72% 54%;
@@ -37,21 +37,21 @@ All colors MUST be HSL.
 
   .dark {
     --background: 232 20% 5%;
-    --foreground: 240 20% 47%;
-    --card: 240 20% 8%;
-    --card-foreground: 240 20% 47%;
-    --popover: 240 20% 8%;
-    --popover-foreground: 240 20% 47%;
+    --foreground: 240 20% 57%;
+    --card: 268 22% 20%;
+    --card-foreground: 240 20% 57%;
+    --popover: 268 22% 20%;
+    --popover-foreground: 240 20% 57%;
     --primary: 263 72% 54%;
-    --primary-foreground: 240 20% 47%;
+    --primary-foreground: 240 20% 57%;
     --secondary: 240 20% 12%;
-    --secondary-foreground: 240 20% 47%;
+    --secondary-foreground: 240 20% 57%;
     --muted: 240 15% 14%;
-    --muted-foreground: 240 15% 40%;
+    --muted-foreground: 240 15% 50%;
     --accent: 263 60% 35%;
-    --accent-foreground: 240 20% 47%;
+    --accent-foreground: 240 20% 57%;
     --destructive: 0 72% 51%;
-    --destructive-foreground: 240 20% 47%;
+    --destructive-foreground: 240 20% 57%;
     --border: 240 15% 18%;
     --input: 240 20% 12%;
     --ring: 263 72% 54%;
@@ -65,7 +65,7 @@ All colors MUST be HSL.
 
   body {
     background-color: #0c080d;
-    color: #7b6284;
+    color: #9b8ba3;
     font-family: 'DM Sans', system-ui, sans-serif;
   }
 
