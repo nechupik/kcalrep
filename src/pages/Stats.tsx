@@ -407,6 +407,17 @@ const Stats = () => {
                   dataKey="calories"
                   fill="hsl(var(--foreground))"
                   radius={[4, 4, 0, 0]}
+                  activeBar={{
+                    fill: "hsl(var(--foreground))",
+                    stroke: "transparent",
+                    strokeWidth: 0,
+                    transform: "scale(1.08)",
+                    transformOrigin: "center"
+                  }}
+                  onClick={(data) => {
+                    // Handle bar click if needed
+                    console.log('Bar clicked:', data);
+                  }}
                 />
               </BarChart>
             </ResponsiveContainer>
