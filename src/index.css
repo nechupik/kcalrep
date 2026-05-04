@@ -10,9 +10,9 @@ All colors MUST be HSL.
   :root {
     --background: 232 20% 5%;
     --foreground: 240 20% 57%;
-    --card: 268 22% 20%;
+    --card: 270 15% 12%;
     --card-foreground: 240 20% 57%;
-    --popover: 268 22% 20%;
+    --popover: 270 15% 12%;
     --popover-foreground: 240 20% 57%;
     --primary: 263 72% 54%;
     --primary-foreground: 240 20% 57%;
@@ -38,9 +38,9 @@ All colors MUST be HSL.
   .dark {
     --background: 232 20% 5%;
     --foreground: 240 20% 57%;
-    --card: 268 22% 20%;
+    --card: 270 15% 12%;
     --card-foreground: 240 20% 57%;
-    --popover: 268 22% 20%;
+    --popover: 270 15% 12%;
     --popover-foreground: 240 20% 57%;
     --primary: 263 72% 54%;
     --primary-foreground: 240 20% 57%;
