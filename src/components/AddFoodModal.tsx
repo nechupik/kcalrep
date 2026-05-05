@@ -158,7 +158,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
       {/* Overlay */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-650 ease-in-out"
         style={{
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? 'auto' : 'none',
@@ -167,7 +167,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
 
       {/* Modal */}
       <div
-        className="relative w-full sm:max-w-lg bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto transition-transform duration-300 ease-in-out"
+        className="relative w-full sm:max-w-lg bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto transition-transform duration-650 ease-in-out"
         style={{
           transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
           pointerEvents: isOpen ? 'auto' : 'none',
