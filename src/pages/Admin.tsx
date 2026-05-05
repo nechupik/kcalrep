@@ -72,7 +72,7 @@ if (!user || user.uid !== ADMIN_UID) return null;
       <AppHeader />
       <section className="container max-w-3xl pt-6 pb-12">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-sunset p-2.5 shadow-glow">
+          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2.5 shadow-glow">
             <Shield className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>

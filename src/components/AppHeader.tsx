@@ -23,8 +23,8 @@ export const AppHeader = () => {
     <>
       <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/40 px-4 py-3 flex items-center justify-between gap-4">
         <NavLink to="/" className="flex items-center gap-2.5">
-          <div className="rounded-xl bg-gradient-sunset p-2 shadow-glow">
-            <Flame className="h-5 w-5 text-primary-foreground" />
+          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2 shadow-glow">
+            <img src="/logo-512x512.png" alt="LoviEat" className="h-5 w-5" />
           </div>
           <span className="font-bold text-lg tracking-tight">
             Lovi<span className="text-gradient-sunset">Eat</span>
@@ -76,7 +76,7 @@ export const AppHeader = () => {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                     isActive
-                      ? "bg-gradient-sunset text-primary-foreground shadow-glow"
+                      ? "bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground shadow-glow"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`
                 }

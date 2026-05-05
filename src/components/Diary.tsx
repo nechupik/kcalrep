@@ -336,7 +336,7 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
                   autoFocus
                 />
               </div>
-              <Button onClick={handleAdd} className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90">
+              <Button onClick={handleAdd} className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90">
                 <Plus className="h-4 w-4 mr-1" />
                 Добавить приём пищи
               </Button>

@@ -143,7 +143,6 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     setActiveTab('product');
   };
 
-  if (!isOpen) return null;
 
   const tabs = [
     { id: 'product' as Tab, label: 'Продукт', icon: Package },
@@ -152,15 +151,28 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none`}
+      aria-hidden={!isOpen}
+    >
       {/* Overlay */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+        style={{
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? 'auto' : 'none',
+        }}
       />
 
       {/* Modal */}
-      <div className="relative w-full sm:max-w-lg bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <div
+        className="relative w-full sm:max-w-lg bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto transition-transform duration-300 ease-in-out"
+        style={{
+          transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
+          pointerEvents: isOpen ? 'auto' : 'none',
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold">Добавить еду</h2>
@@ -177,7 +189,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
               onClick={() => { setActiveTab(tab.id); setSelected(null); setQuery(''); }}
               className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-smooth ${
                 activeTab === tab.id
-                  ? 'bg-gradient-sunset text-primary-foreground shadow-glow'
+                  ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-primary-foreground shadow-glow'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -187,7 +199,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
           ))}
         </div>
 
-        {/* Product / Dish tab */}
+        {/* Keep all existing tab content exactly as before */}
         {(activeTab === 'product' || activeTab === 'dish') && (
           <div className="space-y-4">
             <div className="relative">
@@ -210,7 +222,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                   <button
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-gradient-sunset-soft transition-smooth flex items-center justify-between gap-2"
+                    className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-smooth flex items-center justify-between gap-2"
                   >
                     <span className="text-sm font-medium truncate">{item.name}</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -224,7 +236,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
             )}
 
             {selected && (
-              <div className="rounded-xl border-2 border-primary/30 bg-gradient-sunset-soft p-4 space-y-3">
+              <div className="rounded-xl border-2 border-primary/30 bg-muted/20 p-4 space-y-3">
                 <div>
                   <div className="font-semibold">{selected.name}</div>
                   <div className="text-xs text-muted-foreground">
@@ -256,7 +268,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                 <div className="flex gap-2">
                   <Button
                     onClick={handleAdd}
-                    className="flex-1 bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+                    className="flex-1 bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
                   >
                     Добавить
                   </Button>
@@ -269,7 +281,6 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
           </div>
         )}
 
-        {/* Manual entry tab */}
         {activeTab === 'manual' && (
           <div className="space-y-4">
             <div>
@@ -283,45 +294,43 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Калории (ккал)</Label>
-                <Input type="number" value={manualCalories} onChange={e => setManualCalories(e.target.value)} />
+                <Input type="number" placeholder="0" value={manualCalories} onChange={e => setManualCalories(e.target.value)} />
               </div>
               <div>
                 <Label>Белки (г)</Label>
-                <Input type="number" value={manualProtein} onChange={e => setManualProtein(e.target.value)} />
+                <Input type="number" placeholder="0" value={manualProtein} onChange={e => setManualProtein(e.target.value)} />
               </div>
               <div>
                 <Label>Жиры (г)</Label>
-                <Input type="number" value={manualFat} onChange={e => setManualFat(e.target.value)} />
+                <Input type="number" placeholder="0" value={manualFat} onChange={e => setManualFat(e.target.value)} />
               </div>
               <div>
                 <Label>Углеводы (г)</Label>
-                <Input type="number" value={manualCarbs} onChange={e => setManualCarbs(e.target.value)} />
+                <Input type="number" placeholder="0" value={manualCarbs} onChange={e => setManualCarbs(e.target.value)} />
               </div>
             </div>
+
             <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Сохранить в базу продуктов</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {saveToBase ? 'Продукт сохранится и будет доступен всем пользователям' : 'Запись только в дневник, без сохранения'}
+                  {saveToBase ? 'Продукт сохранится и будет доступен всем' : 'Только в дневник, без сохранения'}
                 </p>
               </div>
               <button
                 onClick={() => setSaveToBase(!saveToBase)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-3 ${
-                  saveToBase ? 'bg-gradient-sunset' : 'bg-muted'
+                  saveToBase ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED]' : 'bg-muted'
                 }`}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                    saveToBase ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${saveToBase ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
+
             <Button
               onClick={handleManualAdd}
               disabled={!manualName || !manualCalories}
-              className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+              className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
             >
               Добавить запись
             </Button>

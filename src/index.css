@@ -80,15 +80,13 @@ All colors MUST be HSL.
   .bg-gradient-sunset-soft { background: var(--gradient-sunset-soft); }
   .bg-gradient-violet { background: var(--gradient-violet); }
   .text-gradient-sunset {
-    background: var(--gradient-sunset);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    filter: brightness(0.5);
   }
   .shadow-glow { box-shadow: var(--shadow-glow); }
   .shadow-soft { box-shadow: var(--shadow-soft); }
   .shadow-card { box-shadow: var(--shadow-card); }
-  .transition-smooth { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  .transition-smooth { transition: all 0.65s cubic-bezier(0.4, 0, 0.2, 1); }
+  .transition-dropdown { transition: all 0.65s cubic-bezier(0.4, 0, 0.2, 1); }
 }
 
 /* PWA Safe Area for iPhone notch */

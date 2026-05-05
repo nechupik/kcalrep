@@ -96,7 +96,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       backgroundImage: {
-        'gradient-sunset': 'linear-gradient(135deg, #4C1D95 0%, #7C3AED 100%)',
+        'gradient-sunset': 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
       },
       backgroundColor: {
         'gradient-sunset-soft': 'rgba(124, 58, 237, 0.15)',

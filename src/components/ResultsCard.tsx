@@ -55,7 +55,7 @@ export const ResultsCard = ({ result, onSave, saved }: ResultsCardProps) => {
         onClick={onSave}
         variant="outline"
         size="lg"
-        className="w-full border-2 border-primary/30 hover:bg-gradient-sunset-soft hover:border-primary"
+        className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
       >
         <Save className="mr-2 h-4 w-4" />
         {saved ? "Норма сохранена" : "Сохранить как мою норму"}

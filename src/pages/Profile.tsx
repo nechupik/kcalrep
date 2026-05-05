@@ -184,7 +184,7 @@ const Profile = () => {
 
       <section className="container max-w-3xl pt-6 pb-12">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-sunset p-2.5 shadow-glow">
+          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2.5 shadow-glow">
             <User className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
@@ -195,17 +195,17 @@ const Profile = () => {
         {/* Profile card */}
         {user && (
           <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="h-16 w-16 rounded-full bg-gradient-sunset flex items-center justify-center text-2xl font-bold text-primary-foreground shadow-glow">
+            <div className="flex items-center gap-4 mb-px">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] flex items-center justify-center text-xl font-bold text-foreground shadow-glow">
                 {(user.displayName || "?").charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <div className="text-lg font-bold truncate">{user.displayName || "No name"}</div>
-                <div className="text-sm text-muted-foreground truncate">
-                  {user.email || "Not logged in"}
-                </div>
               </div>
-              <div className="ml-auto flex gap-2">
+            </div>
+
+            <div className="mb-2">
+              <div className="w-full flex justify-center gap-2">
                 {user && user.uid === ADMIN_UID && (
                   <Button
                     variant="ghost"
@@ -229,34 +229,22 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4 mb-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Имя</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="name"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Введите ваше имя"
-                  />
-                  <Button
-                    onClick={handleSaveName}
-                    size="sm"
-                    className="px-3"
-                  >
-                    <Save className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Электронная почта</Label>
+            <div className="space-y-2">
+              <Label htmlFor="name">Имя</Label>
+              <div className="flex gap-2">
                 <Input
-                  id="email"
-                  type="email"
-                  value={user.email || ""}
-                  disabled
-                  placeholder="Email from Firebase"
+                  id="name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Введите ваше имя"
                 />
+                <Button
+                  onClick={handleSaveName}
+                  size="sm"
+                  className="px-3"
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
@@ -267,7 +255,6 @@ const Profile = () => {
         {user && (
           <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
             <div className="flex items-center gap-2 mb-1">
-              <Calculator className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-bold">Моя норма КБЖУ</h2>
             </div>
             {!norm && (
@@ -282,20 +269,22 @@ const Profile = () => {
                   <CheckCircle2 className="h-4 w-4 text-macro-protein" />
                   Норма задана
                 </div>
-                <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
                   <NormStat label="КАЛОРИИ" value={`${norm.calories}`} unit="ккал" colorClass="text-macro-calories" />
                   <NormStat label="БЕЛКИ" value={`${norm.protein}`} unit="г" colorClass="text-macro-protein" />
                   <NormStat label="ЖИРЫ" value={`${norm.fat}`} unit="г" colorClass="text-macro-fat" />
                   <NormStat label="УГЛЕВОДЫ" value={`${norm.carbs}`} unit="г" colorClass="text-macro-carbs" />
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCalculator(true)}
-                  className="border-primary/30 hover:bg-gradient-sunset-soft hover:border-primary"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Пересчитать норму
-                </Button>
+                <div className="flex justify-center items-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCalculator(true)}
+                    className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Пересчитать норму
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -346,7 +335,7 @@ const Profile = () => {
               <button
                 onClick={() => setActivityEnabled(!activityEnabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  activityEnabled ? 'bg-gradient-sunset' : 'bg-muted'
+                  activityEnabled ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d]' : 'bg-muted'
                 }`}
               >
                 <span
@@ -359,7 +348,7 @@ const Profile = () => {
             <Button
               onClick={handleSaveSettings}
               disabled={savingSettings}
-              className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+              className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90"
             >
               Сохранить настройки
             </Button>
@@ -368,7 +357,7 @@ const Profile = () => {
 
         {/* Login form */}
         {!user && (
-          <Card className="p-6 md:p-8 bg-gradient-sunset-soft border-2 border-dashed border-primary/30">
+          <Card className="p-6 md:p-8 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-2 border-dashed border-primary/30">
             <div className="flex items-center gap-2 mb-4">
               <LogIn className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-bold">{isLoginMode ? "Login" : "Registration"}</h2>
@@ -447,7 +436,7 @@ const Profile = () => {
                 type="submit"
                 size="lg"
                 disabled={isSubmitting}
-                className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+                className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
               >
                 {isSubmitting ? "Loading..." : (isLoginMode ? "Login" : "Register")}
               </Button>

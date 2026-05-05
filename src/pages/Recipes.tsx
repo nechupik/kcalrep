@@ -181,7 +181,7 @@ const Recipes = () => {
 
       <section className="container max-w-3xl pt-6 pb-12">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-sunset p-2.5 shadow-glow">
+          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2.5 shadow-glow">
             <BookOpen className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
@@ -206,7 +206,7 @@ const Recipes = () => {
             <Button
               onClick={handleSearch}
               disabled={loading}
-              className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
+              className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
             >
               Поиск
             </Button>
@@ -215,7 +215,7 @@ const Recipes = () => {
           <Button
             onClick={handleAddRecipe}
             disabled={!user}
-            className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
+            className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
           >
             <Plus className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Добавить блюдо</span>
@@ -247,7 +247,7 @@ const Recipes = () => {
                 <Button
                   onClick={handleAddRecipe}
                   disabled={!user}
-                  className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+                  className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Добавить блюдо
@@ -262,23 +262,11 @@ const Recipes = () => {
                         <h3 className="font-bold text-lg mb-2 break-words">{recipe.name}</h3>
                         
                         {/* KBJU pills */}
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))', color: '#7b6284' }}>
-                            <span>🔥</span>
-                            <span>{recipe.calories} ккал</span>
-                          </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))', color: '#7b6284' }}>
-                            <span>Б</span>
-                            <span>{recipe.protein}г</span>
-                          </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))', color: '#7b6284' }}>
-                            <span>Ж</span>
-                            <span>{recipe.fat}г</span>
-                          </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))', color: '#7b6284' }}>
-                            <span>У</span>
-                            <span>{recipe.carbs}г</span>
-                          </div>
+                        <div className="flex items-center gap-4 text-left">
+                          <span className="text-xs md:text-sm font-medium">{recipe.calories} ккал</span>
+                          <span className="text-xs md:text-sm font-medium">Б {recipe.protein}г</span>
+                          <span className="text-xs md:text-sm font-medium">Ж {recipe.fat}г</span>
+                          <span className="text-xs md:text-sm font-medium">У {recipe.carbs}г</span>
                         </div>
 
                         {/* Description preview */}
@@ -402,7 +390,7 @@ const Recipes = () => {
                       onClick={() => setServingType('grams')}
                       className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
                         servingType === 'grams'
-                          ? 'border-primary bg-gradient-sunset-soft text-foreground'
+                          ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
                           : 'border-border bg-background text-muted-foreground'
                       }`}
                     >
@@ -413,7 +401,7 @@ const Recipes = () => {
                       onClick={() => setServingType('portion')}
                       className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
                         servingType === 'portion'
-                          ? 'border-primary bg-gradient-sunset-soft text-foreground'
+                          ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
                           : 'border-border bg-background text-muted-foreground'
                       }`}
                     >
@@ -449,7 +437,7 @@ const Recipes = () => {
                 <Button
                   onClick={editingRecipe ? handleUpdateRecipe : handleSaveRecipe}
                   disabled={!formData.name.trim()}
-                  className="flex-1 bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+                  className="flex-1 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >
                   {editingRecipe ? "Обновить блюдо" : "Сохранить блюдо"}
                 </Button>

@@ -213,7 +213,7 @@ const Products = () => {
 
       <section className="container max-w-3xl pt-6 pb-12">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-sunset p-2.5 shadow-glow">
+          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2.5 shadow-glow">
             <Package className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
@@ -239,7 +239,7 @@ const Products = () => {
             <Button
               onClick={handleSearch}
               disabled={loading}
-              className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
+              className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
             >
               Поиск
             </Button>
@@ -248,7 +248,7 @@ const Products = () => {
           <Button
             onClick={handleAddProduct}
             disabled={!user}
-            className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
+            className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
           >
             <Plus className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Добавить продукт</span>
@@ -281,7 +281,7 @@ const Products = () => {
                 <Button
                   onClick={loadUserProducts}
                   disabled={!user}
-                  className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+                  className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >
                   Попробовать снова
                 </Button>
@@ -296,7 +296,7 @@ const Products = () => {
                 <Button
                   onClick={handleAddProduct}
                   disabled={!user}
-                  className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+                  className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Добавить продукт
@@ -306,48 +306,33 @@ const Products = () => {
               <div className="space-y-3">
                 {products.map((product) => (
                   <Card key={product.id} className="rounded-xl border border-border/50 bg-card/80 p-4 hover:bg-card transition-smooth">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base mb-1 break-words">{product.name}</h3>
-                        
-                        {/* Macro badges row */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-calories))', color: '#7b6284' }}>
-                            <span>🔥</span>
-                            <span>{product.calories} ккал</span>
-                          </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-protein))', color: '#7b6284' }}>
-                            <span>Б</span>
-                            <span>{product.protein}г</span>
-                          </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-fat))', color: '#7b6284' }}>
-                            <span>Ж</span>
-                            <span>{product.fat}г</span>
-                          </div>
-                          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 rounded-full text-xs md:text-sm font-medium" style={{ backgroundColor: 'hsl(var(--macro-carbs))', color: '#7b6284' }}>
-                            <span>У</span>
-                            <span>{product.carbs}г</span>
-                          </div>
+                    <div className="flex flex-col w-full">
+                      <div className="flex items-center justify-between w-full">
+                        <h3 className="font-semibold text-base break-words">{product.name}</h3>
+                        <div className="flex gap-1 md:gap-2 items-center ml-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditProduct(product)}
+                            className="text-muted-foreground hover:text-primary p-2 md:p-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="text-muted-foreground hover:text-destructive p-2 md:p-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      
-                      <div className="flex gap-1 md:gap-2 items-center ml-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditProduct(product)}
-                          className="text-muted-foreground hover:text-primary p-2 md:p-2"
-                        >
-                          <Edit className="h-3 w-3 md:h-4 md:w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteProduct(product.id)}
-                          className="text-muted-foreground hover:text-destructive p-2 md:p-2"
-                        >
-                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                        </Button>
+                      <div className="flex items-center gap-4 text-left mt-2">
+                        <span className="text-xs md:text-sm font-medium">{product.calories} ккал</span>
+                        <span className="text-xs md:text-sm font-medium">Б {product.protein}г</span>
+                        <span className="text-xs md:text-sm font-medium">Ж {product.fat}г</span>
+                        <span className="text-xs md:text-sm font-medium">У {product.carbs}г</span>
                       </div>
                     </div>
                   </Card>
@@ -376,8 +361,8 @@ const Products = () => {
               </div>
 
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Название продукта</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="name" className="block text-left">Название продукта</Label>
                   <Input
                     id="name"
                     type="text"
@@ -385,6 +370,8 @@ const Products = () => {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Название продукта"
                     required
+                    className="w-full"
+                    style={{ marginLeft: '0', paddingLeft: '12px' }}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -449,7 +436,7 @@ const Products = () => {
                 <Button
                   onClick={editingProduct ? handleUpdateProduct : handleSaveProduct}
                   disabled={!formData.name.trim()}
-                  className="flex-1 bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90 shadow-glow"
+                  className="flex-1 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >
                   {editingProduct ? "Обновить продукт" : "Сохранить продукт"}
                 </Button>

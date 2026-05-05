@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar, Plus, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { MacroRing } from "@/components/MacroRing";
+import { MainCalorieRing } from "@/components/MainCalorieRing";
+import { MacroProgressBar } from "@/components/MacroProgressBar";
 import { AppHeader } from "@/components/AppHeader";
 import { AddFoodModal } from "@/components/AddFoodModal";
 import { Card } from "@/components/ui/card";
@@ -301,14 +303,7 @@ const Index = () => {
               <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                 <div>
                   <h2 className="text-xl font-bold">{isToday ? 'Сегодня' : formatDate(selectedDate)}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedDateTotals.calories} из {norm.calories} ккал · осталось{" "}
-                    <span className="font-semibold text-foreground">
-                      {Math.max(0, norm.calories - selectedDateTotals.calories)}
-                    </span>{" "}
-                    ккал
-                  </p>
-                </div>
+                                  </div>
                 {!isToday && (
                   <Button onClick={goToToday} variant="outline" size="sm">
                     <Calendar className="h-4 w-4 mr-2" />
@@ -316,34 +311,32 @@ const Index = () => {
                   </Button>
                 )}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
-                <MacroRing consumed={selectedDateTotals.calories} total={norm.calories} label="Калории" unit=" ккал" colorVar="--macro-calories" />
-                <MacroRing consumed={selectedDateTotals.protein} total={norm.protein} label="Белки" colorVar="--macro-protein" />
-                <MacroRing consumed={selectedDateTotals.fat} total={norm.fat} label="Жиры" colorVar="--macro-fat" />
-                <MacroRing consumed={selectedDateTotals.carbs} total={norm.carbs} label="Углеводы" colorVar="--macro-carbs" />
+              <div className="flex flex-col items-center gap-8 mb-6">
+                <MainCalorieRing consumed={selectedDateTotals.calories} total={norm.calories} />
+                <div className="w-full max-w-lg flex flex-row justify-between gap-2 px-2">
+                  <MacroProgressBar consumed={selectedDateTotals.protein} total={norm.protein} label="Белки" colorVar="--macro-protein" />
+                  <MacroProgressBar consumed={selectedDateTotals.fat} total={norm.fat} label="Жиры" colorVar="--macro-fat" />
+                  <MacroProgressBar consumed={selectedDateTotals.carbs} total={norm.carbs} label="Углеводы" colorVar="--macro-carbs" />
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+                >
+                  <Plus className="h-6 w-6" />
+                  Добавить еду
+                </button>
               </div>
             </Card>
           ) : null}
         </section>
 
-        {/* Add Food Button */}
-        <section className="container max-w-5xl mb-6">
-          <div className="flex justify-center mb-6">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-3 rounded-2xl bg-gradient-sunset px-8 py-4 text-primary-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
-            >
-              <Plus className="h-6 w-6" />
-              Добавить еду
-            </button>
-          </div>
-        </section>
-
         {/* Activity Tracking */}
-        {norm && (user?.uid === ADMIN_UID || activityEnabled) && (
-          <Card className="p-5 md:p-6 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 mb-6">
+        <section className="container max-w-5xl mb-6">
+          {norm && (user?.uid === ADMIN_UID || activityEnabled) && (
+            <Card className="w-full p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg">{user?.uid === ADMIN_UID ? '⌚' : '👣'}</span>
               <h3 className="font-semibold">Активность за день</h3>
               {activity && (
                 <span className="ml-auto text-sm font-semibold text-green-400">
@@ -365,7 +358,7 @@ const Index = () => {
                 <Button
                   onClick={handleSaveActivity}
                   disabled={savingActivity || !activityInput}
-                  className="bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+                  className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
                 >
                   Сохранить
                 </Button>
@@ -410,7 +403,7 @@ const Index = () => {
                 <Button
                   onClick={handleSaveActivity}
                   disabled={savingActivity || (activityMode === 'steps' && !activityInput)}
-                  className="w-full bg-gradient-sunset border-0 text-primary-foreground hover:opacity-90"
+                  className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90"
                 >
                   Сохранить активность
                 </Button>
@@ -437,7 +430,8 @@ const Index = () => {
               </div>
             )}
           </Card>
-        )}
+          )}
+        </section>
 
         {/* Suggestions */}
         {suggestions.length > 0 && (

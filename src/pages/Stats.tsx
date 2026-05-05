@@ -3,6 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/ui/month-picker";
 import { BarChart3, TrendingUp, Activity, Weight, X } from "lucide-react";
 import {
   Bar,
@@ -383,11 +384,28 @@ const Stats = () => {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barCategoryGap="5%" barGap={0}>
+                <CartesianGrid
+                  vertical={true}
+                  horizontal={true}
+                  strokeDasharray="3 3"
+                  stroke="rgba(107, 107, 138, 0.2)"
+                  verticalCoordinatesGenerator={(props) => {
+                    const { width, offset } = props;
+                    const step = (width - offset.left - offset.right) / 7;
+                    return Array.from({ length: 6 }, (_, i) => offset.left + step * (i + 1));
+                  }}
+                />
+                <XAxis 
+                  dataKey="label" 
+                  tick={{ fill: '#6B6B8A', fontSize: 11 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <Tooltip
+                  cursor={{ fill: 'transparent' }}
                   contentStyle={{
                     background: "hsl(var(--popover))",
                     border: "1px solid hsl(var(--border))",
@@ -406,30 +424,8 @@ const Stats = () => {
                 <Bar
                   dataKey="calories"
                   fill="hsl(var(--foreground))"
-                  radius={[4, 4, 0, 0]}
-                  activeBar={(props: any) => {
-                    const { fill, x, y, width, height } = props;
-                    const scale = 1.03;
-                    const scaledWidth = width * scale;
-                    const scaledHeight = height * scale;
-                    // Scale only upwards - keep bottom edge at same position
-                    const offsetX = x - (scaledWidth - width) / 2;
-                    const offsetY = y - (scaledHeight - height);
-                    
-                    return (
-                      <rect
-                        x={offsetX}
-                        y={offsetY}
-                        width={scaledWidth}
-                        height={scaledHeight}
-                        fill={fill}
-                        stroke="none"
-                        fillOpacity={1}
-                        rx={4}
-                        ry={0}
-                      />
-                    );
-                  }}
+                  radius={[10, 10, 0, 0]}
+                  activeBar={false}
                   onClick={(data) => {
                     // Handle bar click if needed
                     console.log('Bar clicked:', data);
@@ -546,7 +542,11 @@ const Stats = () => {
                   onChange={(e) => setWeightInput(e.target.value)}
                   className="flex-1"
                 />
-                <Button onClick={handleSaveWeight} disabled={!weightInput}>
+                <Button 
+                  onClick={handleSaveWeight} 
+                  disabled={!weightInput}
+                  className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+                >
                   Сохранить вес
                 </Button>
               </div>
@@ -622,11 +622,9 @@ const Stats = () => {
               {/* Month selector */}
               <div className="flex items-center gap-2">
                 <label className="text-sm text-muted-foreground">Месяц:</label>
-                <input
-                  type="month"
+                <MonthPicker
                   value={selectedMonth}
-                  onChange={e => setSelectedMonth(e.target.value)}
-                  className="bg-muted/40 border border-border/50 rounded-lg px-3 py-1.5 text-sm"
+                  onChange={setSelectedMonth}
                 />
               </div>
 
@@ -656,7 +654,7 @@ const Stats = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">По продуктам</p>
                   {productStats.map(p => (
                     <div key={p.name} className="rounded-xl bg-muted/30 px-4 py-3">
-                      <div className="flex justify-between items-start mb-1">
+                      <div className="flex justify-between items-start mb-[5px]">
                         <span className="font-medium text-sm">{p.name}</span>
                         <span className="text-xs text-muted-foreground">{p.count} раз</span>
                       </div>

@@ -93,7 +93,7 @@ export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитат�
                 onClick={() => setGender(g)}
                 className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-smooth ${
                   gender === g
-                    ? "border-primary bg-gradient-sunset-soft text-foreground"
+                    ? "border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground"
                     : "border-border bg-background text-muted-foreground hover:border-primary/40"
                 }`}
               >
@@ -241,7 +241,7 @@ export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитат�
         <Button
           type="submit"
           size="lg"
-          className="w-full bg-gradient-sunset text-primary-foreground hover:opacity-90 shadow-glow border-0 h-12 text-base font-semibold"
+          className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90 shadow-glow border-0 h-12 text-base font-semibold"
         >
           {submitLabel}
           <ArrowRight className="ml-2 h-4 w-4" />
