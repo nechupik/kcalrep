@@ -34,6 +34,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [manualFat, setManualFat] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
   const [saveToBase, setSaveToBase] = useState(false);
+  const [isTabChanging, setIsTabChanging] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !user) return;
@@ -151,28 +152,41 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   ];
 
   return (
+  <div
+    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+    style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
+  >
+    {/* Overlay */}
     <div
-      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none`}
-      aria-hidden={!isOpen}
-    >
-      {/* Overlay */}
-      <div
-        onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-2000 ease-in-out"
-        style={{
-          opacity: isOpen ? 1 : 0,
-          pointerEvents: isOpen ? 'auto' : 'none',
-        }}
-      />
+      onClick={onClose}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(4px)',
+        opacity: isOpen ? 1 : 0,
+        transition: 'opacity 650ms cubic-bezier(0.4, 0, 0.2, 1)',
+        pointerEvents: isOpen ? 'auto' : 'none',
+      }}
+    />
 
-      {/* Modal */}
-      <div
-        className="relative w-full sm:max-w-lg bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto transition-transform duration-2000 ease-in-out"
-        style={{
-          transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
-          pointerEvents: isOpen ? 'auto' : 'none',
-        }}
-      >
+    {/* Modal panel */}
+    <div
+      style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '512px',
+        background: 'hsl(var(--background))',
+        border: '1px solid hsl(var(--border) / 0.5)',
+        borderRadius: '24px 24px 0 0',
+        padding: '24px',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 650ms cubic-bezier(0.4, 0, 0.2, 1)',
+        boxShadow: '0 -4px 40px rgba(0,0,0,0.4)',
+      }}
+    >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold">Добавить еду</h2>
@@ -186,7 +200,16 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setSelected(null); setQuery(''); }}
+              onClick={() => {
+  if (tab.id === activeTab) return;
+  setIsTabChanging(true);
+  setTimeout(() => {
+    setActiveTab(tab.id);
+    setSelected(null);
+    setQuery('');
+    setIsTabChanging(false);
+  }, 150);
+}}
               className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-smooth ${
                 activeTab === tab.id
                   ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-primary-foreground shadow-glow'
@@ -200,142 +223,150 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         </div>
 
         {/* Keep all existing tab content exactly as before */}
-        {(activeTab === 'product' || activeTab === 'dish') && (
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={activeTab === 'product' ? 'Поиск продуктов...' : 'Поиск блюд...'}
-                value={query}
-                onChange={e => { setQuery(e.target.value); setSelected(null); }}
-                className="pl-9"
-              />
-            </div>
-
-            {!selected && (
-              <div className="space-y-1 max-h-56 overflow-y-auto rounded-xl border border-border/50 bg-muted/20 p-2">
-                {loading && <p className="text-sm text-muted-foreground text-center py-4">Загрузка...</p>}
-                {!loading && filtered.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">Ничего не найдено</p>
-                )}
-                {filtered.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleSelect(item)}
-                    className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-smooth flex items-center justify-between gap-2"
-                  >
-                    <span className="text-sm font-medium truncate">{item.name}</span>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {'servingType' in item && item.servingType === 'portion'
-                        ? `${item.calories} ккал/порц` 
-                        : `${item.calories} ккал/100г`}
-                    </span>
-                  </button>
-                ))}
+        <div
+          style={{
+            opacity: isTabChanging ? 0 : 1,
+            transform: isTabChanging ? 'translateY(8px)' : 'translateY(0)',
+            transition: 'opacity 150ms ease-in-out, transform 150ms ease-in-out',
+          }}
+        >
+          {(activeTab === 'product' || activeTab === 'dish') && (
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={activeTab === 'product' ? 'Поиск продуктов...' : 'Поиск блюд...'}
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setSelected(null); }}
+                  className="pl-9"
+                />
               </div>
-            )}
 
-            {selected && (
-              <div className="rounded-xl border-2 border-primary/30 bg-muted/20 p-4 space-y-3">
-                <div>
-                  <div className="font-semibold">{selected.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {isPortion(selected)
-                      ? `Порция: ${selected.calories} ккал · Б ${selected.protein} · Ж ${selected.fat} · У ${selected.carbs}` 
-                      : `на 100г: ${selected.calories} ккал · Б ${selected.protein} · Ж ${selected.fat} · У ${selected.carbs}`}
-                  </div>
+              {!selected && (
+                <div className="space-y-1 max-h-56 overflow-y-auto rounded-xl border border-border/50 bg-muted/20 p-2">
+                  {loading && <p className="text-sm text-muted-foreground text-center py-4">Загрузка...</p>}
+                  {!loading && filtered.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">Ничего не найдено</p>
+                  )}
+                  {filtered.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleSelect(item)}
+                      className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-smooth flex items-center justify-between gap-2"
+                    >
+                      <span className="text-sm font-medium truncate">{item.name}</span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {'servingType' in item && item.servingType === 'portion'
+                          ? `${item.calories} ккал/порц` 
+                          : `${item.calories} ккал/100г`}
+                      </span>
+                    </button>
+                  ))}
                 </div>
+              )}
 
-                {!isPortion(selected) && (
+              {selected && (
+                <div className="rounded-xl border-2 border-primary/30 bg-muted/20 p-4 space-y-3">
                   <div>
-                    <Label className="text-xs">Граммы</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={grams}
-                      onChange={e => setGrams(e.target.value)}
-                      autoFocus
-                    />
+                    <div className="font-semibold">{selected.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {isPortion(selected)
+                        ? `Порция: ${selected.calories} ккал · Б ${selected.protein} · Ж ${selected.fat} · У ${selected.carbs}` 
+                        : `на 100г: ${selected.calories} ккал · Б ${selected.protein} · Ж ${selected.fat} · У ${selected.carbs}`}
+                    </div>
                   </div>
-                )}
 
-                {isPortion(selected) && (
-                  <div className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-                    🍽️ Добавится как одна порция
+                  {!isPortion(selected) && (
+                    <div>
+                      <Label className="text-xs">Граммы</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={grams}
+                        onChange={e => setGrams(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  )}
+
+                  {isPortion(selected) && (
+                    <div className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+                      🍽️ Добавится как одна порция
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleAdd}
+                      className="flex-1 bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
+                    >
+                      Добавить
+                    </Button>
+                    <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}>
+                      Отмена
+                    </Button>
                   </div>
-                )}
+                </div>
+              )}
+            </div>
+          )}
 
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleAdd}
-                    className="flex-1 bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
-                  >
-                    Добавить
-                  </Button>
-                  <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}>
-                    Отмена
-                  </Button>
+          {activeTab === 'manual' && (
+            <div className="space-y-4">
+              <div>
+                <Label>Название</Label>
+                <Input
+                  placeholder="Например: Борщ домашний"
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Калории (ккал)</Label>
+                  <Input type="number" placeholder="0" value={manualCalories} onChange={e => setManualCalories(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Белки (г)</Label>
+                  <Input type="number" placeholder="0" value={manualProtein} onChange={e => setManualProtein(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Жиры (г)</Label>
+                  <Input type="number" placeholder="0" value={manualFat} onChange={e => setManualFat(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Углеводы (г)</Label>
+                  <Input type="number" placeholder="0" value={manualCarbs} onChange={e => setManualCarbs(e.target.value)} />
                 </div>
               </div>
-            )}
-          </div>
-        )}
 
-        {activeTab === 'manual' && (
-          <div className="space-y-4">
-            <div>
-              <Label>Название</Label>
-              <Input
-                placeholder="Например: Борщ домашний"
-                value={manualName}
-                onChange={e => setManualName(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Калории (ккал)</Label>
-                <Input type="number" placeholder="0" value={manualCalories} onChange={e => setManualCalories(e.target.value)} />
+              <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">Сохранить в базу продуктов</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {saveToBase ? 'Продукт сохранится и будет доступен всем' : 'Только в дневник, без сохранения'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSaveToBase(!saveToBase)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-3 ${
+                    saveToBase ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED]' : 'bg-muted'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${saveToBase ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
               </div>
-              <div>
-                <Label>Белки (г)</Label>
-                <Input type="number" placeholder="0" value={manualProtein} onChange={e => setManualProtein(e.target.value)} />
-              </div>
-              <div>
-                <Label>Жиры (г)</Label>
-                <Input type="number" placeholder="0" value={manualFat} onChange={e => setManualFat(e.target.value)} />
-              </div>
-              <div>
-                <Label>Углеводы (г)</Label>
-                <Input type="number" placeholder="0" value={manualCarbs} onChange={e => setManualCarbs(e.target.value)} />
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">Сохранить в базу продуктов</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {saveToBase ? 'Продукт сохранится и будет доступен всем' : 'Только в дневник, без сохранения'}
-                </p>
-              </div>
-              <button
-                onClick={() => setSaveToBase(!saveToBase)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-3 ${
-                  saveToBase ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED]' : 'bg-muted'
-                }`}
+              <Button
+                onClick={handleManualAdd}
+                disabled={!manualName || !manualCalories}
+                className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${saveToBase ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
+                Добавить запись
+              </Button>
             </div>
-
-            <Button
-              onClick={handleManualAdd}
-              disabled={!manualName || !manualCalories}
-              className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
-            >
-              Добавить запись
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
