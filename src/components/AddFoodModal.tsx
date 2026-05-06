@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Package, BookOpen, PenLine, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,8 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [manualCarbs, setManualCarbs] = useState('');
   const [saveToBase, setSaveToBase] = useState(false);
   const [isTabChanging, setIsTabChanging] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
 
   useEffect(() => {
     if (!isOpen || !user) return;
@@ -47,6 +49,13 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     };
     load();
   }, [isOpen, user]);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      const height = contentRef.current.scrollHeight;
+      setContentHeight(height);
+    }
+  }, [activeTab, selected, isTabChanging]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -183,7 +192,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         maxHeight: '90vh',
         overflowY: 'auto',
         transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 650ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'transform 650ms cubic-bezier(0.4, 0, 0.2, 1), height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         boxShadow: '0 -4px 40px rgba(0,0,0,0.4)',
       }}
     >
@@ -208,7 +217,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     setSelected(null);
     setQuery('');
     setIsTabChanging(false);
-  }, 150);
+  }, 350);
 }}
               className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-smooth ${
                 activeTab === tab.id
@@ -225,11 +234,19 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         {/* Keep all existing tab content exactly as before */}
         <div
           style={{
-            opacity: isTabChanging ? 0 : 1,
-            transform: isTabChanging ? 'translateY(8px)' : 'translateY(0)',
-            transition: 'opacity 150ms ease-in-out, transform 150ms ease-in-out',
+            overflow: 'hidden',
+            height: contentHeight,
+            transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
+          <div
+            ref={contentRef}
+            style={{
+              opacity: isTabChanging ? 0 : 1,
+              transform: isTabChanging ? 'translateY(8px)' : 'translateY(0)',
+              transition: 'opacity 350ms ease-in-out, transform 350ms ease-in-out',
+            }}
+          >
           {(activeTab === 'product' || activeTab === 'dish') && (
             <div className="space-y-4">
               <div className="relative">
@@ -366,6 +383,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
               </Button>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
