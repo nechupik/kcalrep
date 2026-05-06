@@ -39,6 +39,8 @@ const Profile = () => {
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [draftResult, setDraftResult] = useState<MacroResult | null>(null);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [isCalcVisible, setIsCalcVisible] = useState(false);
+  const [isCalcMounted, setIsCalcMounted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -50,7 +52,10 @@ const Profile = () => {
       const n = await loadNorm();
       setNorm(n);
       // Si no hay norma pero hay usuario, mostrar calculadora
-      if (user && !n) setShowCalculator(true);
+      if (user && !n) {
+        setIsCalcMounted(true);
+        setTimeout(() => setIsCalcVisible(true), 10);
+      }
       
       // Load user settings
       if (user) {
@@ -131,13 +136,18 @@ const Profile = () => {
     toast.success("Norm calculated - save to apply");
   };
 
-  const handleSaveNorm = () => {
-    if (!draftResult) return;
-    saveNorm(draftResult);
-    setNorm(draftResult);
+  const handleSaveNorm = async (result: MacroResult) => {
+    saveNorm(result);
+    setNorm(result);
     setDraftResult(null);
-    setShowCalculator(false);
+    setIsCalcVisible(false);
+    setTimeout(() => setIsCalcMounted(false), 300);
     toast.success("Norm saved");
+  };
+
+  const handleCloseCalc = () => {
+    setIsCalcVisible(false);
+    setTimeout(() => setIsCalcMounted(false), 300);
   };
 
   const handleSaveName = async () => {
@@ -263,56 +273,80 @@ const Profile = () => {
               </p>
             )}
 
-            {norm && !showCalculator && (
-              <div className="rounded-2xl bg-gradient-sunset-soft border border-primary/20 p-5 mb-4">
-                <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-macro-protein" />
-                  Норма задана
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
-                  <NormStat label="КАЛОРИИ" value={`${norm.calories}`} unit="ккал" colorClass="text-macro-calories" />
-                  <NormStat label="БЕЛКИ" value={`${norm.protein}`} unit="г" colorClass="text-macro-protein" />
-                  <NormStat label="ЖИРЫ" value={`${norm.fat}`} unit="г" colorClass="text-macro-fat" />
-                  <NormStat label="УГЛЕВОДЫ" value={`${norm.carbs}`} unit="г" colorClass="text-macro-carbs" />
-                </div>
-                <div className="flex justify-center items-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCalculator(true)}
-                    className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-all duration-2000 ease-in-out"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Пересчитать норму
-                  </Button>
+            {norm && !isCalcMounted && (
+              <div
+                style={{
+                  opacity: norm ? 1 : 0,
+                  transform: norm ? 'translateY(0)' : 'translateY(16px)',
+                  transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              >
+                <div className="rounded-2xl bg-gradient-sunset-soft border border-primary/20 p-5 mb-4">
+                  <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-4 w-4 text-macro-protein" />
+                    Норма задана
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                    <NormStat label="КАЛОРИИ" value={`${norm.calories}`} unit="ккал" colorClass="text-macro-calories" />
+                    <NormStat label="БЕЛКИ" value={`${norm.protein}`} unit="г" colorClass="text-macro-protein" />
+                    <NormStat label="ЖИРЫ" value={`${norm.fat}`} unit="г" colorClass="text-macro-fat" />
+                    <NormStat label="УГЛЕВОДЫ" value={`${norm.carbs}`} unit="г" colorClass="text-macro-carbs" />
+                  </div>
+                  <div className="flex justify-center items-center">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsCalcMounted(true);
+                        setTimeout(() => setIsCalcVisible(true), 10);
+                      }}
+                      className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-all duration-2000 ease-in-out"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Пересчитать норму
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
 
-            {showCalculator && (
-              <div className="space-y-4">
-                <CalculatorForm
-                  onCalculate={handleCalculate}
-                  submitLabel={norm ? "Recalculate" : "Calculate norm"}
-                />
-                {draftResult && (
-                  <ResultsCard
-                    result={draftResult}
-                    onSave={handleSaveNorm}
-                    saved={!!norm && norm.calories === draftResult.calories}
+            {isCalcMounted && (
+              <div
+                style={{
+                  opacity: isCalcVisible ? 1 : 0,
+                  transform: isCalcVisible ? 'translateY(0)' : 'translateY(16px)',
+                  transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              >
+                <div className="space-y-4">
+                  <CalculatorForm
+                    onCalculate={handleCalculate}
+                    submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
                   />
-                )}
-                {norm && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setShowCalculator(false);
-                      setDraftResult(null);
-                    }}
-                    className="text-muted-foreground"
-                  >
-                    Cancel
-                  </Button>
-                )}
+                  {draftResult && (
+                    <div
+                      style={{
+                        opacity: 1,
+                        transform: 'translateY(0)',
+                        transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      <ResultsCard
+                        result={draftResult}
+                        onSave={() => handleSaveNorm(draftResult)}
+                        saved={!!norm && norm.calories === draftResult.calories}
+                      />
+                    </div>
+                  )}
+                  {norm && (
+                    <Button
+                      variant="ghost"
+                      onClick={handleCloseCalc}
+                      className="text-muted-foreground"
+                    >
+                      Отмена
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </Card>
