@@ -8,53 +8,53 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 232 20% 5%;
-    --foreground: 240 20% 57%;
-    --card: 270 15% 12%;
-    --card-foreground: 240 20% 57%;
-    --popover: 270 15% 12%;
-    --popover-foreground: 240 20% 57%;
-    --primary: 263 72% 54%;
-    --primary-foreground: 240 20% 57%;
-    --secondary: 240 20% 12%;
-    --secondary-foreground: 240 20% 57%;
-    --muted: 240 15% 14%;
-    --muted-foreground: 240 15% 50%;
-    --accent: 263 60% 35%;
-    --accent-foreground: 240 20% 57%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 240 20% 57%;
-    --border: 240 15% 18%;
-    --input: 240 20% 12%;
-    --ring: 263 72% 54%;
+    --background: 232 20% 10%;
+    --foreground: 240 20% 62%;
+    --card: 270 15% 17%;
+    --card-foreground: 240 20% 62%;
+    --popover: 270 15% 17%;
+    --popover-foreground: 240 20% 62%;
+    --primary: 263 72% 59%;
+    --primary-foreground: 240 20% 62%;
+    --secondary: 240 20% 17%;
+    --secondary-foreground: 240 20% 62%;
+    --muted: 240 15% 19%;
+    --muted-foreground: 240 15% 55%;
+    --accent: 263 60% 40%;
+    --accent-foreground: 240 20% 62%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 240 20% 62%;
+    --border: 240 15% 23%;
+    --input: 240 20% 17%;
+    --ring: 263 72% 59%;
     --radius: 0.75rem;
 
-    --macro-calories: #947dbb;
-    --macro-protein: #5B21B6;
-    --macro-fat: #6D28D9;
-    --macro-carbs: #7b6284;
+    --macro-calories: #9d86b8;
+    --macro-protein: #6328c1;
+    --macro-fat: #7625e0;
+    --macro-carbs: #836a8c;
   }
 
   .dark {
-    --background: 232 20% 5%;
-    --foreground: 240 20% 57%;
-    --card: 270 15% 12%;
-    --card-foreground: 240 20% 57%;
-    --popover: 270 15% 12%;
-    --popover-foreground: 240 20% 57%;
-    --primary: 263 72% 54%;
-    --primary-foreground: 240 20% 57%;
-    --secondary: 240 20% 12%;
-    --secondary-foreground: 240 20% 57%;
-    --muted: 240 15% 14%;
-    --muted-foreground: 240 15% 50%;
-    --accent: 263 60% 35%;
-    --accent-foreground: 240 20% 57%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 240 20% 57%;
-    --border: 240 15% 18%;
-    --input: 240 20% 12%;
-    --ring: 263 72% 54%;
+    --background: 232 20% 10%;
+    --foreground: 240 20% 62%;
+    --card: 270 15% 17%;
+    --card-foreground: 240 20% 62%;
+    --popover: 270 15% 17%;
+    --popover-foreground: 240 20% 62%;
+    --primary: 263 72% 59%;
+    --primary-foreground: 240 20% 62%;
+    --secondary: 240 20% 17%;
+    --secondary-foreground: 240 20% 62%;
+    --muted: 240 15% 19%;
+    --muted-foreground: 240 15% 55%;
+    --accent: 263 60% 40%;
+    --accent-foreground: 240 20% 62%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 240 20% 62%;
+    --border: 240 15% 23%;
+    --input: 240 20% 17%;
+    --ring: 263 72% 59%;
   }
 }
 
@@ -64,8 +64,8 @@ All colors MUST be HSL.
   }
 
   body {
-    background-color: #0c080d;
-    color: #9b8ba3;
+    background-color: #130c13;
+    color: #a38fa0;
     font-family: 'DM Sans', system-ui, sans-serif;
   }
 
@@ -120,5 +120,5 @@ input[type='number'] {
 }
 
 /* Scrollbar colors */
-::-webkit-scrollbar-thumb { background: #7b6284; }
-::-webkit-scrollbar-track { background: #7b6284; }
+::-webkit-scrollbar-thumb { background: #836a8c; }
+::-webkit-scrollbar-track { background: #836a8c; }

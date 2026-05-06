@@ -279,7 +279,7 @@ const Profile = () => {
                   <Button
                     variant="outline"
                     onClick={() => setShowCalculator(true)}
-                    className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-all duration-650 ease-in-out"
+                    className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-all duration-2000 ease-in-out"
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Пересчитать норму
