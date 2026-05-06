@@ -44,8 +44,7 @@ const Profile = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savingName, setSavingName] = useState(false);
-  const [calcInput, setCalcInput] = useState<CalcInput | null>(null);
-
+  
   useEffect(() => {
     const loadNormData = async () => {
       const n = await loadNorm();
