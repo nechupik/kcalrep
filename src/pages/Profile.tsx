@@ -37,7 +37,6 @@ const Profile = () => {
   const [isLoginMode, setIsLoginMode] = useState(true);
 
   const [norm, setNorm] = useState<MacroResult | null>(null);
-  const [draftResult, setDraftResult] = useState<MacroResult | null>(null);
   const [showCalculator, setShowCalculator] = useState(false);
   const [calcVisible, setCalcVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +44,7 @@ const Profile = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [calcInput, setCalcInput] = useState<CalcInput | null>(null);
 
   useEffect(() => {
     const loadNormData = async () => {
@@ -125,26 +125,25 @@ const Profile = () => {
     try {
       await signOut();
       setShowCalculator(false);
-      setDraftResult(null);
       toast.message("Вы вышли из аккаунта");
     } catch (error: any) {
       toast.error(error.message || "Ошибка выхода");
     }
   };
 
-  const handleCalculate = (res: MacroResult, _input: CalcInput) => {
-    setDraftResult(res);
-    toast.success("Norm calculated - save to apply");
-  };
-
-  const handleSaveNorm = async (result: MacroResult) => {
-    saveNorm(result);
-    setNorm(result);
-    setDraftResult(null);
+  const handleCalculate = async (res: MacroResult, input: CalcInput) => {
+    await saveNorm(res, {
+      gender: input.gender,
+      height: input.height,
+      age: input.age,
+      goal: input.goal
+    });
+    setNorm(res);
     setCalcVisible(false);
     setTimeout(() => setShowCalculator(false), 300);
-    toast.success("Norm saved");
+    toast.success('Норма пересчитана и сохранена');
   };
+
 
   const handleCloseCalc = () => {
     setCalcVisible(false);
@@ -324,21 +323,6 @@ const Profile = () => {
                   onCalculate={handleCalculate}
                   submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
                 />
-                {draftResult && (
-                  <div
-                    style={{
-                      opacity: 1,
-                      transform: 'translateY(0)',
-                      transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
-                  >
-                    <ResultsCard
-                      result={draftResult}
-                      onSave={() => handleSaveNorm(draftResult)}
-                      saved={!!norm && norm.calories === draftResult.calories}
-                    />
-                  </div>
-                )}
               </div>
             )}
           </Card>
@@ -386,12 +370,12 @@ const Profile = () => {
           <Card className="p-6 md:p-8 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-2 border-dashed border-primary/30">
             <div className="flex items-center gap-2 mb-4">
               <LogIn className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-bold">{isLoginMode ? "Login" : "Registration"}</h2>
+              <h2 className="text-lg font-bold">{isLoginMode ? "Войти" : "Регистрация"}</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-5">
               {isLoginMode 
-                ? "Log in to your account to sync data between devices."
-                : "Create an account to save data and sync between devices."
+                ? "Войдите в аккаунт для синхронизации данных."
+                : "Создайте аккаунт для сохранения данных."
               }
             </p>
             
@@ -409,7 +393,7 @@ const Profile = () => {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
-              Login with Google
+              Войти через Google
             </Button>
 
             <div className="relative mb-4">
@@ -417,20 +401,20 @@ const Profile = () => {
                 <span className="w-full border-t border-border/50" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or</span>
+                <span className="bg-card px-2 text-muted-foreground">или</span>
               </div>
             </div>
 
             <form onSubmit={handleEmailAuth} className="space-y-4">
               {!isLoginMode && (
                 <div className="space-y-2">
-                  <Label htmlFor="register-name">Name</Label>
+                  <Label htmlFor="register-name">Имя</Label>
                   <Input
                     id="register-name"
                     type="text"
                     value={registerName}
                     onChange={(e) => setRegisterName(e.target.value)}
-                    placeholder="What should we call you"
+                    placeholder="Ваше имя"
                     required
                   />
                 </div>
@@ -447,7 +431,7 @@ const Profile = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
+                <Label htmlFor="login-password">Пароль</Label>
                 <Input
                   id="login-password"
                   type="password"
@@ -464,7 +448,7 @@ const Profile = () => {
                 disabled={isSubmitting}
                 className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
               >
-                {isSubmitting ? "Loading..." : (isLoginMode ? "Login" : "Register")}
+                {isSubmitting ? "Загрузка..." : (isLoginMode ? "Войти" : "Зарегистрироваться")}
               </Button>
             </form>
 
@@ -479,7 +463,7 @@ const Profile = () => {
                 }}
                 className="text-sm text-muted-foreground hover:text-primary transition-colors"
               >
-                {isLoginMode ? "No account? Register" : "Have account? Login"}
+                {isLoginMode ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти"}
               </button>
             </div>
           </Card>

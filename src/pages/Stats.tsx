@@ -4,7 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MonthPicker } from "@/components/ui/month-picker";
-import { BarChart3, TrendingUp, Activity, Weight, X } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { BarChart3, TrendingUp, Activity, Weight, X, Trash2 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -19,7 +20,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
-import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore, loadActivity } from "@/lib/firestore";
+import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore, loadActivity, deleteDiaryEntry } from "@/lib/firestore";
 import { recalculateNormWithNewWeight } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
@@ -61,6 +62,8 @@ const Stats = () => {
   });
   const [monthlyDetailEntries, setMonthlyDetailEntries] = useState<DiaryEntry[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const [dayEntries, setDayEntries] = useState<DiaryEntry[]>([]);
   const [dayActivity, setDayActivity] = useState<any | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
@@ -305,6 +308,30 @@ const Stats = () => {
     } finally {
       setLoadingDay(false);
     }
+  };
+
+  const handleRemoveEntry = async (id: string) => {
+    setEntryToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!entryToDelete) return;
+    try {
+      await deleteDiaryEntry(user.uid, entryToDelete);
+      setMonthlyDetailEntries(prev => prev.filter(e => e.id !== entryToDelete));
+      toast.success('Запись удалена');
+    } catch (error) {
+      toast.error('Ошибка удаления записи');
+    } finally {
+      setDeleteConfirmOpen(false);
+      setEntryToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmOpen(false);
+    setEntryToDelete(null);
   };
 
   const handleSaveWeight = async () => {
@@ -819,6 +846,58 @@ const Stats = () => {
           </div>
         )}
       </section>
+
+      {/* Eaten Foods List */}
+      {monthlyDetailEntries.length > 0 && (
+        <Card className="p-5 md:p-6 shadow-card border-border/50 backdrop-blur-sm bg-card/80">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
+            <span className="text-xs text-muted-foreground">{monthlyDetailEntries.length} шт.</span>
+          </div>
+          <div className="space-y-2">
+            {monthlyDetailEntries.slice().reverse().map((e) => (
+              <div
+                key={e.id}
+                className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5 group hover:bg-muted/70 transition-smooth"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{e.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {e.grams > 1 ? `${e.grams}г · ` : '1 порция · '}
+                    <span className="text-macro-calories font-semibold">{e.calories}</span> ккал ·
+                    Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г
+                  </div>
+                </div>
+                <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      onClick={() => handleRemoveEntry(e.id)}
+                      className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1 shrink-0"
+                      aria-label="Удалить"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить запись?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Вы уверены, что хотите удалить "{e.name}"? Это действие нельзя отменить.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={cancelDelete}>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Удалить
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
       <div className="h-8" />
     </div>
   );

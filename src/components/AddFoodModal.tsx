@@ -50,19 +50,19 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     load();
   }, [isOpen, user]);
 
-  useEffect(() => {
-    if (contentRef.current) {
-      const height = contentRef.current.scrollHeight;
-      setContentHeight(height);
-    }
-  }, [activeTab, selected, isTabChanging]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = activeTab === 'product' ? products : dishes;
     if (!q) return list;
     return list.filter(item => item.name.toLowerCase().includes(q));
   }, [query, products, dishes, activeTab]);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      const height = contentRef.current.scrollHeight;
+      setContentHeight(height);
+    }
+  }, [activeTab, selected, isTabChanging, query, filtered, loading]);
 
   const handleSelect = (item: Product | Recipe) => {
     setSelected(item);
@@ -235,7 +235,8 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         <div
           style={{
             overflow: 'hidden',
-            height: contentHeight,
+            height: isTabChanging ? contentHeight : (contentHeight === 'auto' ? 'auto' : Math.max(contentHeight, 300)),
+            minHeight: 300,
             transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >

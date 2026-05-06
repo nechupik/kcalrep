@@ -33,6 +33,7 @@ const Products = () => {
     carbs: "",
   });
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [deletedProduct, setDeletedProduct] = useState<Product | null>(null);
 
 
   // Guard: if no user, don't render
@@ -192,13 +193,49 @@ const Products = () => {
     if (!user) return;
     
     try {
-      await deleteProduct(productId);
-      toast.success("Продукт удалён");
-      loadUserProducts(); // Refresh list
+      // Find the product before deletion
+      const productToDelete = products.find(p => p.id === productId);
+      if (!productToDelete) return;
+      
+      // Remove from UI immediately
+      setProducts(prev => prev.filter(p => p.id !== productId));
+      
+      // Store deleted product for potential restoration
+      setDeletedProduct(productToDelete);
+      
+      // Show toast with undo option
+      toast.success(`Продукт "${productToDelete.name}" удалён`, {
+        action: {
+          label: "Отменить",
+          onClick: () => handleRestoreProduct(productToDelete)
+        },
+        duration: 5000 // 5 seconds to undo
+      });
+      
+      // Actually delete after delay
+      setTimeout(async () => {
+        if (deletedProduct?.id === productId) {
+          try {
+            await deleteProduct(productId);
+          } catch (error) {
+            console.error("Error deleting product:", error);
+            toast.error("Ошибка удаления продукта");
+            // Restore product if deletion failed
+            setProducts(prev => [...prev, productToDelete]);
+          }
+        }
+      }, 5000);
     } catch (error) {
       console.error("Error deleting product:", error);
       toast.error("Ошибка удаления продукта");
     }
+  };
+
+  const handleRestoreProduct = (product: Product) => {
+    // Restore product to UI
+    setProducts(prev => [...prev, product]);
+    setDeletedProduct(null);
+    toast.info(`Продукт "${product.name}" восстановлен`);
   };
 
   const handleCancelEdit = () => {

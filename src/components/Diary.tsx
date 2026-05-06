@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Search, Trash2, Utensils, Package, BookOpen } from "lucide-react";
 import type { FoodItem } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
@@ -38,6 +39,28 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
   const [usageStats, setUsageStats] = useState<UsageStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+
+  const handleRemoveEntry = async (id: string) => {
+    setEntryToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!entryToDelete) return;
+    try {
+      await onRemove(entryToDelete);
+    } finally {
+      setDeleteConfirmOpen(false);
+      setEntryToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmOpen(false);
+    setEntryToDelete(null);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -365,13 +388,31 @@ export const Diary = ({ entries, onAdd, onRemove }: DiaryProps) => {
                       Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г
                     </div>
                   </div>
-                  <button
-                    onClick={async () => await onRemove(e.id)}
-                    className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1"
-                    aria-label="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        onClick={() => handleRemoveEntry(e.id)}
+                        className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1"
+                        aria-label="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Удалить запись?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Вы уверены, что хотите удалить "{e.name}"? Это действие нельзя отменить.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel onClick={cancelDelete}>Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Удалить
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               ))}
             </div>

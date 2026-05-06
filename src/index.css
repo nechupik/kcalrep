@@ -122,3 +122,65 @@ input[type='number'] {
 /* Scrollbar colors */
 ::-webkit-scrollbar-thumb { background: #836a8c; }
 ::-webkit-scrollbar-track { background: #836a8c; }
+
+/* Toast swipe styles */
+[data-sonner-toast][data-swipe="move"] {
+  transform: translateX(var(--swipe-amount, 0));
+  transition: none;
+}
+
+[data-sonner-toast][data-swipe="cancel"] {
+  transform: translateX(0);
+  transition: transform 200ms ease-out;
+}
+
+[data-sonner-toast][data-swipe="end"] {
+  animation: swipe-out 350ms ease-out forwards;
+}
+
+@keyframes swipe-out {
+  from {
+    transform: translateX(var(--swipe-amount, 0));
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Toast exit animation - top to bottom */
+[data-sonner-toast][data-dismissed] {
+  animation: toast-exit 350ms ease-out forwards;
+}
+
+@keyframes toast-exit {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+}
+
+/* Alternative selectors for sonner */
+.sonner-toast[data-removed] {
+  animation: toast-exit 350ms ease-out forwards;
+}
+
+.sonner-toast.exiting {
+  animation: toast-exit 350ms ease-out forwards;
+}
+
+/* Global toast exit styles */
+[data-sonner-toast] {
+  transition: all 350ms ease-out;
+}
+
+[data-sonner-toast][data-state="destroyed"] {
+  transform: translateY(100px);
+  opacity: 0;
+  transition: transform 350ms ease-out, opacity 350ms ease-out;
+}

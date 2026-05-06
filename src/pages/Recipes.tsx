@@ -35,6 +35,7 @@ const Recipes = () => {
     carbs: "",
     description: "",
   });
+  const [deletedRecipe, setDeletedRecipe] = useState<Recipe | null>(null);
 
   // Guard: if no user, don't render
   if (!user) {
@@ -153,19 +154,55 @@ const Recipes = () => {
     if (!user) return;
     
     try {
-      await deleteRecipe(recipeId);
-      toast.success("Блюдо удалёно");
-      loadUserRecipes(); // Refresh list
+      // Find recipe before deletion
+      const recipeToDelete = recipes.find(r => r.id === recipeId);
+      if (!recipeToDelete) return;
+      
+      // Remove from UI immediately
+      setRecipes(prev => prev.filter(r => r.id !== recipeId));
+      
+      // Store deleted recipe for potential restoration
+      setDeletedRecipe(recipeToDelete);
+      
+      // Show toast with undo option
+      toast.success(`Блюдо "${recipeToDelete.name}" удалёно`, {
+        action: {
+          label: "Отменить",
+          onClick: () => handleRestoreRecipe(recipeToDelete)
+        },
+        duration: 5000 // 5 seconds to undo
+      });
+      
+      // Actually delete after delay
+      setTimeout(async () => {
+        if (deletedRecipe?.id === recipeId) {
+          try {
+            await deleteRecipe(recipeId);
+          } catch (error) {
+            console.error("Error deleting recipe:", error);
+            toast.error("Ошибка удаления блюда");
+            // Restore recipe if deletion failed
+            setRecipes(prev => [...prev, recipeToDelete]);
+          }
+        }
+      }, 5000);
     } catch (error) {
       console.error("Error deleting recipe:", error);
       toast.error("Ошибка удаления блюда");
     }
   };
 
+  const handleRestoreRecipe = (recipe: Recipe) => {
+    // Restore recipe to UI
+    setRecipes(prev => [...prev, recipe]);
+    setDeletedRecipe(null);
+    toast.info(`Блюдо "${recipe.name}" восстановлено`);
+  };
+
   const handleCancelEdit = () => {
     setEditingRecipe(null);
     setServingType('grams');
-    setFormData({ name: "", calories: 0, protein: 0, fat: 0, carbs: 0, description: "" });
+    setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
     setShowAddForm(false);
   };
 
