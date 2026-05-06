@@ -39,8 +39,7 @@ const Profile = () => {
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [draftResult, setDraftResult] = useState<MacroResult | null>(null);
   const [showCalculator, setShowCalculator] = useState(false);
-  const [isCalcVisible, setIsCalcVisible] = useState(false);
-  const [isCalcMounted, setIsCalcMounted] = useState(false);
+  const [calcVisible, setCalcVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -53,8 +52,10 @@ const Profile = () => {
       setNorm(n);
       // Si no hay norma pero hay usuario, mostrar calculadora
       if (user && !n) {
-        setIsCalcMounted(true);
-        setTimeout(() => setIsCalcVisible(true), 10);
+        setShowCalculator(true);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setCalcVisible(true));
+        });
       }
       
       // Load user settings
@@ -140,14 +141,14 @@ const Profile = () => {
     saveNorm(result);
     setNorm(result);
     setDraftResult(null);
-    setIsCalcVisible(false);
-    setTimeout(() => setIsCalcMounted(false), 300);
+    setCalcVisible(false);
+    setTimeout(() => setShowCalculator(false), 300);
     toast.success("Norm saved");
   };
 
   const handleCloseCalc = () => {
-    setIsCalcVisible(false);
-    setTimeout(() => setIsCalcMounted(false), 300);
+    setCalcVisible(false);
+    setTimeout(() => setShowCalculator(false), 300);
   };
 
   const handleSaveName = async () => {
@@ -273,7 +274,7 @@ const Profile = () => {
               </p>
             )}
 
-            {norm && !isCalcMounted && (
+            {norm && !showCalculator && (
               <div
                 style={{
                   opacity: norm ? 1 : 0,
@@ -296,8 +297,10 @@ const Profile = () => {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        setIsCalcMounted(true);
-                        setTimeout(() => setIsCalcVisible(true), 10);
+                        setShowCalculator(true);
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => setCalcVisible(true));
+                        });
                       }}
                       className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-all duration-2000 ease-in-out"
                     >
@@ -309,44 +312,33 @@ const Profile = () => {
               </div>
             )}
 
-            {isCalcMounted && (
+            {showCalculator && (
               <div
                 style={{
-                  opacity: isCalcVisible ? 1 : 0,
-                  transform: isCalcVisible ? 'translateY(0)' : 'translateY(16px)',
+                  opacity: calcVisible ? 1 : 0,
+                  transform: calcVisible ? 'translateY(0)' : 'translateY(16px)',
                   transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
-                <div className="space-y-4">
-                  <CalculatorForm
-                    onCalculate={handleCalculate}
-                    submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
-                  />
-                  {draftResult && (
-                    <div
-                      style={{
-                        opacity: 1,
-                        transform: 'translateY(0)',
-                        transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-                      }}
-                    >
-                      <ResultsCard
-                        result={draftResult}
-                        onSave={() => handleSaveNorm(draftResult)}
-                        saved={!!norm && norm.calories === draftResult.calories}
-                      />
-                    </div>
-                  )}
-                  {norm && (
-                    <Button
-                      variant="ghost"
-                      onClick={handleCloseCalc}
-                      className="text-muted-foreground"
-                    >
-                      Отмена
-                    </Button>
-                  )}
-                </div>
+                <CalculatorForm
+                  onCalculate={handleCalculate}
+                  submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
+                />
+                {draftResult && (
+                  <div
+                    style={{
+                      opacity: 1,
+                      transform: 'translateY(0)',
+                      transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    }}
+                  >
+                    <ResultsCard
+                      result={draftResult}
+                      onSave={() => handleSaveNorm(draftResult)}
+                      saved={!!norm && norm.calories === draftResult.calories}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </Card>
