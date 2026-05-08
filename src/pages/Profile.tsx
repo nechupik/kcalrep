@@ -44,6 +44,11 @@ const Profile = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualCalories, setManualCalories] = useState('');
+  const [manualProtein, setManualProtein] = useState('');
+  const [manualFat, setManualFat] = useState('');
+  const [manualCarbs, setManualCarbs] = useState('');
   
   useEffect(() => {
     const loadNormData = async () => {
@@ -72,6 +77,15 @@ const Profile = () => {
       setDisplayName(user.displayName || '');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (manualMode && norm) {
+      setManualCalories(String(norm.calories));
+      setManualProtein(String(norm.protein));
+      setManualFat(String(norm.fat));
+      setManualCarbs(String(norm.carbs));
+    }
+  }, [manualMode]);
 
   const handleSave = () => {
     // Profile data is now managed by Firebase Auth
@@ -275,7 +289,105 @@ const Profile = () => {
               </p>
             )}
 
-            {norm && !showCalculator && (
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setManualMode(false)}
+                className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border ${
+                  !manualMode
+                    ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-white border-transparent'
+                    : 'border-border/50 text-muted-foreground'
+                }`}
+              >
+                🧮 Калькулятор
+              </button>
+              <button
+                onClick={() => setManualMode(true)}
+                className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border ${
+                  manualMode
+                    ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-white border-transparent'
+                    : 'border-border/50 text-muted-foreground'
+                }`}
+              >
+                ✏️ Ввести вручную
+              </button>
+            </div>
+
+            {manualMode && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Введите вашу норму КБЖУ вручную. Эти значения будут использоваться как целевые показатели в дневнике.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Калории (ккал)</Label>
+                    <Input
+                      type="number"
+                      placeholder="например: 2000"
+                      value={manualCalories}
+                      onChange={e => setManualCalories(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Белки (г)</Label>
+                    <Input
+                      type="number"
+                      placeholder="например: 150"
+                      value={manualProtein}
+                      onChange={e => setManualProtein(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Жиры (г)</Label>
+                    <Input
+                      type="number"
+                      placeholder="например: 70"
+                      value={manualFat}
+                      onChange={e => setManualFat(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Углеводы (г)</Label>
+                    <Input
+                      type="number"
+                      placeholder="например: 180"
+                      value={manualCarbs}
+                      onChange={e => setManualCarbs(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={async () => {
+                    if (!manualCalories || !manualProtein || !manualFat || !manualCarbs) {
+                      toast.error('Заполните все поля');
+                      return;
+                    }
+                    const manualNorm = {
+                      calories: Number(manualCalories),
+                      protein: Number(manualProtein),
+                      fat: Number(manualFat),
+                      carbs: Number(manualCarbs),
+                      bmr: Number(manualCalories),
+                      tdee: Number(manualCalories),
+                      activityFactor: 1.2,
+                      activityLabel: 'sedentary' as const,
+                      goalMultiplier: 1.0,
+                      gender: 'male' as const,
+                      height: 0,
+                      age: 0,
+                      goal: 'maintain' as const,
+                    };
+                    await saveNorm(manualNorm);
+                    setNorm(manualNorm);
+                    toast.success('Норма КБЖУ сохранена');
+                  }}
+                  className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-white hover:opacity-90"
+                >
+                  Сохранить норму
+                </Button>
+              </div>
+            )}
+
+            {!manualMode && norm && !showCalculator && (
               <div
                 style={{
                   opacity: norm ? 1 : 0,
@@ -313,7 +425,7 @@ const Profile = () => {
               </div>
             )}
 
-            {showCalculator && (
+            {!manualMode && showCalculator && (
               <div
                 style={{
                   opacity: calcVisible ? 1 : 0,
@@ -324,6 +436,21 @@ const Profile = () => {
                 <CalculatorForm
                   onCalculate={handleCalculate}
                   submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
+                />
+              </div>
+            )}
+
+            {!manualMode && !norm && (
+              <div
+                style={{
+                  opacity: calcVisible ? 1 : 0,
+                  transform: calcVisible ? 'translateY(0)' : 'translateY(16px)',
+                  transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              >
+                <CalculatorForm
+                  onCalculate={handleCalculate}
+                  submitLabel="Рассчитать норму"
                 />
               </div>
             )}
