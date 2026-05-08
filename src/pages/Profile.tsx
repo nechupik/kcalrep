@@ -130,18 +130,21 @@ const Profile = () => {
     }
   };
 
-  const handleCalculate = async (res: MacroResult, input: CalcInput) => {
-    await saveNorm(res, {
-      gender: input.gender,
-      height: input.height,
-      age: input.age,
-      goal: input.goal
-    });
+  const handleCalculate = async (res: MacroResult, _input: CalcInput) => {
+  console.log('handleCalculate called', res);
+  try {
+    console.log('calling saveNorm...');
+    await saveNorm(res);
+    console.log('saveNorm done');
     setNorm(res);
     setCalcVisible(false);
     setTimeout(() => setShowCalculator(false), 300);
     toast.success('Норма пересчитана и сохранена');
-  };
+  } catch (error) {
+    console.error('handleCalculate error:', error);
+    toast.error('Ошибка сохранения нормы');
+  }
+};
 
 
   const handleCloseCalc = () => {
