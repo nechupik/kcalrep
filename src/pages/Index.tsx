@@ -188,7 +188,7 @@ const Index = () => {
         } else {
           const steps = Number(activityInput) || 0;
           const lastWeight = await getLastWeight();
-          caloriesBurned = Math.round(steps * lastWeight * 0.00065);
+          caloriesBurned = Math.round(steps * lastWeight * 0.0005);
           type = 'steps';
           value = steps;
         }

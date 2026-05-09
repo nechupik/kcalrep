@@ -1,6 +1,6 @@
 // Питательные расчёты и база продуктов
 
-const MIN_CALORIES_FEMALE = 1250;
+const MIN_CALORIES_FEMALE = 1200;
 const MIN_CALORIES_MALE = 1500;
 
 export type Gender = "male" | "female";
@@ -46,7 +46,7 @@ const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
 };
 
 const GOAL_ADJUSTMENT: Record<Goal, number> = {
-  lose: -0.15,
+  lose: -0.10,
   maintain: 0,
   gain: 0.10,
 };
@@ -123,7 +123,7 @@ export function calculateMacros(input: CalcInput): MacroResult {
   const calories = Math.round(tdee * goalMultiplier);
 
   const bmi = weight / ((height / 100) ** 2);
-  const proteinPerKg = goal === "maintain" ? 1.6 : 2.0;
+  const proteinPerKg = gender === 'female' ? 1.7 : 2.0;
   const rawProtein = Math.round(weight * proteinPerKg);
   const protein = bmi > 30
     ? Math.round(Math.min(rawProtein, weight * 1.6))
@@ -136,9 +136,7 @@ export function calculateMacros(input: CalcInput): MacroResult {
   let warning: string | undefined;
 
   // Minimum fat floor - gender specific
-  const minFat = gender === 'female'
-    ? Math.round(weight * 0.9)
-    : Math.round(weight * 1.0);
+  const minFat = Math.round(weight * 1.0);
 
   let finalFat = Math.max(fat, minFat);
 
@@ -193,7 +191,8 @@ export function recalculateNormWithNewWeight(
   const tdee = Math.round(result.bmr * currentNorm.activityFactor);
   const calories = Math.round(tdee * currentNorm.goalMultiplier);
   const bmi = newWeight / ((currentNorm.height / 100) ** 2);
-  const proteinPerKg = currentNorm.goal === "maintain" ? 1.6 : 2.0;
+  const gender = currentNorm.gender as Gender;
+  const proteinPerKg = gender === 'female' ? 1.7 : 2.0;
   const rawProtein = Math.round(newWeight * proteinPerKg);
   const protein = bmi > 30 ? Math.round(Math.min(rawProtein, newWeight * 1.6)) : rawProtein;
   const fatFromPercent = Math.round((calories * 0.27) / 9);
@@ -201,10 +200,7 @@ export function recalculateNormWithNewWeight(
   const fat = Math.max(fatFromPercent, fatFromWeight);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 
-  const gender = currentNorm.gender as Gender;
-  const minFat = gender === 'female'
-    ? Math.round(newWeight * 0.9)
-    : Math.round(newWeight * 1.0);
+  const minFat = Math.round(newWeight * 1.0);
   const finalFat = Math.max(fat, minFat);
   const minCalories = gender === 'female' ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE;
   const finalCalories = Math.max(calories, minCalories);
