@@ -459,24 +459,18 @@ export async function deleteAllDiaryEntries(): Promise<{ deleted: number; error?
 
 export async function deleteAllProducts(): Promise<{ deleted: number; error?: string }> {
   try {
-    const usersSnap = await getDocs(collection(db, 'users'));
-    let totalDeleted = 0;
-
-    for (const userDoc of usersSnap.docs) {
-      const productsSnap = await getDocs(collection(db, 'users', userDoc.id, 'products'));
-      const batch = writeBatch(db);
-      
-      productsSnap.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      
-      if (productsSnap.size > 0) {
-        await batch.commit();
-        totalDeleted += productsSnap.size;
-      }
+    const productsSnap = await getDocs(collection(db, 'shared_products'));
+    const batch = writeBatch(db);
+    
+    productsSnap.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    if (productsSnap.size > 0) {
+      await batch.commit();
     }
     
-    return { deleted: totalDeleted };
+    return { deleted: productsSnap.size };
   } catch (error) {
     console.error('Error deleting all products:', error);
     return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -485,24 +479,18 @@ export async function deleteAllProducts(): Promise<{ deleted: number; error?: st
 
 export async function deleteAllRecipes(): Promise<{ deleted: number; error?: string }> {
   try {
-    const usersSnap = await getDocs(collection(db, 'users'));
-    let totalDeleted = 0;
-
-    for (const userDoc of usersSnap.docs) {
-      const recipesSnap = await getDocs(collection(db, 'users', userDoc.id, 'recipes'));
-      const batch = writeBatch(db);
-      
-      recipesSnap.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      
-      if (recipesSnap.size > 0) {
-        await batch.commit();
-        totalDeleted += recipesSnap.size;
-      }
+    const recipesSnap = await getDocs(collection(db, 'shared_recipes'));
+    const batch = writeBatch(db);
+    
+    recipesSnap.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    if (recipesSnap.size > 0) {
+      await batch.commit();
     }
     
-    return { deleted: totalDeleted };
+    return { deleted: recipesSnap.size };
   } catch (error) {
     console.error('Error deleting all recipes:', error);
     return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
