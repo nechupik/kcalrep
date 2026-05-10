@@ -9,7 +9,7 @@ export const MainCalorieRing = ({ consumed, total, size = 200 }: MainCalorieRing
   const radius = (size - 24) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (pct / 100) * circumference;
-  const color = "hsl(var(--macro-calories))";
+  const color = "var(--macro-calories)";
 
   return (
     <div className="flex flex-col items-center gap-4">

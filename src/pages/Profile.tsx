@@ -148,7 +148,12 @@ const Profile = () => {
   console.log('handleCalculate called', res);
   try {
     console.log('calling saveNorm...');
-    await saveNorm(res);
+    await saveNorm(res, {
+      gender: _input.gender,
+      height: _input.height,
+      age: _input.age,
+      goal: _input.goal,
+    });
     console.log('saveNorm done');
     setNorm(res);
     setCalcVisible(false);
@@ -209,15 +214,7 @@ const Profile = () => {
       <AppHeader />
 
       <section className="container max-w-3xl pt-6 pb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2.5 shadow-glow">
-            <User className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Профиль</h1>
-                      </div>
-        </div>
-
+        
         {/* Profile card */}
         {user && (
           <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
@@ -292,31 +289,28 @@ const Profile = () => {
             <div className="flex gap-2 mb-4">
               <button
                 onClick={() => setManualMode(false)}
-                className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border ${
+                className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border justify-center whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:opacity-90 transition-all duration-2000 ease-in-out ${
                   !manualMode
-                    ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-white border-transparent'
-                    : 'border-border/50 text-muted-foreground'
+                    ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-transparent shadow-glow'
+                    : 'border-border/50 text-muted-foreground bg-background hover:bg-accent hover:text-accent-foreground'
                 }`}
               >
-                🧮 Калькулятор
+                Калькулятор
               </button>
               <button
                 onClick={() => setManualMode(true)}
-                className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border ${
+                className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border justify-center whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:opacity-90 transition-all duration-2000 ease-in-out ${
                   manualMode
-                    ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-white border-transparent'
-                    : 'border-border/50 text-muted-foreground'
+                    ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-transparent shadow-glow'
+                    : 'border-border/50 text-muted-foreground bg-background hover:bg-accent hover:text-accent-foreground'
                 }`}
               >
-                ✏️ Ввести вручную
+                Ввести вручную
               </button>
             </div>
 
             {manualMode && (
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Введите вашу норму КБЖУ вручную. Эти значения будут использоваться как целевые показатели в дневнике.
-                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Калории (ккал)</Label>
@@ -417,7 +411,6 @@ const Profile = () => {
                       }}
                       className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-all duration-2000 ease-in-out"
                     >
-                      <RotateCcw className="h-4 w-4 mr-2" />
                       Пересчитать норму
                     </Button>
                   </div>

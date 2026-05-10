@@ -123,20 +123,20 @@ export function calculateMacros(input: CalcInput): MacroResult {
   const calories = Math.round(tdee * goalMultiplier);
 
   const bmi = weight / ((height / 100) ** 2);
-  const proteinPerKg = gender === 'female' ? 1.7 : 2.0;
+  const proteinPerKg = gender === 'female' ? 1.8 : 2.0;
   const rawProtein = Math.round(weight * proteinPerKg);
   const protein = bmi > 30
     ? Math.round(Math.min(rawProtein, weight * 1.6))
     : rawProtein;
   const fatFromPercent = Math.round((calories * 0.27) / 9);
-  const fatFromWeight = Math.round(weight * 1.0);
+  const fatFromWeight = Math.round(weight * (gender === 'female' ? 1.1 : 1.0));
   const fat = Math.max(fatFromPercent, fatFromWeight);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 
   let warning: string | undefined;
 
   // Minimum fat floor - gender specific
-  const minFat = Math.round(weight * 1.0);
+  const minFat = Math.round(weight * (gender === 'female' ? 1.1 : 1.0));
 
   let finalFat = Math.max(fat, minFat);
 
@@ -192,15 +192,15 @@ export function recalculateNormWithNewWeight(
   const calories = Math.round(tdee * currentNorm.goalMultiplier);
   const bmi = newWeight / ((currentNorm.height / 100) ** 2);
   const gender = currentNorm.gender as Gender;
-  const proteinPerKg = gender === 'female' ? 1.7 : 2.0;
+  const proteinPerKg = gender === 'female' ? 1.8 : 2.0;
   const rawProtein = Math.round(newWeight * proteinPerKg);
   const protein = bmi > 30 ? Math.round(Math.min(rawProtein, newWeight * 1.6)) : rawProtein;
   const fatFromPercent = Math.round((calories * 0.27) / 9);
-  const fatFromWeight = Math.round(newWeight * 1.0);
+  const fatFromWeight = Math.round(newWeight * (gender === 'female' ? 1.1 : 1.0));
   const fat = Math.max(fatFromPercent, fatFromWeight);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 
-  const minFat = Math.round(newWeight * 1.0);
+  const minFat = Math.round(newWeight * (gender === 'female' ? 1.1 : 1.0));
   const finalFat = Math.max(fat, minFat);
   const minCalories = gender === 'female' ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE;
   const finalCalories = Math.max(calories, minCalories);

@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadRecipes, saveRecipe, deleteRecipe, updateRecipe, type Recipe } from "@/lib/recipes";
-import { BookOpen, Search, Plus, Edit, Trash2 } from "lucide-react";
+import { RecipeFromIngredients } from "@/components/RecipeFromIngredients";
+import { BookOpen, Search, Plus, Edit, Trash2, Calculator } from "lucide-react";
 
 function pluralize(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
@@ -27,6 +28,7 @@ const Recipes = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [servingType, setServingType] = useState<'grams' | 'portion'>('grams');
+  const [addMode, setAddMode] = useState<'manual' | 'ingredients'>('manual');
   const [formData, setFormData] = useState({
     name: "",
     calories: "",
@@ -36,6 +38,8 @@ const Recipes = () => {
     description: "",
   });
   const [deletedRecipe, setDeletedRecipe] = useState<Recipe | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Guard: if no user, don't render
   if (!user) {
@@ -85,6 +89,14 @@ const Recipes = () => {
     if (!user) return;
     
     setShowAddForm(true);
+    setAddMode('manual');
+  };
+
+  const handleAddRecipeFromIngredients = () => {
+    if (!user) return;
+    
+    setShowAddForm(true);
+    setAddMode('ingredients');
   };
 
   const handleSaveRecipe = async () => {
@@ -199,11 +211,60 @@ const Recipes = () => {
     toast.info(`Блюдо "${recipe.name}" восстановлено`);
   };
 
+  // Reset to first page when recipes change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [recipes]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(recipes.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentRecipes = recipes.slice(startIndex, endIndex);
+
+  // Pagination controls
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+  };
+
   const handleCancelEdit = () => {
     setEditingRecipe(null);
     setServingType('grams');
+    setAddMode('manual');
     setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
     setShowAddForm(false);
+  };
+
+  const handleSaveRecipeFromIngredients = async (recipeData: {
+    name: string;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    text: string;
+    servingType: 'grams' | 'portion';
+  }) => {
+    if (!user) return;
+    
+    try {
+      await saveRecipe(recipeData, user.uid);
+      
+      toast.success(`Добавлено: ${recipeData.name}`);
+      setShowAddForm(false);
+      setAddMode('manual');
+      loadUserRecipes(); // Refresh list
+    } catch (error) {
+      console.error("Error saving recipe:", error);
+      toast.error("Ошибка сохранения блюда");
+    }
   };
 
   // Truncate description for preview
@@ -217,15 +278,7 @@ const Recipes = () => {
       <AppHeader />
 
       <section className="container max-w-3xl pt-6 pb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2.5 shadow-glow">
-            <BookOpen className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Блюда</h1>
-                      </div>
-        </div>
-
+        
         {/* Search bar */}
         <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
           <div className="flex gap-2 mb-4">
@@ -249,15 +302,27 @@ const Recipes = () => {
             </Button>
           </div>
 
-          <Button
-            onClick={handleAddRecipe}
-            disabled={!user}
-            className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Добавить блюдо</span>
-            <span className="sm:hidden">Добавить</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleAddRecipe}
+              disabled={!user}
+              className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Добавить блюдо</span>
+              <span className="sm:hidden">Добавить</span>
+            </Button>
+            <Button
+              onClick={handleAddRecipeFromIngredients}
+              disabled={!user}
+              variant="outline"
+              className="border-border/50 text-foreground hover:bg-muted/50 px-4 md:px-6"
+            >
+              <Calculator className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Из ингредиентов</span>
+              <span className="sm:hidden">Ингредиенты</span>
+            </Button>
+          </div>
         </Card>
 
         {/* Recipes list */}
@@ -266,7 +331,7 @@ const Recipes = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Мои блюда</h2>
               <div className="text-sm text-muted-foreground">
-                {pluralize(recipes.length, 'блюдо', 'блюда', 'блюд')} · КБЖУ на 100г
+                {pluralize(recipes.length, 'блюдо', 'блюда', 'блюд')}
               </div>
             </div>
 
@@ -281,6 +346,7 @@ const Recipes = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Добавьте первое блюдо!
                 </p>
+                <div className="flex gap-2">
                 <Button
                   onClick={handleAddRecipe}
                   disabled={!user}
@@ -289,10 +355,21 @@ const Recipes = () => {
                   <Plus className="h-4 w-4 mr-2" />
                   Добавить блюдо
                 </Button>
+                <Button
+                  onClick={handleAddRecipeFromIngredients}
+                  disabled={!user}
+                  variant="outline"
+                  className="border-border/50 text-foreground hover:bg-muted/50"
+                >
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Из ингредиентов
+                </Button>
+              </div>
               </div>
             ) : (
               <div className="space-y-3">
-                {recipes.map((recipe) => (
+                {/* Show current page recipes */}
+                {currentRecipes.map((recipe) => (
                   <Card key={recipe.id} className="rounded-xl border border-border/50 bg-card/80 p-4 hover:bg-card transition-smooth">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
@@ -335,6 +412,55 @@ const Recipes = () => {
                     </div>
                   </Card>
                 ))}
+                
+                {/* Pagination controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center pt-4 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPreviousPage}
+                        disabled={currentPage === 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </Button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => goToPage(page)}
+                            className={`h-8 w-8 p-0 ${
+                              currentPage === page
+                                ? "bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-0"
+                                : "border-border/50 hover:bg-muted/50"
+                            }`}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                        className="h-8 w-8 p-0"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -343,10 +469,11 @@ const Recipes = () => {
         {/* Add/Edit Recipe Modal */}
         {showAddForm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border border-border/50">
+            <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-border/50">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">
-                  {editingRecipe ? "Редактировать блюдо" : "Добавить блюдо"}
+                  {editingRecipe ? "Редактировать блюдо" : 
+                   addMode === 'ingredients' ? "Создать блюдо из ингредиентов" : "Добавить блюдо"}
                 </h2>
                 <Button
                   variant="ghost"
@@ -358,127 +485,259 @@ const Recipes = () => {
                 </Button>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Название блюда</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Название блюда"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              {editingRecipe ? (
+                // Edit mode - always manual form
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="calories">Калории (на 100г)</Label>
+                    <Label htmlFor="name">Название блюда</Label>
                     <Input
-                      id="calories"
-                      type="number"
-                      value={formData.calories}
-                      onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
-                      placeholder="0"
+                      id="name"
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Название блюда"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="protein">Белки (на 100г)</Label>
-                    <Input
-                      id="protein"
-                      type="number"
-                      step="0.1"
-                      value={formData.protein}
-                      onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
-                      placeholder="0"
-                      required
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="calories">Калории (на 100г)</Label>
+                      <Input
+                        id="calories"
+                        type="number"
+                        value={formData.calories}
+                        onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="protein">Белки (на 100г)</Label>
+                      <Input
+                        id="protein"
+                        type="number"
+                        step="0.1"
+                        value={formData.protein}
+                        onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fat">Жиры (на 100г)</Label>
+                      <Input
+                        id="fat"
+                        type="number"
+                        step="0.1"
+                        value={formData.fat}
+                        onChange={(e) => setFormData({ ...formData, fat: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="carbs">Углеводы (на 100г)</Label>
+                      <Input
+                        id="carbs"
+                        type="number"
+                        step="0.1"
+                        value={formData.carbs}
+                        onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="fat">Жиры (на 100г)</Label>
-                    <Input
-                      id="fat"
-                      type="number"
-                      step="0.1"
-                      value={formData.fat}
-                      onChange={(e) => setFormData({ ...formData, fat: e.target.value })}
-                      placeholder="0"
-                      required
-                    />
+                    <Label className="text-sm font-semibold">Тип порции</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setServingType('grams')}
+                        className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
+                          servingType === 'grams'
+                            ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
+                            : 'border-border bg-background text-muted-foreground'
+                        }`}
+                      >
+                        ⚖️ По граммам
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setServingType('portion')}
+                        className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
+                          servingType === 'portion'
+                            ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
+                            : 'border-border bg-background text-muted-foreground'
+                        }`}
+                      >
+                        🍽️ Порция
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {servingType === 'grams'
+                        ? 'КБЖУ указывается на 100г. При добавлении в дневник вводите граммовку.'
+                        : 'КБЖУ указывается за одну порцию целиком. При добавлении в дневник граммовка не нужна.'}
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="carbs">Углеводы (на 100г)</Label>
-                    <Input
-                      id="carbs"
-                      type="number"
-                      step="0.1"
-                      value={formData.carbs}
-                      onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
-                      placeholder="0"
-                      required
+                    <Label htmlFor="description">Описание блюда</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Напишите описание: ингредиенты, шаги, заметки..."
+                      rows={6}
                     />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Тип порции</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setServingType('grams')}
-                      className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
-                        servingType === 'grams'
-                          ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
-                          : 'border-border bg-background text-muted-foreground'
-                      }`}
-                    >
-                      ⚖️ По граммам
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setServingType('portion')}
-                      className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
-                        servingType === 'portion'
-                          ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
-                          : 'border-border bg-background text-muted-foreground'
-                      }`}
-                    >
-                      🍽️ Порция
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {servingType === 'grams'
-                      ? 'КБЖУ указывается на 100г. При добавлении в дневник вводите граммовку.'
-                      : 'КБЖУ указывается за одну порцию целиком. При добавлении в дневник граммовка не нужна.'}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Описание блюда</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Напишите описание: ингредиенты, шаги, заметки..."
-                    rows={6}
-                  />
-                </div>
-              </div>
 
-              <div className="flex gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleCancelEdit}
-                  className="flex-1 text-muted-foreground hover:text-primary"
-                >
-                  Отмена
-                </Button>
-                <Button
-                  onClick={editingRecipe ? handleUpdateRecipe : handleSaveRecipe}
-                  disabled={!formData.name.trim()}
-                  className="flex-1 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
-                >
-                  {editingRecipe ? "Обновить блюдо" : "Сохранить блюдо"}
-                </Button>
-              </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      className="flex-1 text-muted-foreground hover:text-primary"
+                    >
+                      Отмена
+                    </Button>
+                    <Button
+                      onClick={handleUpdateRecipe}
+                      disabled={!formData.name.trim()}
+                      className="flex-1 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
+                    >
+                      Обновить блюдо
+                    </Button>
+                  </div>
+                </div>
+              ) : addMode === 'ingredients' ? (
+                // Add from ingredients mode
+                <RecipeFromIngredients
+                  onSave={handleSaveRecipeFromIngredients}
+                  onCancel={handleCancelEdit}
+                />
+              ) : (
+                // Add manual mode
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Название блюда</Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Название блюда"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="calories">Калории (на 100г)</Label>
+                      <Input
+                        id="calories"
+                        type="number"
+                        value={formData.calories}
+                        onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="protein">Белки (на 100г)</Label>
+                      <Input
+                        id="protein"
+                        type="number"
+                        step="0.1"
+                        value={formData.protein}
+                        onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fat">Жиры (на 100г)</Label>
+                      <Input
+                        id="fat"
+                        type="number"
+                        step="0.1"
+                        value={formData.fat}
+                        onChange={(e) => setFormData({ ...formData, fat: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="carbs">Углеводы (на 100г)</Label>
+                      <Input
+                        id="carbs"
+                        type="number"
+                        step="0.1"
+                        value={formData.carbs}
+                        onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Тип порции</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setServingType('grams')}
+                        className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
+                          servingType === 'grams'
+                            ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
+                            : 'border-border bg-background text-muted-foreground'
+                        }`}
+                      >
+                        ⚖️ По граммам
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setServingType('portion')}
+                        className={`rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-smooth ${
+                          servingType === 'portion'
+                            ? 'border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground'
+                            : 'border-border bg-background text-muted-foreground'
+                        }`}
+                      >
+                        🍽️ Порция
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {servingType === 'grams'
+                        ? 'КБЖУ указывается на 100г. При добавлении в дневник вводите граммовку.'
+                        : 'КБЖУ указывается за одну порцию целиком. При добавлении в дневник граммовка не нужна.'}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Описание блюда</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Напишите описание: ингредиенты, шаги, заметки..."
+                      rows={6}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      className="flex-1 text-muted-foreground hover:text-primary"
+                    >
+                      Отмена
+                    </Button>
+                    <Button
+                      onClick={handleSaveRecipe}
+                      disabled={!formData.name.trim()}
+                      className="flex-1 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
+                    >
+                      Сохранить блюдо
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

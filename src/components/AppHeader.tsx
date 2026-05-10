@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Flame, BarChart3, User, Home, Package, BookOpen, X } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 const links = [
@@ -14,22 +14,29 @@ const links = [
 export const AppHeader = () => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
 
   const handleLinkClick = () => {
     setIsOpen(false);
   };
 
+  // Get current tab name based on location
+  const getCurrentTabName = () => {
+    const currentLink = links.find(link => link.to === location.pathname);
+    return currentLink ? currentLink.label : "LoviEat";
+  };
+
   return (
     <>
       <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/40 px-4 py-3 flex items-center justify-between gap-4">
-        <NavLink to="/" className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5">
           <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2 shadow-glow">
             <img src="/logo-512x512.png" alt="LoviEat" className="h-5 w-5" />
           </div>
           <span className="font-bold text-lg tracking-tight">
-            Lovi<span className="text-gradient-sunset">Eat</span>
+            {getCurrentTabName()}
           </span>
-        </NavLink>
+        </div>
 
         {user && (
           <button 

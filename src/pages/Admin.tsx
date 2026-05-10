@@ -4,9 +4,19 @@ import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, getCountFromServer } from "firebase/firestore";
-import { Shield, Users, Database, Activity } from "lucide-react";
+import { 
+  deleteAllDiaryEntries, 
+  deleteAllProducts, 
+  deleteAllRecipes, 
+  deleteAllWeight, 
+  deleteAllNormData, 
+  deleteAllActivityData 
+} from "@/lib/firestore";
+import { Shield, Users, Database, Activity, Trash2, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 
@@ -21,6 +31,7 @@ const Admin = () => {
   });
   const [firebaseStatus, setFirebaseStatus] = useState<"checking" | "online" | "offline">("checking");
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate("/"); return; }
@@ -64,6 +75,108 @@ const Admin = () => {
     }
   };
 
+
+  const handleDeleteAllDiaryEntries = async () => {
+    setDeleting('diary');
+    try {
+      const result = await deleteAllDiaryEntries();
+      if (result.error) {
+        toast.error(`Ошибка удаления записей дневника: ${result.error}`);
+      } else {
+        toast.success(`Удалено ${result.deleted} записей из дневников всех пользователей`);
+        await loadStats();
+      }
+    } catch (error) {
+      toast.error('Ошибка при удалении записей дневника');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteAllProducts = async () => {
+    setDeleting('products');
+    try {
+      const result = await deleteAllProducts();
+      if (result.error) {
+        toast.error(`Ошибка удаления продуктов: ${result.error}`);
+      } else {
+        toast.success(`Удалено ${result.deleted} продуктов всех пользователей`);
+        await loadStats();
+      }
+    } catch (error) {
+      toast.error('Ошибка при удалении продуктов');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteAllRecipes = async () => {
+    setDeleting('recipes');
+    try {
+      const result = await deleteAllRecipes();
+      if (result.error) {
+        toast.error(`Ошибка удаления рецептов: ${result.error}`);
+      } else {
+        toast.success(`Удалено ${result.deleted} рецептов всех пользователей`);
+        await loadStats();
+      }
+    } catch (error) {
+      toast.error('Ошибка при удалении рецептов');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteAllWeight = async () => {
+    setDeleting('weight');
+    try {
+      const result = await deleteAllWeight();
+      if (result.error) {
+        toast.error(`Ошибка удаления записей веса: ${result.error}`);
+      } else {
+        toast.success(`Удалено ${result.deleted} записей веса всех пользователей`);
+        await loadStats();
+      }
+    } catch (error) {
+      toast.error('Ошибка при удалении записей веса');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteAllNorms = async () => {
+    setDeleting('norms');
+    try {
+      const result = await deleteAllNormData();
+      if (result.error) {
+        toast.error(`Ошибка удаления норм КБЖУ: ${result.error}`);
+      } else {
+        toast.success(`Удалено ${result.deleted} норм КБЖУ всех пользователей`);
+        await loadStats();
+      }
+    } catch (error) {
+      toast.error('Ошибка при удалении норм КБЖУ');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteAllActivity = async () => {
+    setDeleting('activity');
+    try {
+      const result = await deleteAllActivityData();
+      if (result.error) {
+        toast.error(`Ошибка удаления данных активности: ${result.error}`);
+      } else {
+        toast.success(`Удалено ${result.deleted} записей активности всех пользователей`);
+        await loadStats();
+      }
+    } catch (error) {
+      toast.error('Ошибка при удалении данных активности');
+    } finally {
+      setDeleting(null);
+    }
+  };
 
 if (!user || user.uid !== ADMIN_UID) return null;
 
@@ -133,9 +246,193 @@ if (!user || user.uid !== ADMIN_UID) return null;
             <Users className="h-4 w-4 text-primary" />
             <h2 className="font-semibold">Действия</h2>
           </div>
-          <Button onClick={loadStats} variant="outline" size="sm">
-            🔄 Обновить статистику
-          </Button>
+          <div className="space-y-3">
+            <Button onClick={loadStats} variant="outline" size="sm" className="w-full justify-start">
+              🔄 Обновить статистику
+            </Button>
+            
+            <div className="border-t pt-3">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <h3 className="font-semibold text-destructive">Опасные действия</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {/* Delete Diary Entries */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={deleting === 'diary'}
+                      className="w-full justify-start"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleting === 'diary' ? 'Удаление...' : 'Удалить все записи дневников'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить все записи дневников?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Это действие безвозвратно удалит все записи дневников ({stats.totalDiaryEntries} шт.) всех пользователей системы.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAllDiaryEntries} className="bg-destructive text-destructive-foreground">
+                        Удалить всё
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Delete Products */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={deleting === 'products'}
+                      className="w-full justify-start"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleting === 'products' ? 'Удаление...' : 'Удалить все продукты'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить все продукты?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Это действие безвозвратно удалит все продукты ({stats.totalProducts} шт.) всех пользователей системы.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAllProducts} className="bg-destructive text-destructive-foreground">
+                        Удалить всё
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Delete Recipes */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={deleting === 'recipes'}
+                      className="w-full justify-start"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleting === 'recipes' ? 'Удаление...' : 'Удалить все рецепты'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить все рецепты?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Это действие безвозвратно удалит все рецепты ({stats.totalRecipes} шт.) всех пользователей системы.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAllRecipes} className="bg-destructive text-destructive-foreground">
+                        Удалить всё
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Delete Weight */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={deleting === 'weight'}
+                      className="w-full justify-start"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleting === 'weight' ? 'Удаление...' : 'Удалить все записи веса'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить все записи веса?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Это действие безвозвратно удалит все записи веса всех пользователей системы.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAllWeight} className="bg-destructive text-destructive-foreground">
+                        Удалить всё
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Delete Norms */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={deleting === 'norms'}
+                      className="w-full justify-start"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleting === 'norms' ? 'Удаление...' : 'Удалить все нормы КБЖУ'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить все нормы КБЖУ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Это действие безвозвратно удалит все нормы КБЖУ всех пользователей системы. Пользователям придется заново рассчитывать свои нормы.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAllNorms} className="bg-destructive text-destructive-foreground">
+                        Удалить всё
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Delete Activity */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={deleting === 'activity'}
+                      className="w-full justify-start"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleting === 'activity' ? 'Удаление...' : 'Удалить все данные активности'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Удалить все данные активности?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Это действие безвозвратно удалит все данные активности (шаги, калории) всех пользователей системы.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAllActivity} className="bg-destructive text-destructive-foreground">
+                        Удалить всё
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          </div>
         </Card>
       </section>
     </div>

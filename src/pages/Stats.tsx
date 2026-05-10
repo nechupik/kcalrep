@@ -394,15 +394,7 @@ const Stats = () => {
       <AppHeader />
 
       <section className="container max-w-5xl pt-6 pb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-violet p-2.5 shadow-soft">
-            <BarChart3 className="h-5 w-5 text-accent-foreground" />
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Статистика</h1>
-                      </div>
-        </div>
-
+        
         {/* SECTION 1 - Weekly Chart */}
         <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 mb-6">
           <div className="flex items-center gap-2 mb-4">
@@ -584,7 +576,7 @@ const Stats = () => {
                   <p className="text-sm text-muted-foreground">Нет данных</p>
                 ) : (
                   <div className="space-y-1">
-                    {weightEntries.slice(0, 5).map((entry) => (
+                    {weightEntries.slice(0, 3).map((entry) => (
                       <div key={entry.id} className="flex justify-between text-sm">
                         <span>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
                         <span className="font-medium">{entry.weight} кг</span>
@@ -619,9 +611,9 @@ const Stats = () => {
                       <Line
                         type="monotone"
                         dataKey="weight"
-                        stroke="hsl(var(--macro-protein))"
+                        stroke="hsl(var(--foreground))"
                         strokeWidth={2}
-                        dot={{ fill: "hsl(var(--macro-protein))", r: 3 }}
+                        dot={{ fill: "hsl(var(--foreground))", r: 3 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>

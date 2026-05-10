@@ -34,6 +34,8 @@ const Products = () => {
   });
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [deletedProduct, setDeletedProduct] = useState<Product | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
 
   // Guard: if no user, don't render
@@ -244,20 +246,36 @@ const Products = () => {
     setShowAddForm(false);
   };
 
+  // Reset to first page when products change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [products]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(products.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentProducts = products.slice(startIndex, endIndex);
+
+  // Pagination controls
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+  };
+
   return (
     <div className="min-h-screen">
       <AppHeader />
 
       <section className="container max-w-3xl pt-6 pb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2.5 shadow-glow">
-            <Package className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Продукты</h1>
-                      </div>
-        </div>
-
+        
         {/* Search bar */}
         <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
           {/* Main search */}
@@ -300,7 +318,7 @@ const Products = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Продукты</h2>
               <div className="text-sm text-muted-foreground">
-                {pluralize(products.length, 'продукт', 'продукта', 'продуктов')} · КБЖУ на 100г
+                {pluralize(products.length, 'продукт', 'продукта', 'продуктов')}
               </div>
             </div>
 
@@ -341,7 +359,8 @@ const Products = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {products.map((product) => (
+                {/* Show current page products */}
+                {currentProducts.map((product) => (
                   <Card key={product.id} className="rounded-xl border border-border/50 bg-card/80 p-4 hover:bg-card transition-smooth">
                     <div className="flex flex-col w-full">
                       <div className="flex items-center justify-between w-full">
@@ -374,6 +393,55 @@ const Products = () => {
                     </div>
                   </Card>
                 ))}
+                
+                {/* Pagination controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center pt-4 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPreviousPage}
+                        disabled={currentPage === 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </Button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => goToPage(page)}
+                            className={`h-8 w-8 p-0 ${
+                              currentPage === page
+                                ? "bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-0"
+                                : "border-border/50 hover:bg-muted/50"
+                            }`}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                        className="h-8 w-8 p-0"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

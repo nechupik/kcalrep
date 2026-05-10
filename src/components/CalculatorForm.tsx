@@ -92,21 +92,34 @@ export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитат�
             <Target className="h-4 w-4 text-accent" />
             Цель
           </Label>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(GOAL_LABELS) as Goal[]).map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGoal(g)}
-                className={`rounded-xl border-2 px-3 py-3 text-xs font-medium transition-smooth ${
-                  goal === g
-                    ? "border-accent bg-gradient-violet text-accent-foreground"
-                    : "border-border bg-background text-muted-foreground hover:border-accent/40"
-                }`}
-              >
-                {GOAL_LABELS[g]}
-              </button>
-            ))}
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {(["lose", "maintain"] as Goal[]).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGoal(g)}
+                  className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-smooth flex items-center justify-center whitespace-nowrap ${
+                    goal === g
+                      ? "border-accent bg-gradient-violet text-accent-foreground"
+                      : "border-border bg-background text-muted-foreground hover:border-accent/40"
+                  }`}
+                >
+                  {GOAL_LABELS[g]}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setGoal("gain")}
+              className={`w-full rounded-xl border-2 px-4 py-3 text-sm font-medium transition-smooth flex items-center justify-center whitespace-nowrap ${
+                goal === "gain"
+                  ? "border-accent bg-gradient-violet text-accent-foreground"
+                  : "border-border bg-background text-muted-foreground hover:border-accent/40"
+              }`}
+            >
+              {GOAL_LABELS["gain"]}
+            </button>
           </div>
         </div>
 

@@ -8,7 +8,7 @@ interface MacroProgressBarProps {
 
 export const MacroProgressBar = ({ consumed, total, label, unit = "г", colorVar }: MacroProgressBarProps) => {
   const pct = total > 0 ? Math.min(100, (consumed / total) * 100) : 0;
-  const color = `hsl(var(${colorVar}))`;
+  const color = `var(${colorVar})`;
 
   return (
     <div className="flex-1 min-w-[80px] max-w-[120px]">

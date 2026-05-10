@@ -246,9 +246,7 @@ const Index = () => {
       <div className="min-h-screen">
         <AppHeader />
 
-        {/* Пустой "герой" */}
-        <section className="container pt-2 pb-6 max-w-5xl" aria-hidden />
-
+        
         {/* Weight Reminder */}
         {showWeightReminder && (
           <section className="container max-w-5xl mb-6">
@@ -330,7 +328,7 @@ const Index = () => {
               <div className="flex gap-2">
                 <Input
                   type="number"
-                  placeholder="Калории из Apple Watch"
+                  placeholder="Kcal from Apple Watch"
                   value={activityInput}
                   onChange={e => setActivityInput(e.target.value)}
                   className="flex-1"

@@ -9,6 +9,7 @@ import {
   where,
   orderBy,
   getDocs,
+  writeBatch,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -427,4 +428,157 @@ export async function loadUserSettings(userId: string): Promise<UserSettings | n
   const snap = await getDoc(settingsDoc);
   if (snap.exists()) return snap.data() as UserSettings;
   return null;
+}
+
+// Admin functions for deleting all user data
+export async function deleteAllDiaryEntries(): Promise<{ deleted: number; error?: string }> {
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    let totalDeleted = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const diarySnap = await getDocs(collection(db, 'users', userDoc.id, 'diary'));
+      const batch = writeBatch(db);
+      
+      diarySnap.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      if (diarySnap.size > 0) {
+        await batch.commit();
+        totalDeleted += diarySnap.size;
+      }
+    }
+    
+    return { deleted: totalDeleted };
+  } catch (error) {
+    console.error('Error deleting all diary entries:', error);
+    return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+export async function deleteAllProducts(): Promise<{ deleted: number; error?: string }> {
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    let totalDeleted = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const productsSnap = await getDocs(collection(db, 'users', userDoc.id, 'products'));
+      const batch = writeBatch(db);
+      
+      productsSnap.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      if (productsSnap.size > 0) {
+        await batch.commit();
+        totalDeleted += productsSnap.size;
+      }
+    }
+    
+    return { deleted: totalDeleted };
+  } catch (error) {
+    console.error('Error deleting all products:', error);
+    return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+export async function deleteAllRecipes(): Promise<{ deleted: number; error?: string }> {
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    let totalDeleted = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const recipesSnap = await getDocs(collection(db, 'users', userDoc.id, 'recipes'));
+      const batch = writeBatch(db);
+      
+      recipesSnap.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      if (recipesSnap.size > 0) {
+        await batch.commit();
+        totalDeleted += recipesSnap.size;
+      }
+    }
+    
+    return { deleted: totalDeleted };
+  } catch (error) {
+    console.error('Error deleting all recipes:', error);
+    return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+export async function deleteAllWeight(): Promise<{ deleted: number; error?: string }> {
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    let totalDeleted = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const weightSnap = await getDocs(collection(db, 'users', userDoc.id, 'weight'));
+      const batch = writeBatch(db);
+      
+      weightSnap.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      if (weightSnap.size > 0) {
+        await batch.commit();
+        totalDeleted += weightSnap.size;
+      }
+    }
+    
+    return { deleted: totalDeleted };
+  } catch (error) {
+    console.error('Error deleting all weight entries:', error);
+    return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+export async function deleteAllNormData(): Promise<{ deleted: number; error?: string }> {
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    let totalDeleted = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const normDoc = doc(db, 'users', userDoc.id, 'norm', 'main');
+      const normSnap = await getDoc(normDoc);
+      
+      if (normSnap.exists()) {
+        await deleteDoc(normDoc);
+        totalDeleted++;
+      }
+    }
+    
+    return { deleted: totalDeleted };
+  } catch (error) {
+    console.error('Error deleting all norm data:', error);
+    return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+export async function deleteAllActivityData(): Promise<{ deleted: number; error?: string }> {
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    let totalDeleted = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const activitySnap = await getDocs(collection(db, 'users', userDoc.id, 'activity'));
+      const batch = writeBatch(db);
+      
+      activitySnap.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      if (activitySnap.size > 0) {
+        await batch.commit();
+        totalDeleted += activitySnap.size;
+      }
+    }
+    
+    return { deleted: totalDeleted };
+  } catch (error) {
+    console.error('Error deleting all activity data:', error);
+    return { deleted: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
 }
