@@ -25,7 +25,7 @@ export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитат�
   const [age, setAge] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
-  const [goal, setGoal] = useState<Goal>("maintain");
+  const [goal, setGoal] = useState<Goal>("lose");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

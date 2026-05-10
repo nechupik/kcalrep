@@ -21,16 +21,22 @@ export const Onboarding = () => {
   };
 
   const handleSaveNorm = async () => {
-    if (!result || !input) return;
+    console.log('handleSaveNorm called', { result, input });
+    if (!result || !input) {
+      console.log('No result or input, returning');
+      return;
+    }
 
     setIsSaving(true);
     try {
+      console.log('Calling saveNorm...');
       await saveNorm(result, {
         gender: input.gender,
         height: input.height,
         age: input.age,
         goal: input.goal,
       });
+      console.log('saveNorm completed successfully');
       setIsSaved(true);
       toast.success("Норма КБЖУ сохранена!");
       
@@ -39,8 +45,8 @@ export const Onboarding = () => {
         navigate("/");
       }, 1500);
     } catch (error) {
-      toast.error("Ошибка сохранения нормы");
       console.error("Error saving norm:", error);
+      toast.error("Ошибка сохранения нормы");
     } finally {
       setIsSaving(false);
     }
@@ -57,7 +63,7 @@ export const Onboarding = () => {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-8 w-full">
           {/* Calculator Form */}
           <div className="space-y-4">
             <CalculatorForm 
