@@ -438,15 +438,15 @@ export async function deleteAllDiaryEntries(): Promise<{ deleted: number; error?
 
     for (const userDoc of usersSnap.docs) {
       const diarySnap = await getDocs(collection(db, 'users', userDoc.id, 'diary'));
-      const batch = writeBatch(db);
+      const docs = diarySnap.docs;
       
-      diarySnap.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      
-      if (diarySnap.size > 0) {
+      // Разбиваем на чанки по 400
+      for (let i = 0; i < docs.length; i += 400) {
+        const chunk = docs.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(d => batch.delete(d.ref));
         await batch.commit();
-        totalDeleted += diarySnap.size;
+        totalDeleted += chunk.length;
       }
     }
     
@@ -504,15 +504,15 @@ export async function deleteAllWeight(): Promise<{ deleted: number; error?: stri
 
     for (const userDoc of usersSnap.docs) {
       const weightSnap = await getDocs(collection(db, 'users', userDoc.id, 'weight'));
-      const batch = writeBatch(db);
+      const docs = weightSnap.docs;
       
-      weightSnap.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      
-      if (weightSnap.size > 0) {
+      // Разбиваем на чанки по 400
+      for (let i = 0; i < docs.length; i += 400) {
+        const chunk = docs.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(d => batch.delete(d.ref));
         await batch.commit();
-        totalDeleted += weightSnap.size;
+        totalDeleted += chunk.length;
       }
     }
     
@@ -552,15 +552,15 @@ export async function deleteAllActivityData(): Promise<{ deleted: number; error?
 
     for (const userDoc of usersSnap.docs) {
       const activitySnap = await getDocs(collection(db, 'users', userDoc.id, 'activity'));
-      const batch = writeBatch(db);
+      const docs = activitySnap.docs;
       
-      activitySnap.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      
-      if (activitySnap.size > 0) {
+      // Разбиваем на чанки по 400
+      for (let i = 0; i < docs.length; i += 400) {
+        const chunk = docs.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(d => batch.delete(d.ref));
         await batch.commit();
-        totalDeleted += activitySnap.size;
+        totalDeleted += chunk.length;
       }
     }
     
