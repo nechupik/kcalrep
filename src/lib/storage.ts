@@ -81,19 +81,23 @@ export async function loadDiary(date?: string): Promise<DiaryEntry[]> {
 
 export async function saveDiary(entries: DiaryEntry[]) {
   const user = getCurrentUser();
+  console.log('saveDiary: Current user:', user?.uid);
   if (user) {
     try {
       // For Firestore, we need to handle entries individually
       // This is a simplified approach - in practice, you might want to sync changes
       // For now, we'll save all entries to Firestore
       const todayEntries = entries.filter(entry => entry.date === todayKey());
+      console.log('saveDiary: Today entries to save:', todayEntries.length);
       
       // First, let's get existing entries for today to avoid duplicates
       const existingEntries = await loadDiaryFromFirestore(user.uid, todayKey());
+      console.log('saveDiary: Existing entries in Firestore:', existingEntries.length);
       
       // Add new entries that don't exist
       for (const entry of todayEntries) {
         if (!entry.id || !existingEntries.find(e => e.id === entry.id)) {
+          console.log('saveDiary: Saving entry to Firestore:', entry.name);
           await saveDiaryEntry(user.uid, {
             foodId: entry.foodId,
             name: entry.name,

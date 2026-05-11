@@ -433,16 +433,46 @@ export async function loadUserSettings(userId: string): Promise<UserSettings | n
 // Admin functions for deleting all user data
 export async function deleteAllDiaryEntries(): Promise<{ deleted: number; error?: string }> {
   try {
+    console.log('deleteAllDiaryEntries: Starting...');
+    console.log('Firebase config:', {
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
+    });
+    console.log('Database instance:', db);
+    
+    // Проверяем существование коллекции users
     const usersSnap = await getDocs(collection(db, 'users'));
+    console.log(`deleteAllDiaryEntries: Found ${usersSnap.size} users`);
+    console.log('Users query snapshot metadata:', usersSnap.metadata);
+    
+    if (usersSnap.size === 0) {
+      console.log('No users found. Checking if collection exists...');
+      // Проверяем есть ли вообще коллекция users
+      try {
+        const testDoc = await getDoc(doc(db, 'users', '_test'));
+        console.log('Test doc exists:', testDoc.exists());
+      } catch (e) {
+        console.log('Collection users might not exist:', e);
+      }
+      
+      // Проверяем shared collections для сравнения
+      const sharedProductsSnap = await getDocs(collection(db, 'shared_products'));
+      const sharedRecipesSnap = await getDocs(collection(db, 'shared_recipes'));
+      console.log(`Shared products: ${sharedProductsSnap.size}, Shared recipes: ${sharedRecipesSnap.size}`);
+    }
+    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
+      console.log(`deleteAllDiaryEntries: Processing user ${userDoc.id}`);
       const diarySnap = await getDocs(collection(db, 'users', userDoc.id, 'diary'));
       const docs = diarySnap.docs;
+      console.log(`deleteAllDiaryEntries: User ${userDoc.id} has ${docs.length} diary entries`);
       
       // Разбиваем на чанки по 400
       for (let i = 0; i < docs.length; i += 400) {
         const chunk = docs.slice(i, i + 400);
+        console.log(`deleteAllDiaryEntries: Deleting chunk ${Math.floor(i/400) + 1} with ${chunk.length} documents`);
         const batch = writeBatch(db);
         chunk.forEach(d => batch.delete(d.ref));
         await batch.commit();
@@ -450,6 +480,7 @@ export async function deleteAllDiaryEntries(): Promise<{ deleted: number; error?
       }
     }
     
+    console.log(`deleteAllDiaryEntries: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all diary entries:', error);
@@ -499,12 +530,20 @@ export async function deleteAllRecipes(): Promise<{ deleted: number; error?: str
 
 export async function deleteAllWeight(): Promise<{ deleted: number; error?: string }> {
   try {
+    console.log('deleteAllWeight: Starting...');
     const usersSnap = await getDocs(collection(db, 'users'));
+    console.log(`deleteAllWeight: Found ${usersSnap.size} users`);
+    
+    if (usersSnap.size === 0) {
+      console.log('No users found for weight deletion');
+    }
+    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
       const weightSnap = await getDocs(collection(db, 'users', userDoc.id, 'weight'));
       const docs = weightSnap.docs;
+      console.log(`deleteAllWeight: User ${userDoc.id} has ${docs.length} weight entries`);
       
       // Разбиваем на чанки по 400
       for (let i = 0; i < docs.length; i += 400) {
@@ -516,6 +555,7 @@ export async function deleteAllWeight(): Promise<{ deleted: number; error?: stri
       }
     }
     
+    console.log(`deleteAllWeight: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all weight entries:', error);
@@ -525,19 +565,31 @@ export async function deleteAllWeight(): Promise<{ deleted: number; error?: stri
 
 export async function deleteAllNormData(): Promise<{ deleted: number; error?: string }> {
   try {
+    console.log('deleteAllNormData: Starting...');
     const usersSnap = await getDocs(collection(db, 'users'));
+    console.log(`deleteAllNormData: Found ${usersSnap.size} users`);
+    
+    if (usersSnap.size === 0) {
+      console.log('No users found for norm deletion');
+    }
+    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
+      console.log(`deleteAllNormData: Processing user ${userDoc.id}`);
       const normDoc = doc(db, 'users', userDoc.id, 'norm', 'main');
       const normSnap = await getDoc(normDoc);
       
       if (normSnap.exists()) {
         await deleteDoc(normDoc);
         totalDeleted++;
+        console.log(`deleteAllNormData: Deleted norm for user ${userDoc.id}`);
+      } else {
+        console.log(`deleteAllNormData: No norm found for user ${userDoc.id}`);
       }
     }
     
+    console.log(`deleteAllNormData: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all norm data:', error);
@@ -547,12 +599,20 @@ export async function deleteAllNormData(): Promise<{ deleted: number; error?: st
 
 export async function deleteAllActivityData(): Promise<{ deleted: number; error?: string }> {
   try {
+    console.log('deleteAllActivityData: Starting...');
     const usersSnap = await getDocs(collection(db, 'users'));
+    console.log(`deleteAllActivityData: Found ${usersSnap.size} users`);
+    
+    if (usersSnap.size === 0) {
+      console.log('No users found for activity deletion');
+    }
+    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
       const activitySnap = await getDocs(collection(db, 'users', userDoc.id, 'activity'));
       const docs = activitySnap.docs;
+      console.log(`deleteAllActivityData: User ${userDoc.id} has ${docs.length} activity entries`);
       
       // Разбиваем на чанки по 400
       for (let i = 0; i < docs.length; i += 400) {
@@ -564,6 +624,7 @@ export async function deleteAllActivityData(): Promise<{ deleted: number; error?
       }
     }
     
+    console.log(`deleteAllActivityData: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all activity data:', error);
