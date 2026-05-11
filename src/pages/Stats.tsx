@@ -335,6 +335,10 @@ const Stats = () => {
   };
 
   const handleSaveWeight = async () => {
+    console.log('handleSaveWeight: Starting...');
+    console.log('handleSaveWeight: Current user:', user?.uid);
+    console.log('handleSaveWeight: Weight input:', weightInput);
+    
     if (!user || !weightInput) return;
     
     const weight = parseFloat(weightInput);
@@ -342,7 +346,9 @@ const Stats = () => {
 
     try {
       const today = new Date().toISOString().split('T')[0];
+      console.log('handleSaveWeight: Saving weight:', weight, 'for date:', today, 'user:', user.uid);
       await saveWeight(user.uid, weight, today);
+      console.log('handleSaveWeight: Weight saved successfully');
       
       // Reload weight entries
       const weights = await loadWeight(user.uid, 10);

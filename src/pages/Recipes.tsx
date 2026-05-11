@@ -281,34 +281,36 @@ const Recipes = () => {
         
         {/* Search bar */}
         <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-          <div className="flex gap-2 mb-4">
-            <div className="relative flex-1">
+          <div className="flex gap-2 mb-4 items-center">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
               <Input
+                id="search"
                 type="text"
                 placeholder="Поиск блюд..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4"
+                className="pl-10 pr-12 h-10"
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
             <Button
               onClick={handleSearch}
               disabled={loading}
-              className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+              className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-6 py-0 h-10 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
             >
-              Поиск
+              <span className="hidden sm:inline">Поиск</span>
+              <span className="sm:hidden">Найти</span>
             </Button>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={handleAddRecipe}
               disabled={!user}
-              className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow px-4 md:px-6"
+              className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow px-4 md:px-6 flex-1 min-w-0 sm:flex-none"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-0.5 overflow-hidden" />
               <span className="hidden sm:inline">Добавить блюдо</span>
               <span className="sm:hidden">Добавить</span>
             </Button>
@@ -316,9 +318,9 @@ const Recipes = () => {
               onClick={handleAddRecipeFromIngredients}
               disabled={!user}
               variant="outline"
-              className="border-border/50 text-foreground hover:bg-muted/50 px-4 md:px-6"
+              className="border-border/50 text-foreground hover:bg-muted/50 px-4 md:px-6 flex-1 min-w-0 sm:flex-none"
             >
-              <Calculator className="h-4 w-4 mr-2" />
+              <Calculator className="h-4 w-4 mr-0.5 overflow-hidden" />
               <span className="hidden sm:inline">Из ингредиентов</span>
               <span className="sm:hidden">Ингредиенты</span>
             </Button>
@@ -346,22 +348,22 @@ const Recipes = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Добавьте первое блюдо!
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 justify-center">
                 <Button
                   onClick={handleAddRecipe}
                   disabled={!user}
-                  className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
+                  className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow flex-1 min-w-0"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 mr-0.5 overflow-hidden" />
                   Добавить блюдо
                 </Button>
                 <Button
                   onClick={handleAddRecipeFromIngredients}
                   disabled={!user}
                   variant="outline"
-                  className="border-border/50 text-foreground hover:bg-muted/50"
+                  className="border-border/50 text-foreground hover:bg-muted/50 flex-1 min-w-0"
                 >
-                  <Calculator className="h-4 w-4 mr-2" />
+                  <Calculator className="h-4 w-4 mr-0.5 overflow-hidden" />
                   Из ингредиентов
                 </Button>
               </div>

@@ -138,6 +138,7 @@ const Index = () => {
     setEntryToDelete(null);
   };
 
+  
   const handleRepeatYesterday = async () => {
     const yesterday = new Date(selectedDate + 'T00:00:00');
     yesterday.setDate(yesterday.getDate() - 1);
@@ -226,7 +227,7 @@ const Index = () => {
   const deficitData = useMemo(() => {
     if (!norm) return null;
     const activityCalories = (activityEnabled && activity?.caloriesBurned) ? activity.caloriesBurned : 0;
-    const burned = norm.bmr + activityCalories;
+    const burned = norm.bmr * 1.2 + activityCalories;
     const deficit = burned - selectedDateTotals.calories;
     return {
       burned,
@@ -390,15 +391,7 @@ const Index = () => {
 
             {/* Deficit summary */}
             {deficitData && (
-              <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
-                  <div className="font-bold text-sm">{deficitData.burned} ккал</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Съедено</div>
-                  <div className="font-bold text-sm">{selectedDateTotals.calories} ккал</div>
-                </div>
+              <div className="mt-4 pt-4 border-t border-border/40 text-center">
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
                   <div className={`font-bold text-sm ${deficitData.deficit > 0 ? 'text-green-400' : 'text-red-400'}`}>
