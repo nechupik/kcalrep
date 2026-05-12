@@ -187,15 +187,13 @@ const Recipes = () => {
       
       // Actually delete after delay
       setTimeout(async () => {
-        if (deletedRecipe?.id === recipeId) {
-          try {
-            await deleteRecipe(recipeId);
-          } catch (error) {
-            console.error("Error deleting recipe:", error);
-            toast.error("Ошибка удаления блюда");
-            // Restore recipe if deletion failed
-            setRecipes(prev => [...prev, recipeToDelete]);
-          }
+        try {
+          await deleteRecipe(recipeId);
+        } catch (error) {
+          console.error("Error deleting recipe:", error);
+          toast.error("Ошибка удаления блюда");
+          // Restore recipe if deletion failed
+          setRecipes(prev => [...prev, recipeToDelete]);
         }
       }, 5000);
     } catch (error) {
@@ -205,7 +203,7 @@ const Recipes = () => {
   };
 
   const handleRestoreRecipe = (recipe: Recipe) => {
-    // Restore recipe to UI
+    // Restore recipe to UI and cancel deletion
     setRecipes(prev => [...prev, recipe]);
     setDeletedRecipe(null);
     toast.info(`Блюдо "${recipe.name}" восстановлено`);

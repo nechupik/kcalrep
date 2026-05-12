@@ -216,15 +216,13 @@ const Products = () => {
       
       // Actually delete after delay
       setTimeout(async () => {
-        if (deletedProduct?.id === productId) {
-          try {
-            await deleteProduct(productId);
-          } catch (error) {
-            console.error("Error deleting product:", error);
-            toast.error("Ошибка удаления продукта");
-            // Restore product if deletion failed
-            setProducts(prev => [...prev, productToDelete]);
-          }
+        try {
+          await deleteProduct(productId);
+        } catch (error) {
+          console.error("Error deleting product:", error);
+          toast.error("Ошибка удаления продукта");
+          // Restore product if deletion failed
+          setProducts(prev => [...prev, productToDelete]);
         }
       }, 5000);
     } catch (error) {
@@ -234,7 +232,7 @@ const Products = () => {
   };
 
   const handleRestoreProduct = (product: Product) => {
-    // Restore product to UI
+    // Restore product to UI and cancel deletion
     setProducts(prev => [...prev, product]);
     setDeletedProduct(null);
     toast.info(`Продукт "${product.name}" восстановлен`);
