@@ -17,6 +17,7 @@ import {
   loadNorm,
   addDiaryEntry,
   removeDiaryEntry,
+  updateDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
 import { saveActivity, loadActivity, loadWeight, loadFullNormData, loadUserSettings, wasWeightEnteredThisWeek, type ActivityEntry } from "@/lib/firestore";
@@ -36,6 +37,9 @@ const Index = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [entryToEdit, setEntryToEdit] = useState<DiaryEntry | null>(null);
+  const [editGrams, setEditGrams] = useState('');
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -136,6 +140,48 @@ const Index = () => {
   const cancelDelete = () => {
     setDeleteConfirmOpen(false);
     setEntryToDelete(null);
+  };
+
+  const handleEditEntry = (entry: DiaryEntry) => {
+    setEntryToEdit(entry);
+    setEditGrams(entry.grams.toString());
+    setShowEditModal(true);
+  };
+
+  const handleUpdateGrams = async () => {
+    if (!entryToEdit || !editGrams) return;
+    
+    const newGrams = Number(editGrams);
+    if (isNaN(newGrams) || newGrams <= 0) {
+      toast.error('Введите корректное количество граммов');
+      return;
+    }
+
+    try {
+      // Calculate new nutritional values based on the ratio
+      const ratio = newGrams / entryToEdit.grams;
+      const updatedEntry = {
+        grams: newGrams,
+        calories: Math.round(entryToEdit.calories * ratio),
+        protein: Math.round(entryToEdit.protein * ratio * 10) / 10,
+        fat: Math.round(entryToEdit.fat * ratio * 10) / 10,
+        carbs: Math.round(entryToEdit.carbs * ratio * 10) / 10,
+      };
+
+      await updateDiaryEntry(entryToEdit.id, updatedEntry);
+      
+      // Update local state
+      setEntries(prev => prev.map(e => 
+        e.id === entryToEdit.id ? { ...e, ...updatedEntry } : e
+      ));
+      
+      toast.success(`Обновлено: ${entryToEdit.name} - ${newGrams}г`);
+      setShowEditModal(false);
+      setEntryToEdit(null);
+      setEditGrams('');
+    } catch (error) {
+      toast.error('Ошибка обновления записи');
+    }
   };
 
   
@@ -250,7 +296,7 @@ const Index = () => {
         
         {/* Weight Reminder */}
         {showWeightReminder && (
-          <section className="container max-w-5xl mb-6">
+          <section className="container max-w-5xl mt-4 mb-4">
             <Card className="p-4 border-yellow-500/50 bg-yellow-500/10 backdrop-blur-sm shadow-soft">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -276,7 +322,7 @@ const Index = () => {
         )}
 
         {/* Daily progress */}
-        <section className="container max-w-5xl mb-8">
+        <section className="container max-w-5xl mt-4 mb-4">
           {norm ? (
             <Card className="p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
               <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
@@ -312,7 +358,7 @@ const Index = () => {
         </section>
 
         {/* Activity Tracking */}
-        <section className="container max-w-5xl mb-6">
+        <section className="container max-w-5xl mb-4">
           {norm && (user?.uid === ADMIN_UID || activityEnabled) && (
             <Card className="w-full p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
             <div className="flex items-center gap-2 mb-4">
@@ -395,7 +441,7 @@ const Index = () => {
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
                   <div className={`font-bold text-sm ${deficitData.deficit > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {deficitData.deficit > 0 ? '+' : ''}{deficitData.deficit} ккал
+                    {deficitData.deficit > 0 ? '+' : ''}{Math.round(deficitData.deficit)} ккал
                   </div>
                 </div>
               </div>
@@ -405,8 +451,9 @@ const Index = () => {
         </section>
 
         {/* Eaten Foods List */}
-        {entries.length > 0 && (
-          <Card className="p-5 md:p-6 shadow-card border-border/50 backdrop-blur-sm bg-card/80">
+        <section className="container max-w-5xl">
+          {entries.length > 0 && (
+            <Card className="w-full p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
               <span className="text-xs text-muted-foreground">{entries.length} шт.</span>
@@ -415,7 +462,8 @@ const Index = () => {
               {entries.slice().reverse().map((e) => (
                 <div
                   key={e.id}
-                  className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5 group hover:bg-muted/70 transition-smooth"
+                  className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5 group hover:bg-muted/70 transition-smooth cursor-pointer"
+                  onClick={() => handleEditEntry(e)}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{e.name}</div>
@@ -428,7 +476,10 @@ const Index = () => {
                   <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
                     <AlertDialogTrigger asChild>
                       <button
-                        onClick={() => handleRemoveEntry(e.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleRemoveEntry(e.id);
+                        }}
                         className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1 shrink-0"
                         aria-label="Удалить"
                       >
@@ -455,6 +506,7 @@ const Index = () => {
             </div>
           </Card>
         )}
+        </section>
 
               <div className="h-8" />
       </div>
@@ -465,6 +517,82 @@ const Index = () => {
         onAdd={handleAddEntry}
         selectedDate={selectedDate}
       />
+
+      {/* Edit Grams Modal */}
+      {showEditModal && entryToEdit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-md border border-border/50">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Изменить граммовку</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEntryToEdit(null);
+                  setEditGrams('');
+                }}
+                className="text-muted-foreground hover:text-primary"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                {entryToEdit.name}
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="grams" className="block text-sm font-medium">
+                  Граммовка
+                </label>
+                <Input
+                  id="grams"
+                  type="number"
+                  value={editGrams}
+                  onChange={(e) => setEditGrams(e.target.value)}
+                  placeholder="Введите граммовку"
+                  className="w-full"
+                  min="1"
+                  step="1"
+                />
+              </div>
+
+              {entryToEdit && editGrams && !isNaN(Number(editGrams)) && Number(editGrams) > 0 && (
+                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                  Новые значения:
+                  <div className="mt-1">
+                    Ккал: {Math.round(entryToEdit.calories * (Number(editGrams) / entryToEdit.grams))} ·
+                    Б: {Math.round(entryToEdit.protein * (Number(editGrams) / entryToEdit.grams) * 10) / 10}г ·
+                    Ж: {Math.round(entryToEdit.fat * (Number(editGrams) / entryToEdit.grams) * 10) / 10}г ·
+                    У: {Math.round(entryToEdit.carbs * (Number(editGrams) / entryToEdit.grams) * 10) / 10}г
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEntryToEdit(null);
+                  setEditGrams('');
+                }}
+                className="flex-1 text-muted-foreground hover:text-primary"
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={handleUpdateGrams}
+                disabled={!editGrams || isNaN(Number(editGrams)) || Number(editGrams) <= 0}
+                className="flex-1 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
+              >
+                Сохранить
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

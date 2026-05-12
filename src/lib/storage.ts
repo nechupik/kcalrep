@@ -1,6 +1,6 @@
 import type { MacroResult } from "./nutrition";
 import { getCurrentUser } from "./auth";
-import { saveNorm as saveNormToFirestore, loadNorm as loadNormFromFirestore, saveDiaryEntry, loadDiary as loadDiaryFromFirestore, deleteDiaryEntry } from "./firestore";
+import { saveNorm as saveNormToFirestore, loadNorm as loadNormFromFirestore, saveDiaryEntry, loadDiary as loadDiaryFromFirestore, deleteDiaryEntry, updateDiaryEntry as updateDiaryEntryInFirestore } from "./firestore";
 
 const NORM_KEY = "kbju.norm";
 const DIARY_KEY = "kbju.diary";
@@ -172,6 +172,33 @@ export async function removeDiaryEntry(entryId: string) {
     const entries = await loadDiary();
     const filteredEntries = entries.filter(entry => entry.id !== entryId);
     localStorage.setItem(DIARY_KEY, JSON.stringify(filteredEntries));
+  }
+}
+
+// Helper function to update a diary entry
+export async function updateDiaryEntry(entryId: string, updates: Partial<DiaryEntry>) {
+  const user = getCurrentUser();
+  if (user) {
+    try {
+      await updateDiaryEntryInFirestore(user.uid, entryId, updates);
+    } catch (error) {
+      console.error("Failed to update diary entry in Firestore:", error);
+      // Fallback to localStorage
+      const entries = await loadDiary();
+      const entryIndex = entries.findIndex(entry => entry.id === entryId);
+      if (entryIndex !== -1) {
+        entries[entryIndex] = { ...entries[entryIndex], ...updates };
+        localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+      }
+    }
+  } else {
+    // Fallback to localStorage
+    const entries = await loadDiary();
+    const entryIndex = entries.findIndex(entry => entry.id === entryId);
+    if (entryIndex !== -1) {
+      entries[entryIndex] = { ...entries[entryIndex], ...updates };
+      localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    }
   }
 }
 

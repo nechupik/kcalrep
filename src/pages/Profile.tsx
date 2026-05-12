@@ -40,7 +40,7 @@ const Profile = () => {
   const [showCalculator, setShowCalculator] = useState(false);
   const [calcVisible, setCalcVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activityEnabled, setActivityEnabled] = useState(true);
+  const [activityEnabled, setActivityEnabled] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -466,12 +466,12 @@ const Profile = () => {
               </div>
               <button
                 onClick={() => setActivityEnabled(!activityEnabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  activityEnabled ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d]' : 'bg-muted'
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
+                  activityEnabled ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d]' : 'bg-gray-300'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 ${
                     activityEnabled ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />

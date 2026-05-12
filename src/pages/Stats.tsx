@@ -402,7 +402,7 @@ const Stats = () => {
       <section className="container max-w-5xl pt-6 pb-12">
         
         {/* SECTION 1 - Weekly Chart */}
-        <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 mb-6">
+        <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 mb-4">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="h-4 w-4 text-primary" />
             <h2 className="font-semibold">Калории за неделю</h2>
@@ -461,7 +461,7 @@ const Stats = () => {
           </div>
         </Card>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
+        <div className="grid md:grid-cols-2 gap-6 mb-4">
           {/* SECTION 2 - Monthly Overview */}
           <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
             <div className="mb-4 text-left">
@@ -702,7 +702,7 @@ const Stats = () => {
         {selectedDay && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
             <div onClick={() => setSelectedDay(null)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative w-full sm:max-w-lg bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto">
+            <div className="relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto">
               
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
@@ -812,8 +812,11 @@ const Stats = () => {
                             )}
 
                             {/* Foods list */}
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Съедено</p>
+                            <Card className="w-full p-5 md:p-6 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
+                              <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
+                                <span className="text-xs text-muted-foreground">{dayEntries.length} шт.</span>
+                              </div>
                               <div className="space-y-2">
                                 {dayEntries.map((entry) => (
                                   <div key={entry.id} className="rounded-xl bg-muted/30 px-3 py-2.5">
@@ -827,7 +830,7 @@ const Stats = () => {
                                   </div>
                                 ))}
                               </div>
-                            </div>
+                            </Card>
                           </>
                         );
                       })()}
@@ -846,8 +849,9 @@ const Stats = () => {
       </section>
 
       {/* Eaten Foods List */}
-      {monthlyDetailEntries.length > 0 && (
-        <Card className="p-5 md:p-6 shadow-card border-border/50 backdrop-blur-sm bg-card/80">
+      <section className="container max-w-5xl">
+        {monthlyDetailEntries.length > 0 && (
+          <Card className="w-full p-4 shadow-card border-border/50 backdrop-blur-sm bg-card/80">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
             <span className="text-xs text-muted-foreground">{monthlyDetailEntries.length} шт.</span>
@@ -896,6 +900,7 @@ const Stats = () => {
           </div>
         </Card>
       )}
+      </section>
       <div className="h-8" />
     </div>
   );
