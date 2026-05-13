@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Calendar, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { MacroRing } from "@/components/MacroRing";
 import { MainCalorieRing } from "@/components/MainCalorieRing";
 import { MacroProgressBar } from "@/components/MacroProgressBar";
 import { AppHeader } from "@/components/AppHeader";
 import { AddFoodModal } from "@/components/AddFoodModal";
+import { EatenFoodsList } from "@/components/EatenFoodsList";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -35,8 +35,6 @@ const Index = () => {
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [showWeightReminder, setShowWeightReminder] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState<DiaryEntry | null>(null);
   const [editGrams, setEditGrams] = useState('');
@@ -118,28 +116,14 @@ const Index = () => {
   };
 
   const handleRemoveEntry = async (id: string) => {
-    setEntryToDelete(id);
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!entryToDelete) return;
     try {
-      await removeDiaryEntry(entryToDelete);
+      await removeDiaryEntry(id);
       const diaryData = await loadDiary(selectedDate);
       setEntries(Array.isArray(diaryData) ? diaryData : []);
       toast.success('Запись удалена');
     } catch (error) {
       toast.error('Ошибка удаления записи');
-    } finally {
-      setDeleteConfirmOpen(false);
-      setEntryToDelete(null);
     }
-  };
-
-  const cancelDelete = () => {
-    setDeleteConfirmOpen(false);
-    setEntryToDelete(null);
   };
 
   const handleEditEntry = (entry: DiaryEntry) => {
@@ -452,60 +436,11 @@ const Index = () => {
 
         {/* Eaten Foods List */}
         <section className="container max-w-5xl">
-          {entries.length > 0 && (
-            <Card className="w-full p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
-              <span className="text-xs text-muted-foreground">{entries.length} шт.</span>
-            </div>
-            <div className="space-y-2">
-              {entries.slice().reverse().map((e) => (
-                <div
-                  key={e.id}
-                  className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5 group hover:bg-muted/70 transition-smooth cursor-pointer"
-                  onClick={() => handleEditEntry(e)}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">{e.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {e.grams > 1 ? `${e.grams}г · ` : '1 порция · '}
-                      <span className="text-macro-calories font-semibold">{e.calories}</span> ккал ·
-                      Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г
-                    </div>
-                  </div>
-                  <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-                    <AlertDialogTrigger asChild>
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleRemoveEntry(e.id);
-                        }}
-                        className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1 shrink-0"
-                        aria-label="Удалить"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Удалить запись?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Вы уверены, что хотите удалить "{e.name}"? Это действие нельзя отменить.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel onClick={cancelDelete}>Отмена</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                          Удалить
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+          <EatenFoodsList
+            entries={entries}
+            onRemove={handleRemoveEntry}
+            onEdit={handleEditEntry}
+          />
         </section>
 
               <div className="h-8" />

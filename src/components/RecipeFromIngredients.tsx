@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { loadProducts, type Product } from "@/lib/products";
-import { Search, Plus, Trash2, Calculator } from "lucide-react";
+import { Search, Plus, Trash2, Calculator, Edit2, Check, X } from "lucide-react";
+import type { RecipeIngredient as RecipeIngredientType } from "@/lib/recipes";
 
 interface RecipeIngredient {
   product: Product;
@@ -22,26 +23,50 @@ interface RecipeFromIngredientsProps {
     carbs: number;
     text: string;
     servingType: 'grams' | 'portion';
+    ingredients?: RecipeIngredientType[];
   }) => void;
   onCancel: () => void;
+  initialData?: {
+    name: string;
+    ingredients: RecipeIngredientType[];
+    description: string;
+    servingType: 'grams' | 'portion';
+  };
 }
 
-export const RecipeFromIngredients = ({ onSave, onCancel }: RecipeFromIngredientsProps) => {
-  const [recipeName, setRecipeName] = useState("");
+export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeFromIngredientsProps) => {
+  const [recipeName, setRecipeName] = useState(initialData?.name || "");
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [grams, setGrams] = useState("");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState(initialData?.description || "");
   const [loading, setLoading] = useState(false);
-  const [servingType, setServingType] = useState<'grams' | 'portion'>('grams');
+  const [servingType, setServingType] = useState<'grams' | 'portion'>(initialData?.servingType || 'grams');
+  const [editingGramsIndex, setEditingGramsIndex] = useState<number | null>(null);
+  const [editingGramsValue, setEditingGramsValue] = useState("");
 
   // Load products on component mount
   useEffect(() => {
     loadProductsList();
   }, []);
+
+  // Load initial ingredients if editing
+  useEffect(() => {
+    if (initialData?.ingredients && products.length > 0) {
+      const loadedIngredients: RecipeIngredient[] = initialData.ingredients.map(ing => {
+        const product = products.find(p => p.id === ing.productId);
+        if (!product) return null;
+        return {
+          product,
+          grams: ing.grams
+        };
+      }).filter((ing): ing is RecipeIngredient => ing !== null);
+      setIngredients(loadedIngredients);
+    }
+  }, [initialData, products]);
 
   // Filter products when search query changes
   useEffect(() => {
@@ -104,6 +129,29 @@ export const RecipeFromIngredients = ({ onSave, onCancel }: RecipeFromIngredient
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
+  const handleStartEditGrams = (index: number) => {
+    setEditingGramsIndex(index);
+    setEditingGramsValue(ingredients[index].grams.toString());
+  };
+
+  const handleSaveGrams = (index: number) => {
+    const newGrams = Number(editingGramsValue);
+    if (newGrams <= 0) {
+      toast.error("Граммовка должна быть больше 0");
+      return;
+    }
+    const updatedIngredients = [...ingredients];
+    updatedIngredients[index].grams = newGrams;
+    setIngredients(updatedIngredients);
+    setEditingGramsIndex(null);
+    setEditingGramsValue("");
+  };
+
+  const handleCancelEditGrams = () => {
+    setEditingGramsIndex(null);
+    setEditingGramsValue("");
+  };
+
   const handleSaveRecipe = () => {
     if (!recipeName.trim()) {
       toast.error("Введите название блюда");
@@ -123,6 +171,17 @@ export const RecipeFromIngredients = ({ onSave, onCancel }: RecipeFromIngredient
       ? `Ингредиенты:\n${ingredientsList}\n\nОписание:\n${description}`
       : `Ингредиенты:\n${ingredientsList}`;
 
+    // Convert ingredients to RecipeIngredientType format
+    const ingredientsData: RecipeIngredientType[] = ingredients.map(ing => ({
+      productId: ing.product.id,
+      productName: ing.product.name,
+      grams: ing.grams,
+      calories: ing.product.calories,
+      protein: ing.product.protein,
+      fat: ing.product.fat,
+      carbs: ing.product.carbs,
+    }));
+
     onSave({
       name: recipeName,
       calories: Math.round(totals.calories),
@@ -130,7 +189,8 @@ export const RecipeFromIngredients = ({ onSave, onCancel }: RecipeFromIngredient
       fat: Math.round(totals.fat * 10) / 10,
       carbs: Math.round(totals.carbs * 10) / 10,
       text: fullDescription,
-      servingType
+      servingType,
+      ingredients: ingredientsData
     });
   };
 
@@ -218,19 +278,66 @@ export const RecipeFromIngredients = ({ onSave, onCancel }: RecipeFromIngredient
                 <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded">
                   <div className="flex-1">
                     <span className="font-medium">{ingredient.product.name}</span>
-                    <span className="text-muted-foreground ml-2">{ingredient.grams}г</span>
-                    <div className="text-xs text-muted-foreground">
-                      {Math.round(ingredient.product.calories * ingredient.grams / 100)} ккал
-                    </div>
+                    {editingGramsIndex === index ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Input
+                          type="number"
+                          value={editingGramsValue}
+                          onChange={(e) => setEditingGramsValue(e.target.value)}
+                          className="w-20 h-8 text-sm"
+                          min="1"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveGrams(index);
+                            if (e.key === 'Escape') handleCancelEditGrams();
+                          }}
+                        />
+                        <span className="text-sm text-muted-foreground">г</span>
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveGrams(index)}
+                          className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCancelEditGrams}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground ml-2">{ingredient.grams}г</span>
+                        <div className="text-xs text-muted-foreground">
+                          {Math.round(ingredient.product.calories * ingredient.grams / 100)} ккал
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRemoveIngredient(index)}
-                    className="text-muted-foreground hover:text-destructive p-2"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  <div className="flex gap-1">
+                    {editingGramsIndex !== index && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStartEditGrams(index)}
+                        className="text-muted-foreground hover:text-primary p-2"
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRemoveIngredient(index)}
+                      className="text-muted-foreground hover:text-destructive p-2"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

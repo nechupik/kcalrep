@@ -1,6 +1,16 @@
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "./firebase";
 
+export interface RecipeIngredient {
+  productId: string;
+  productName: string;
+  grams: number;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+}
+
 export interface Recipe {
   id: string;
   name: string;
@@ -14,6 +24,7 @@ export interface Recipe {
   portionProtein?: number;
   portionFat?: number;
   portionCarbs?: number;
+  ingredients?: RecipeIngredient[]; // structured ingredients data for editing
   createdBy?: string;
   createdAt?: any;
 }

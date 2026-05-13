@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { EatenFoodsList } from "@/components/EatenFoodsList";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MonthPicker } from "@/components/ui/month-picker";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { BarChart3, TrendingUp, Activity, Weight, X, Trash2 } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, Weight, X } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -62,8 +62,6 @@ const Stats = () => {
   });
   const [monthlyDetailEntries, setMonthlyDetailEntries] = useState<DiaryEntry[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const [dayEntries, setDayEntries] = useState<DiaryEntry[]>([]);
   const [dayActivity, setDayActivity] = useState<any | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
@@ -311,27 +309,13 @@ const Stats = () => {
   };
 
   const handleRemoveEntry = async (id: string) => {
-    setEntryToDelete(id);
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!entryToDelete) return;
     try {
-      await deleteDiaryEntry(user.uid, entryToDelete);
-      setMonthlyDetailEntries(prev => prev.filter(e => e.id !== entryToDelete));
+      await deleteDiaryEntry(user.uid, id);
+      setMonthlyDetailEntries(prev => prev.filter(e => e.id !== id));
       toast.success('Запись удалена');
     } catch (error) {
       toast.error('Ошибка удаления записи');
-    } finally {
-      setDeleteConfirmOpen(false);
-      setEntryToDelete(null);
     }
-  };
-
-  const cancelDelete = () => {
-    setDeleteConfirmOpen(false);
-    setEntryToDelete(null);
   };
 
   const handleSaveWeight = async () => {
@@ -812,25 +796,11 @@ const Stats = () => {
                             )}
 
                             {/* Foods list */}
-                            <Card className="w-full p-5 md:p-6 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
-                              <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
-                                <span className="text-xs text-muted-foreground">{dayEntries.length} шт.</span>
-                              </div>
-                              <div className="space-y-2">
-                                {dayEntries.map((entry) => (
-                                  <div key={entry.id} className="rounded-xl bg-muted/30 px-3 py-2.5">
-                                    <div className="flex justify-between items-start">
-                                      <span className="text-sm font-medium">{entry.name}</span>
-                                      <span className="text-xs font-bold text-macro-calories">{entry.calories} ккал</span>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground mt-0.5">
-                                      {entry.grams > 1 ? `${entry.grams}г` : '1 порция'} · Б {entry.protein}г · Ж {entry.fat}г · У {entry.carbs}г
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </Card>
+                            <EatenFoodsList
+                              entries={dayEntries}
+                              onRemove={handleRemoveEntry}
+                              className="p-5 md:p-6"
+                            />
                           </>
                         );
                       })()}
@@ -850,56 +820,11 @@ const Stats = () => {
 
       {/* Eaten Foods List */}
       <section className="container max-w-5xl">
-        {monthlyDetailEntries.length > 0 && (
-          <Card className="w-full p-4 shadow-card border-border/50 backdrop-blur-sm bg-card/80">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Съедено</h3>
-            <span className="text-xs text-muted-foreground">{monthlyDetailEntries.length} шт.</span>
-          </div>
-          <div className="space-y-2">
-            {monthlyDetailEntries.slice().reverse().map((e) => (
-              <div
-                key={e.id}
-                className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5 group hover:bg-muted/70 transition-smooth"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">{e.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {e.grams > 1 ? `${e.grams}г · ` : '1 порция · '}
-                    <span className="text-macro-calories font-semibold">{e.calories}</span> ккал ·
-                    Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г
-                  </div>
-                </div>
-                <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      onClick={() => handleRemoveEntry(e.id)}
-                      className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1 shrink-0"
-                      aria-label="Удалить"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Удалить запись?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Вы уверены, что хотите удалить "{e.name}"? Это действие нельзя отменить.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel onClick={cancelDelete}>Отмена</AlertDialogCancel>
-                      <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Удалить
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+        <EatenFoodsList
+          entries={monthlyDetailEntries}
+          onRemove={handleRemoveEntry}
+          className="p-4 shadow-card"
+        />
       </section>
       <div className="h-8" />
     </div>

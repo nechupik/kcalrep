@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { loadRecipes, saveRecipe, deleteRecipe, updateRecipe, type Recipe } from "@/lib/recipes";
+import { loadRecipes, saveRecipe, deleteRecipe, updateRecipe, type Recipe, type RecipeIngredient as RecipeIngredientType } from "@/lib/recipes";
 import { RecipeFromIngredients } from "@/components/RecipeFromIngredients";
 import { BookOpen, Search, Plus, Edit, Trash2, Calculator } from "lucide-react";
 
@@ -40,6 +40,7 @@ const Recipes = () => {
   const [deletedRecipe, setDeletedRecipe] = useState<Recipe | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [editingRecipeIngredients, setEditingRecipeIngredients] = useState<RecipeIngredientType[] | null>(null);
 
   // Guard: if no user, don't render
   if (!user) {
@@ -126,33 +127,74 @@ const Recipes = () => {
   const handleEditRecipe = async (recipe: Recipe) => {
     setEditingRecipe(recipe);
     setServingType(recipe.servingType || 'grams');
-    setFormData({
-      name: recipe.name,
-      calories: recipe.calories.toString(),
-      protein: recipe.protein.toString(),
-      fat: recipe.fat.toString(),
-      carbs: recipe.carbs.toString(),
-      description: recipe.text || "",
-    });
+    
+    // Check if recipe has ingredients (created from ingredients)
+    if (recipe.ingredients && recipe.ingredients.length > 0) {
+      setEditingRecipeIngredients(recipe.ingredients);
+      setAddMode('ingredients');
+    } else {
+      setEditingRecipeIngredients(null);
+      setAddMode('manual');
+      setFormData({
+        name: recipe.name,
+        calories: recipe.calories.toString(),
+        protein: recipe.protein.toString(),
+        fat: recipe.fat.toString(),
+        carbs: recipe.carbs.toString(),
+        description: recipe.text || "",
+      });
+    }
     setShowAddForm(true);
   };
 
   const handleUpdateRecipe = async () => {
-    if (!user || !editingRecipe || !formData.name.trim()) return;
+    if (!user || !editingRecipe) return;
     
     try {
-      await updateRecipe(editingRecipe.id!, {
-        name: formData.name,
-        calories: Number(formData.calories) || 0,
-        protein: Number(formData.protein) || 0,
-        fat: Number(formData.fat) || 0,
-        carbs: Number(formData.carbs) || 0,
-        text: formData.description,
-        servingType,
-      });
+      // If editing recipe with ingredients, use the ingredient-based update
+      if (editingRecipeIngredients && editingRecipeIngredients.length > 0) {
+        // Calculate totals from ingredients
+        const totals = editingRecipeIngredients.reduce((acc, ing) => {
+          const factor = ing.grams / 100;
+          return {
+            calories: acc.calories + (ing.calories * factor),
+            protein: acc.protein + (ing.protein * factor),
+            fat: acc.fat + (ing.fat * factor),
+            carbs: acc.carbs + (ing.carbs * factor),
+          };
+        }, { calories: 0, protein: 0, fat: 0, carbs: 0 });
+
+        const ingredientsList = editingRecipeIngredients
+          .map(ing => `${ing.productName} - ${ing.grams}г`)
+          .join('\n');
+
+        await updateRecipe(editingRecipe.id!, {
+          name: editingRecipe.name,
+          calories: Math.round(totals.calories),
+          protein: Math.round(totals.protein * 10) / 10,
+          fat: Math.round(totals.fat * 10) / 10,
+          carbs: Math.round(totals.carbs * 10) / 10,
+          text: editingRecipe.text || `Ингредиенты:\n${ingredientsList}`,
+          servingType: editingRecipe.servingType || 'grams',
+          ingredients: editingRecipeIngredients,
+        });
+      } else {
+        // Manual edit mode
+        if (!formData.name.trim()) return;
+        await updateRecipe(editingRecipe.id!, {
+          name: formData.name,
+          calories: Number(formData.calories) || 0,
+          protein: Number(formData.protein) || 0,
+          fat: Number(formData.fat) || 0,
+          carbs: Number(formData.carbs) || 0,
+          text: formData.description,
+          servingType,
+        });
+      }
       
-      toast.success(`Обновлено: ${formData.name}`);
+      toast.success(`Обновлено: ${editingRecipe.name}`);
       setEditingRecipe(null);
+      setEditingRecipeIngredients(null);
       setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
       setShowAddForm(false);
       loadUserRecipes(); // Refresh list
@@ -235,6 +277,7 @@ const Recipes = () => {
 
   const handleCancelEdit = () => {
     setEditingRecipe(null);
+    setEditingRecipeIngredients(null);
     setServingType('grams');
     setAddMode('manual');
     setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
@@ -249,15 +292,25 @@ const Recipes = () => {
     carbs: number;
     text: string;
     servingType: 'grams' | 'portion';
+    ingredients?: RecipeIngredientType[];
   }) => {
     if (!user) return;
     
     try {
-      await saveRecipe(recipeData, user.uid);
+      if (editingRecipe) {
+        // Update existing recipe
+        await updateRecipe(editingRecipe.id!, recipeData);
+        toast.success(`Обновлено: ${recipeData.name}`);
+      } else {
+        // Create new recipe
+        await saveRecipe(recipeData, user.uid);
+        toast.success(`Добавлено: ${recipeData.name}`);
+      }
       
-      toast.success(`Добавлено: ${recipeData.name}`);
       setShowAddForm(false);
       setAddMode('manual');
+      setEditingRecipe(null);
+      setEditingRecipeIngredients(null);
       loadUserRecipes(); // Refresh list
     } catch (error) {
       console.error("Error saving recipe:", error);
@@ -485,8 +538,20 @@ const Recipes = () => {
                 </Button>
               </div>
 
-              {editingRecipe ? (
-                // Edit mode - always manual form
+              {editingRecipe && editingRecipeIngredients && editingRecipeIngredients.length > 0 ? (
+                // Edit mode for recipes with ingredients - use RecipeFromIngredients
+                <RecipeFromIngredients
+                  onSave={handleSaveRecipeFromIngredients}
+                  onCancel={handleCancelEdit}
+                  initialData={{
+                    name: editingRecipe.name,
+                    ingredients: editingRecipeIngredients,
+                    description: editingRecipe.text?.replace(/Ингредиенты:.*?(\n\nОписание:|$)/s, '').trim() || '',
+                    servingType: editingRecipe.servingType || 'grams'
+                  }}
+                />
+              ) : editingRecipe ? (
+                // Edit mode for manual recipes
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Название блюда</Label>
@@ -613,6 +678,12 @@ const Recipes = () => {
                 <RecipeFromIngredients
                   onSave={handleSaveRecipeFromIngredients}
                   onCancel={handleCancelEdit}
+                  initialData={editingRecipe && editingRecipeIngredients ? {
+                    name: editingRecipe.name,
+                    ingredients: editingRecipeIngredients,
+                    description: editingRecipe.text?.replace(/Ингредиенты:.*?(\n\nОписание:|$)/s, '').trim() || '',
+                    servingType: editingRecipe.servingType || 'grams'
+                  } : undefined}
                 />
               ) : (
                 // Add manual mode
