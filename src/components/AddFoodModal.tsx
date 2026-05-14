@@ -27,6 +27,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [selected, setSelected] = useState<Product | Recipe | null>(null);
   const [grams, setGrams] = useState('100');
   const [loading, setLoading] = useState(true);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   // Manual entry state
   const [manualName, setManualName] = useState('');
@@ -185,9 +186,20 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   >
     {/* Overlay */}
     <div
+      ref={overlayRef}
       onClick={handleClose}
-      className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
-    />
+      className={`absolute inset-0 ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
+    >
+      <div
+        className="absolute inset-0 bg-black/60"
+      />
+      <div
+        className="absolute inset-0 backdrop-blur-sm transition-opacity duration-650 ease-in-out"
+        style={{
+          opacity: animationState === 'enter' ? 1 : 0
+        }}
+      />
+    </div>
 
     {/* Modal panel */}
     <div
@@ -302,6 +314,18 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                         onChange={e => setGrams(e.target.value)}
                         autoFocus
                       />
+                      <div
+                        className={`mt-2 overflow-hidden transition-all ease-in-out ${grams && Number(grams) > 0 ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}
+                        style={{ transitionDuration: '650ms' }}
+                      >
+                        {grams && Number(grams) > 0 && (
+                          <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-2">
+                            <div className="text-sm font-medium text-primary">
+                              {Math.round(selected.calories * (Number(grams) / 100))} ккал · Б {+(selected.protein * (Number(grams) / 100)).toFixed(1)} · Ж {+(selected.fat * (Number(grams) / 100)).toFixed(1)} · У {+(selected.carbs * (Number(grams) / 100)).toFixed(1)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
