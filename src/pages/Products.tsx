@@ -149,7 +149,7 @@ const Products = () => {
         protein: Number(formData.protein) || 0,
         fat: Number(formData.fat) || 0,
         carbs: Number(formData.carbs) || 0,
-        category: formData.category || undefined,
+        category: formData.category || null,
       }, user.uid);
       
       toast.success(`Добавлено: ${formData.name}`);
@@ -208,7 +208,7 @@ const Products = () => {
           protein: Number(formData.protein) || 0,
           fat: Number(formData.fat) || 0,
           carbs: Number(formData.carbs) || 0,
-          category: formData.category || undefined,
+          category: formData.category || null,
         });
       } else {
         // Create new product if no ID exists
@@ -218,7 +218,7 @@ const Products = () => {
           protein: Number(formData.protein) || 0,
           fat: Number(formData.fat) || 0,
           carbs: Number(formData.carbs) || 0,
-          category: formData.category || undefined,
+          category: formData.category || null,
         }, user.uid);
       }
       

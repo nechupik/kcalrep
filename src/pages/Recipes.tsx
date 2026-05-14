@@ -124,7 +124,7 @@ const Recipes = () => {
         protein: Number(formData.protein) || 0,
         fat: Number(formData.fat) || 0,
         carbs: Number(formData.carbs) || 0,
-        text: formData.description,
+        text: formData.description || null,
         servingType,
       }, user.uid);
       
@@ -254,7 +254,7 @@ const Recipes = () => {
           protein: Number(formData.protein) || 0,
           fat: Number(formData.fat) || 0,
           carbs: Number(formData.carbs) || 0,
-          text: formData.description,
+          text: formData.description || null,
           servingType,
         });
       }
@@ -450,7 +450,7 @@ const Recipes = () => {
                   disabled={!user}
                   className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >
-                  Добавить блюдо
+                  Создать блюдо
                 </Button>
               </div>
             ) : (
@@ -890,7 +890,7 @@ const Recipes = () => {
           disabled={!user}
           className="rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-12 py-6 text-foreground font-bold text-xl shadow-glow hover:opacity-90 transition-smooth"
         >
-          Добавить
+          Создать
         </Button>
       </div>
       <div className="h-20" />

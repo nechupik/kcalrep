@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { UserDataViewer } from "@/components/UserDataViewer";
-import { BarChart3, TrendingUp, Activity, Weight, X, Eye } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, Weight, X, Eye, Brain } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -22,11 +22,13 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
 import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore, loadActivity, deleteDiaryEntry, saveActivity } from "@/lib/firestore";
+import { analyzeNutrition, formatStreak, type NutritionAnalyticsInput, type NutritionAnalyticsResult } from "@/lib/nutritionAnalytics";
 import type { ActivityEntry } from "@/lib/firestore";
 import { recalculateNormWithNewWeight } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MONTHS = [
@@ -73,6 +75,8 @@ const Stats = () => {
   const [showActivityEdit, setShowActivityEdit] = useState(false);
   const [activityEditInput, setActivityEditInput] = useState('');
   const [savingDayActivity, setSavingDayActivity] = useState(false);
+  const [analytics, setAnalytics] = useState<NutritionAnalyticsResult | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const ADMIN_UID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
 
   // Control modal animation
@@ -120,6 +124,155 @@ const Stats = () => {
     };
 
     loadData();
+  }, [user]);
+
+  // Load and calculate analytics when data changes
+  useEffect(() => {
+    const calculateAnalytics = async () => {
+      if (!user || !norm) return;
+
+      setAnalyticsLoading(true);
+      try {
+        // Load extended data for analytics (last 30 days)
+        const today = new Date();
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 29);
+
+        const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+        const endDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        const [diaryEntries, weights, activities] = await Promise.all([
+          loadDiaryRange(user.uid, startDateStr, endDateStr),
+          loadWeight(user.uid, 30),
+          Promise.all(
+            Array.from({ length: 30 }, (_, i) => {
+              const d = new Date(today);
+              d.setDate(d.getDate() - i);
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              return loadActivity(user.uid, dateStr);
+            })
+          ),
+        ]);
+
+        // Build foodLogsByDay
+        const foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay'] = [];
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          const dayEntries = diaryEntries.filter(e => e.date === dateStr);
+
+          foodLogsByDay.push({
+            date: dateStr,
+            calories: dayEntries.reduce((sum, e) => sum + e.calories, 0),
+            protein: dayEntries.reduce((sum, e) => sum + e.protein, 0),
+            fat: dayEntries.reduce((sum, e) => sum + e.fat, 0),
+            carbs: dayEntries.reduce((sum, e) => sum + e.carbs, 0),
+            entries: dayEntries.length,
+          });
+        }
+
+        // Calculate daily deficit
+        const dailyDeficit = foodLogsByDay.map(day => {
+          const activityEntry = activities.find(a => a?.date === day.date);
+          const burned = (norm.bmr || 0) + (activityEntry?.caloriesBurned || 0);
+          return burned - day.calories;
+        });
+
+        // Build timestampsMeals
+        const timestampsMeals: NutritionAnalyticsInput['timestampsMeals'] = [];
+        diaryEntries.forEach(entry => {
+          const hour = new Date(entry.addedAt || Date.now()).getHours();
+          timestampsMeals.push({
+            hour,
+            calories: entry.calories,
+          });
+        });
+
+        // Calculate tracked days and streak
+        const trackedDays = foodLogsByDay.filter(d => d.entries > 0).length;
+        let streakDays = 0;
+        for (let i = foodLogsByDay.length - 1; i >= 0; i--) {
+          if (foodLogsByDay[i].entries > 0) {
+            streakDays++;
+          } else {
+            break;
+          }
+        }
+
+        // Get current weight
+        const currentWeight = weights.length > 0 ? weights[0].weight : 70;
+
+        // Build weight history
+        const weightHistory = weights.map(w => ({
+          date: w.date,
+          weight: w.weight,
+        }));
+
+        // Get activity calories
+        const activityCalories = activities
+          .filter(a => a !== null)
+          .map(a => a.caloriesBurned);
+
+        // Calculate averages
+        const activeDays = foodLogsByDay.filter(d => d.entries > 0);
+        const avgCalories = activeDays.length > 0
+          ? activeDays.reduce((sum, d) => sum + d.calories, 0) / activeDays.length
+          : 0;
+        const avgProtein = activeDays.length > 0
+          ? activeDays.reduce((sum, d) => sum + d.protein, 0) / activeDays.length
+          : 0;
+        const avgFat = activeDays.length > 0
+          ? activeDays.reduce((sum, d) => sum + d.fat, 0) / activeDays.length
+          : 0;
+        const avgCarbs = activeDays.length > 0
+          ? activeDays.reduce((sum, d) => sum + d.carbs, 0) / activeDays.length
+          : 0;
+
+        const analyticsInput: NutritionAnalyticsInput = {
+          currentWeight,
+          targetWeight: currentNorm?.goal === 'lose' ? currentWeight - 5 : undefined,
+          avgCalories,
+          avgProtein,
+          avgFat,
+          avgCarbs,
+          dailyTargetCalories: norm.calories,
+          dailyTargetProtein: norm.protein,
+          dailyTargetFat: norm.fat,
+          dailyTargetCarbs: norm.carbs,
+          activityCalories,
+          dailyDeficit,
+          weightHistory,
+          foodLogsByDay,
+          trackedDays,
+          streakDays,
+          timestampsMeals,
+        };
+
+        const result = analyzeNutrition(analyticsInput);
+        setAnalytics(result);
+      } catch (error) {
+        console.error('Failed to calculate analytics:', error);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+
+    if (entries.length > 0 && norm) {
+      calculateAnalytics();
+    }
+  }, [entries, norm, user, weightEntries]);
+
+  // Reference to current norm data
+  const [currentNorm, setCurrentNorm] = useState<any>(null);
+
+  useEffect(() => {
+    const loadCurrentNorm = async () => {
+      if (!user) return;
+      const normData = await loadFullNormData(user.uid);
+      setCurrentNorm(normData);
+    };
+    loadCurrentNorm();
   }, [user]);
 
   useEffect(() => {
@@ -448,6 +601,19 @@ const Stats = () => {
       <AppHeader />
 
       <section className="container max-w-5xl pt-6 pb-12">
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="mb-4 w-full grid grid-cols-2">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Обзор
+            </TabsTrigger>
+            <TabsTrigger value="ai-analytics" className="flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              AI Аналитика
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
         
         {/* SECTION 1 - Weekly Chart */}
         <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 mb-4">
@@ -1001,6 +1167,316 @@ const Stats = () => {
             </div>
           </div>
         )}
+          </TabsContent>
+
+          {/* AI Analytics Tab */}
+          <TabsContent value="ai-analytics" className="space-y-4">
+            {analyticsLoading ? (
+              <Card className="p-8 text-center">
+                <div className="animate-pulse">
+                  <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">Анализируем ваши данные...</p>
+                </div>
+              </Card>
+            ) : analytics ? (
+              <>
+                {/* Overall Score */}
+                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Brain className="h-5 w-5 text-primary" />
+                    <h2 className="font-semibold">AI Оценка питания</h2>
+                  </div>
+                  <div className="text-center py-4">
+                    <div className={`text-5xl font-bold mb-2 ${
+                      analytics.nutritionScore >= 90 ? 'text-green-500' :
+                      analytics.nutritionScore >= 75 ? 'text-lime-500' :
+                      analytics.nutritionScore >= 60 ? 'text-yellow-500' :
+                      analytics.nutritionScore >= 40 ? 'text-orange-500' : 'text-red-500'
+                    }`}>
+                      {analytics.nutritionScore}/100
+                    </div>
+                    <p className="text-lg text-muted-foreground">
+                      {analytics.nutritionScore >= 90 ? 'Отлично' :
+                       analytics.nutritionScore >= 75 ? 'Хорошо' :
+                       analytics.nutritionScore >= 60 ? 'Нормально' :
+                       analytics.nutritionScore >= 40 ? 'Требует внимания' : 'Критично'}
+                    </p>
+                  </div>
+                </Card>
+
+                {/* Daily Verdict */}
+                <Card className="p-5 md:p-6 bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-primary/20 rounded-full p-2 mt-0.5">
+                      <Activity className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">Сводка дня</h3>
+                      <p className="text-muted-foreground">{analytics.dailyVerdict}</p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Protein Compliance */}
+                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-macro-protein/20 rounded-full p-2">
+                      <span className="text-lg">💪</span>
+                    </div>
+                    <h3 className="font-semibold">Выполнение белковой нормы</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Оценка</span>
+                      <span className="font-medium">{analytics.proteinCompliance.score}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-macro-protein h-2 rounded-full transition-all"
+                        style={{ width: `${analytics.proteinCompliance.score}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Успешных дней</span>
+                      <span className="font-medium">{analytics.proteinCompliance.successDays}</span>
+                    </div>
+                    {analytics.proteinCompliance.avgMiss > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Средний недобор</span>
+                        <span className="font-medium">{analytics.proteinCompliance.avgMiss}%</span>
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground mt-2">{analytics.proteinCompliance.verdict}</p>
+                  </div>
+                </Card>
+
+                {/* Deficit Analysis */}
+                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-accent/20 rounded-full p-2">
+                      <span className="text-lg">⚖️</span>
+                    </div>
+                    <h3 className="font-semibold">Анализ дефицита</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-muted/50 rounded-lg">
+                        <div className="text-sm text-muted-foreground">Ожидаемая потеря</div>
+                        <div className="text-lg font-semibold">{analytics.deficitAnalysis.expectedLoss.toFixed(2)} кг</div>
+                      </div>
+                      <div className="text-center p-3 bg-muted/50 rounded-lg">
+                        <div className="text-sm text-muted-foreground">Фактическая потеря</div>
+                        <div className="text-lg font-semibold">{analytics.deficitAnalysis.actualLoss.toFixed(2)} кг</div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Расхождение</span>
+                      <span className={`font-medium ${
+                        analytics.deficitAnalysis.discrepancy > 20 ? 'text-red-500' : 'text-green-500'
+                      }`}>
+                        {analytics.deficitAnalysis.discrepancy.toFixed(1)}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{analytics.deficitAnalysis.interpretation}</p>
+                    {analytics.deficitAnalysis.possibleCause && (
+                      <p className="text-sm text-yellow-500">{analytics.deficitAnalysis.possibleCause}</p>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Plateau Detection */}
+                {analytics.plateau.plateau && (
+                  <Card className="p-5 md:p-6 bg-red-500/10 border-red-500/30">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-red-500/20 rounded-full p-2 mt-0.5">
+                        <span className="text-lg">🛑</span>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-red-400 mb-1">Обнаружено плато</h3>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Вес не снижается уже {analytics.plateau.daysStuck} дней
+                        </p>
+                        {analytics.plateau.recommendation && (
+                          <p className="text-sm text-muted-foreground">{analytics.plateau.recommendation}</p>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Protein Forecast */}
+                {analytics.forecast && (
+                  <Card className={`p-5 md:p-6 border-l-4 ${
+                    analytics.forecast.urgency === 'high' ? 'border-red-500 bg-red-500/5' :
+                    analytics.forecast.urgency === 'medium' ? 'border-yellow-500 bg-yellow-500/5' :
+                    'border-green-500 bg-green-500/5'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-full p-2 mt-0.5">
+                        <span className="text-lg">⏰</span>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1">Прогноз белка</h3>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Осталось набрать: <span className="font-medium">{analytics.forecast.remainingProtein}г</span>
+                        </p>
+                        <p className="text-sm">{analytics.forecast.practicalAdvice}</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Calorie Stability */}
+                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-blue-500/20 rounded-full p-2">
+                      <span className="text-lg">📊</span>
+                    </div>
+                    <h3 className="font-semibold">Стабильность калорий</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Оценка стабильности</span>
+                      <span className="font-medium">{analytics.stability.stabilityScore}/100</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full transition-all"
+                        style={{ width: `${analytics.stability.stabilityScore}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Разброс (σ)</span>
+                      <span className="font-medium">{analytics.stability.variance} ккал</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{analytics.stability.explanation}</p>
+                  </div>
+                </Card>
+
+                {/* Patterns */}
+                {analytics.patterns.length > 0 && (
+                  <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="bg-purple-500/20 rounded-full p-2">
+                        <span className="text-lg">🔍</span>
+                      </div>
+                      <h3 className="font-semibold">Обнаруженные паттерны</h3>
+                    </div>
+                    <div className="space-y-2">
+                      {analytics.patterns.map((pattern, idx) => (
+                        <div 
+                          key={idx}
+                          className={`p-3 rounded-lg text-sm ${
+                            pattern.severity === 'alert' ? 'bg-red-500/10 border border-red-500/20' :
+                            pattern.severity === 'warning' ? 'bg-yellow-500/10 border border-yellow-500/20' :
+                            'bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {pattern.type === 'weekend' ? '📅' :
+                               pattern.type === 'weekday' ? '📆' :
+                               pattern.type === 'evening' ? '🌙' : '📈'}
+                            </span>
+                            <span>{pattern.description}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Recovery Risk */}
+                {(analytics.recovery.riskLevel === 'high' || analytics.recovery.riskLevel === 'medium') && (
+                  <Card className={`p-5 md:p-6 ${
+                    analytics.recovery.riskLevel === 'high' ? 'bg-red-500/10 border-red-500/30' :
+                    analytics.recovery.riskLevel === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                    'bg-orange-500/10 border-orange-500/30'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`rounded-full p-2 mt-0.5 ${
+                        analytics.recovery.riskLevel === 'high' ? 'bg-red-500/20' :
+                        analytics.recovery.riskLevel === 'medium' ? 'bg-yellow-500/20' :
+                        'bg-orange-500/20'
+                      }`}>
+                        <span className="text-lg">⚠️</span>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1">
+                          Риск восстановления: {
+                            analytics.recovery.riskLevel === 'high' ? 'Высокий' :
+                            analytics.recovery.riskLevel === 'medium' ? 'Средний' : 'Низкий'
+                          }
+                        </h3>
+                        <p className="text-sm text-muted-foreground">{analytics.recovery.explanation}</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Weight Interpretation */}
+                {analytics.weightInterpretation.type !== 'none' && (
+                  <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-green-500/20 rounded-full p-2 mt-0.5">
+                        <span className="text-lg">
+                          {analytics.weightInterpretation.type === 'water' ? '💧' :
+                           analytics.weightInterpretation.type === 'fluctuation' ? '📊' :
+                           analytics.weightInterpretation.type === 'real' ? '⚖️' : '📝'}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1">Интерпретация веса</h3>
+                        <p className="text-sm text-muted-foreground">{analytics.weightInterpretation.explanation}</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Streaks */}
+                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-green-500/20 rounded-full p-2">
+                      <span className="text-lg">🔥</span>
+                    </div>
+                    <h3 className="font-semibold">Серии</h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {(() => {
+                      const calorieStreak = formatStreak(analytics.streaks.calorieStreak);
+                      const proteinStreak = formatStreak(analytics.streaks.proteinStreak);
+                      const deficitStreak = formatStreak(analytics.streaks.deficitStreak);
+                      return (
+                        <>
+                          <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <div className="text-2xl font-bold text-green-500">{calorieStreak.value}</div>
+                            <div className="text-xs text-muted-foreground">{calorieStreak.label}</div>
+                          </div>
+                          <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <div className="text-2xl font-bold text-macro-protein">{proteinStreak.value}</div>
+                            <div className="text-xs text-muted-foreground">{proteinStreak.label}</div>
+                          </div>
+                          <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <div className="text-2xl font-bold text-accent">{deficitStreak.value}</div>
+                            <div className="text-xs text-muted-foreground">{deficitStreak.label}</div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <Card className="p-8 text-center">
+                <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">Недостаточно данных для анализа</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Записывайте питание минимум 3 дня, чтобы увидеть аналитику
+                </p>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </section>
 
       {/* Eaten Foods List */}
