@@ -87,6 +87,67 @@ All colors MUST be HSL.
   .shadow-card { box-shadow: var(--shadow-card); }
   .transition-smooth { transition: all 0.65s cubic-bezier(0.4, 0, 0.2, 1); }
   .transition-dropdown { transition: all 0.65s cubic-bezier(0.4, 0, 0.2, 1); }
+  .toast-enter {
+    animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .toast-exit {
+    animation: slideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Modal slide-up animation */
+  @keyframes modal-slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes modal-slide-down {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(100%);
+    }
+  }
+
+  .modal-enter {
+    animation: modal-slide-up 650ms ease-in-out forwards;
+  }
+
+  .modal-exit {
+    animation: modal-slide-down 650ms ease-in-out forwards;
+  }
+
+  /* Overlay fade animation */
+  @keyframes overlay-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes overlay-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  .overlay-enter {
+    animation: overlay-fade-in 650ms ease-in-out forwards;
+  }
+
+  .overlay-exit {
+    animation: overlay-fade-out 650ms ease-in-out forwards;
+  }
 }
 
 /* PWA Safe Area for iPhone notch */
@@ -171,6 +232,7 @@ input::placeholder {
     opacity: 0;
   }
 }
+
 
 /* Alternative selectors for sonner */
 .sonner-toast[data-removed] {

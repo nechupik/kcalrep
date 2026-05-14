@@ -20,6 +20,7 @@ type Tab = 'product' | 'dish' | 'manual';
 export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodModalProps) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('product');
+  const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [dishes, setDishes] = useState<Recipe[]>([]);
   const [query, setQuery] = useState('');
@@ -37,6 +38,18 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [isTabChanging, setIsTabChanging] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
+
+  // Control animation
+  useEffect(() => {
+    if (isOpen) {
+      setAnimationState('enter');
+    } else {
+      setAnimationState('exit');
+      setTimeout(() => {
+        setAnimationState(null);
+      }, 650);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !user) return;
@@ -108,7 +121,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
 
     await onAdd(entry);
     resetForm();
-    onClose();
+    handleClose();
   };
 
   const handleManualAdd = async () => {
@@ -137,7 +150,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     
     await onAdd(entry);
     resetForm();
-    onClose();
+    handleClose();
   };
 
   const resetForm = () => {
@@ -160,46 +173,30 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     { id: 'manual' as Tab, label: 'Вручную', icon: PenLine },
   ];
 
+  const handleClose = () => {
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
   return (
   <div
     className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-    style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
   >
     {/* Overlay */}
     <div
-      onClick={onClose}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(4px)',
-        opacity: isOpen ? 1 : 0,
-        transition: 'opacity 650ms cubic-bezier(0.4, 0, 0.2, 1)',
-        pointerEvents: isOpen ? 'auto' : 'none',
-      }}
+      onClick={handleClose}
+      className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
     />
 
     {/* Modal panel */}
     <div
-      style={{
-        position: 'relative',
-        width: '100%',
-        maxWidth: '512px',
-        background: 'hsl(var(--background))',
-        border: '1px solid hsl(var(--border) / 0.5)',
-        borderRadius: '24px 24px 0 0',
-        padding: '24px',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 650ms cubic-bezier(0.4, 0, 0.2, 1), height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-        boxShadow: '0 -4px 40px rgba(0,0,0,0.4)',
-      }}
+      className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
     >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold">Добавить еду</h2>
-          <button onClick={onClose} className="rounded-xl p-2 hover:bg-muted/50 transition-smooth">
+          <button onClick={handleClose} className="rounded-xl p-2 hover:bg-muted/50 transition-smooth">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -210,15 +207,15 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
             <button
               key={tab.id}
               onClick={() => {
-  if (tab.id === activeTab) return;
-  setIsTabChanging(true);
-  setTimeout(() => {
-    setActiveTab(tab.id);
-    setSelected(null);
-    setQuery('');
-    setIsTabChanging(false);
-  }, 350);
-}}
+                const handleTabChange = (tab: Tab) => {
+                  setIsTabChanging(true);
+                  setTimeout(() => {
+                    setActiveTab(tab);
+                    setTimeout(() => setIsTabChanging(false), 300);
+                  }, 300);
+                };
+                handleTabChange(tab.id);
+              }}
               className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-smooth ${
                 activeTab === tab.id
                   ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-primary-foreground shadow-glow'

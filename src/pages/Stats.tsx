@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MonthPicker } from "@/components/ui/month-picker";
-import { BarChart3, TrendingUp, Activity, Weight, X } from "lucide-react";
+import { UserDataViewer } from "@/components/UserDataViewer";
+import { BarChart3, TrendingUp, Activity, Weight, X, Eye } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -65,6 +66,21 @@ const Stats = () => {
   const [dayEntries, setDayEntries] = useState<DiaryEntry[]>([]);
   const [dayActivity, setDayActivity] = useState<any | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
+  const [showUserDataViewer, setShowUserDataViewer] = useState(false);
+  const [isDayModalOpen, setIsDayModalOpen] = useState(false);
+  const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
+
+  // Control modal animation
+  useEffect(() => {
+    if (selectedDay) {
+      setAnimationState('enter');
+    } else {
+      setAnimationState('exit');
+      setTimeout(() => {
+        setAnimationState(null);
+      }, 650);
+    }
+  }, [selectedDay]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -613,6 +629,19 @@ const Stats = () => {
           </div>
         </Card>
 
+        {/* User Data Viewer Button - Only for specific user */}
+        {user?.uid === '3DXd9soOLnSZj4Axhg7zWPef2lj2' && (
+          <Card className="p-4 md:p-5 bg-card/80 backdrop-blur-sm border-border/50 mb-4">
+            <Button
+              onClick={() => setShowUserDataViewer(true)}
+              className="w-full flex items-center gap-2 justify-center bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
+            >
+              <Eye className="h-4 w-4" />
+              <span>Шо там Женя?</span>
+            </Button>
+          </Card>
+        )}
+
         {/* SECTION 5 - Interesting Statistics */}
         <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
           <button
@@ -685,8 +714,13 @@ const Stats = () => {
         {/* Day Detail Modal */}
         {selectedDay && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-            <div onClick={() => setSelectedDay(null)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto">
+            <div 
+              onClick={() => setSelectedDay(null)} 
+              className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`} 
+            />
+            <div 
+              className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
+            >
               
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
@@ -699,7 +733,10 @@ const Stats = () => {
                   <p className="text-sm text-muted-foreground">Детальная статистика</p>
                 </div>
                 <button
-                  onClick={() => setSelectedDay(null)}
+                  onClick={() => {
+                    setIsDayModalOpen(false);
+                    setTimeout(() => setSelectedDay(null), 650);
+                  }}
                   className="rounded-xl p-2 hover:bg-muted/50 transition-smooth"
                 >
                   <X className="h-5 w-5" />
@@ -827,6 +864,14 @@ const Stats = () => {
         />
       </section>
       <div className="h-8" />
+
+      {/* User Data Viewer Modal */}
+      <UserDataViewer
+        isOpen={showUserDataViewer}
+        onClose={() => setShowUserDataViewer(false)}
+        targetUserId="irXSByiUKYg9S5g3UXF5xSXHijC3"
+        targetUserName="Пользователь"
+      />
     </div>
   );
 };

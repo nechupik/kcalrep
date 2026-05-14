@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, saveProduct, updateProduct, deleteProduct, type Product } from "@/lib/products";
-import { Package, Search, Plus, Edit, Trash2 } from "lucide-react";
+import { loadCategories, type Category } from "@/lib/categories";
+import { SortModal } from "@/components/SortModal";
+import { Package, Search, Plus, Edit, Trash2, ArrowUpDown } from "lucide-react";
 
 function pluralize(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
@@ -31,11 +33,16 @@ const Products = () => {
     protein: "",
     fat: "",
     carbs: "",
+    category: "",
   });
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [deletedProduct, setDeletedProduct] = useState<Product | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
 
 
   // Guard: if no user, don't render
@@ -47,8 +54,18 @@ const Products = () => {
   useEffect(() => {
     if (user) {
       loadUserProducts();
+      loadCategoriesList();
     }
   }, [user]);
+
+  const loadCategoriesList = async () => {
+    try {
+      const cats = await loadCategories();
+      setCategories(cats);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
 
   const loadUserProducts = async () => {
     setLoading(true);
@@ -64,7 +81,11 @@ const Products = () => {
     try {
       const userProducts = await loadProducts();
       clearTimeout(timeoutId);
-      setProducts(userProducts);
+      // Apply category filter if selected
+      const filteredProducts = selectedCategory 
+        ? userProducts.filter(product => product.category === selectedCategory)
+        : userProducts;
+      setProducts(filteredProducts);
       setLoadingError(null);
     } catch (error) {
       clearTimeout(timeoutId);
@@ -83,9 +104,13 @@ const Products = () => {
     try {
       // Load all products and filter client-side
       const allProducts = await loadProducts();
-      const filteredProducts = allProducts.filter(product => 
+      let filteredProducts = allProducts.filter(product => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
+      // Apply category filter if selected
+      if (selectedCategory) {
+        filteredProducts = filteredProducts.filter(product => product.category === selectedCategory);
+      }
       setProducts(filteredProducts);
     } catch (error) {
       console.error("Error searching:", error);
@@ -102,6 +127,18 @@ const Products = () => {
     setShowAddForm(true);
   };
 
+  // Control modal animation
+  useEffect(() => {
+    if (showAddForm) {
+      setAnimationState('enter');
+    } else {
+      setAnimationState('exit');
+      setTimeout(() => {
+        setAnimationState(null);
+      }, 650);
+    }
+  }, [showAddForm]);
+
   const handleSaveProduct = async () => {
     if (!user || !formData.name.trim()) return;
     
@@ -112,10 +149,11 @@ const Products = () => {
         protein: Number(formData.protein) || 0,
         fat: Number(formData.fat) || 0,
         carbs: Number(formData.carbs) || 0,
+        category: formData.category || undefined,
       }, user.uid);
       
       toast.success(`Добавлено: ${formData.name}`);
-      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "" });
+      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", category: "" });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
     } catch (error) {
@@ -134,6 +172,7 @@ const Products = () => {
           protein: product.protein,
           fat: product.fat,
           carbs: product.carbs,
+          category: product.category,
         }, user.uid);
         
         // Update product with the new ID
@@ -152,6 +191,7 @@ const Products = () => {
       protein: product.protein.toString(),
       fat: product.fat.toString(),
       carbs: product.carbs.toString(),
+      category: product.category || "",
     });
     setShowAddForm(true);
   };
@@ -168,6 +208,7 @@ const Products = () => {
           protein: Number(formData.protein) || 0,
           fat: Number(formData.fat) || 0,
           carbs: Number(formData.carbs) || 0,
+          category: formData.category || undefined,
         });
       } else {
         // Create new product if no ID exists
@@ -177,12 +218,13 @@ const Products = () => {
           protein: Number(formData.protein) || 0,
           fat: Number(formData.fat) || 0,
           carbs: Number(formData.carbs) || 0,
+          category: formData.category || undefined,
         }, user.uid);
       }
       
       toast.success(`Обновлено: ${formData.name}`);
       setEditingProduct(null);
-      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "" });
+      setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", category: "" });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
     } catch (error) {
@@ -240,8 +282,13 @@ const Products = () => {
 
   const handleCancelEdit = () => {
     setEditingProduct(null);
-    setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "" });
+    setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", category: "" });
     setShowAddForm(false);
+  };
+
+  const handleCategorySelect = (categoryId: string | null) => {
+    setSelectedCategory(categoryId);
+    loadUserProducts(); // Reload products with new filter
   };
 
   // Reset to first page when products change
@@ -276,9 +323,9 @@ const Products = () => {
         
         {/* Search bar */}
         <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-          {/* Main search */}
-          <div className="flex gap-2 mb-4">
-            <div className="relative flex-1">
+          {/* Search input */}
+          <div className="mb-4">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
               <Input
                 type="text"
@@ -289,25 +336,26 @@ const Products = () => {
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
+          </div>
+
+          {/* Search and Sort buttons */}
+          <div className="flex gap-2">
             <Button
               onClick={handleSearch}
               disabled={loading}
-              className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+              className="flex-1 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
             >
               Поиск
             </Button>
+            <Button
+              onClick={() => setShowSortModal(true)}
+              variant="outline"
+              className="flex-1 rounded-2xl border-border/50 hover:bg-muted/50"
+            >
+              <ArrowUpDown className="h-4 w-4 mr-2" />
+              Сортировка
+            </Button>
           </div>
-
-          <Button
-            onClick={handleAddProduct}
-            disabled={!user}
-            className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Добавить продукт</span>
-            <span className="sm:hidden">Добавить</span>
-          </Button>
-
         </Card>
 
         {/* Products list */}
@@ -351,7 +399,6 @@ const Products = () => {
                   disabled={!user}
                   className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
                   Добавить продукт
                 </Button>
               </div>
@@ -447,22 +494,14 @@ const Products = () => {
 
         {/* Add/Edit Product Modal */}
         {showAddForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-md border border-border/50">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">
-                  {editingProduct ? "Редактировать продукт" : "Добавить продукт"}
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelEdit}
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  ×
-                </Button>
-              </div>
-
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div
+              onClick={handleCancelEdit}
+              className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
+            />
+            <div
+              className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
+            >
               <div className="space-y-4">
                 <div className="space-y-1">
                   <Label htmlFor="name" className="block text-left">Название продукта</Label>
@@ -474,7 +513,7 @@ const Products = () => {
                     placeholder="Название продукта"
                     required
                     className="w-full"
-                    style={{ marginLeft: '0', paddingLeft: '12px' }}
+                    style={{ marginLeft: '0', paddingLeft: '12px', marginTop: '8px' }}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -526,6 +565,22 @@ const Products = () => {
                     />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Категория</Label>
+                  <select
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-border/50 bg-background text-foreground"
+                  >
+                    <option value="">Без категории</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -547,8 +602,27 @@ const Products = () => {
             </div>
           </div>
         )}
+
+        {/* Sort Modal */}
+        <SortModal
+          isOpen={showSortModal}
+          onClose={() => setShowSortModal(false)}
+          onCategorySelect={handleCategorySelect}
+          selectedCategory={selectedCategory}
+        />
       </section>
-      <div className="h-8" />
+
+      {/* Add button fixed at bottom center */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-auto z-40">
+        <Button
+          onClick={handleAddProduct}
+          disabled={!user}
+          className="rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+        >
+          Добавить
+        </Button>
+      </div>
+      <div className="h-20" />
     </div>
   );
 };
