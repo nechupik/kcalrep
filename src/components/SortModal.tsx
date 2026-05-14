@@ -14,15 +14,12 @@ interface SortModalProps {
   selectedCategory: string | null;
 }
 
-const ADMIN_USER_ID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
-
 export const SortModal = ({ isOpen, onClose, onCategorySelect, selectedCategory }: SortModalProps) => {
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const isAdmin = user?.uid === ADMIN_USER_ID;
 
   useEffect(() => {
     if (isOpen) {
@@ -151,8 +148,8 @@ export const SortModal = ({ isOpen, onClose, onCategorySelect, selectedCategory 
           )}
         </div>
 
-        {/* Create category form (admin only) */}
-        {isAdmin && (
+        {/* Create category form */}
+        {user && (
           <div className="mt-6 pt-4 border-t border-border/50">
             {!showCreateForm ? (
               <Button
