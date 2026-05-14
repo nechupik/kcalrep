@@ -8,6 +8,7 @@ export interface Product {
   protein: number;
   fat: number;
   carbs: number;
+  category?: string;
   createdBy?: string;
   createdAt?: any;
 }

@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { DiaryEntry } from "@/lib/storage";
+
+const VISIBLE_COUNT = 4;
 
 interface EatenFoodsListProps {
   entries: DiaryEntry[];
@@ -14,6 +17,7 @@ interface EatenFoodsListProps {
 export const EatenFoodsList = ({ entries, onRemove, onEdit, className }: EatenFoodsListProps) => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const handleRemoveEntry = (id: string) => {
     setEntryToDelete(id);
@@ -34,6 +38,11 @@ export const EatenFoodsList = ({ entries, onRemove, onEdit, className }: EatenFo
 
   if (entries.length === 0) return null;
 
+  const reversed = entries.slice().reverse();
+  const hasMore = reversed.length > VISIBLE_COUNT;
+  const visible = expanded ? reversed : reversed.slice(0, VISIBLE_COUNT);
+  const hiddenCount = reversed.length - VISIBLE_COUNT;
+
   return (
     <>
       <Card className={`w-full p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80 ${className || ''}`}>
@@ -42,7 +51,7 @@ export const EatenFoodsList = ({ entries, onRemove, onEdit, className }: EatenFo
           <span className="text-xs text-muted-foreground">{entries.length} шт.</span>
         </div>
         <div className="space-y-2">
-          {entries.slice().reverse().map((e) => (
+          {visible.map((e) => (
             <div
               key={e.id}
               className={`flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5 group hover:bg-muted/70 transition-smooth ${onEdit ? 'cursor-pointer' : ''}`}
@@ -69,6 +78,16 @@ export const EatenFoodsList = ({ entries, onRemove, onEdit, className }: EatenFo
             </div>
           ))}
         </div>
+
+        {hasMore && (
+          <button
+            onClick={() => setExpanded(o => !o)}
+            className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-smooth py-1.5 rounded-lg hover:bg-muted/40"
+          >
+            <ChevronDown className={cn("h-4 w-4 transition-transform duration-300", expanded && "rotate-180")} />
+            {expanded ? "Скрыть" : `Ещё ${hiddenCount}`}
+          </button>
+        )}
       </Card>
 
       {/* Delete Confirmation Dialog */}

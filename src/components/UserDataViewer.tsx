@@ -1,12 +1,178 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { X, Calendar, Loader2 } from "lucide-react";
+import { X, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { loadNorm, loadDiary, loadActivity } from "@/lib/firestore";
 import type { MacroResult } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+const WEEKDAYS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const MONTHS_RU = [
+  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+];
+
+function formatDateStr(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+interface CalendarPickerProps {
+  value: string;
+  onChange: (date: string) => void;
+}
+
+function CalendarPicker({ value, onChange }: CalendarPickerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const parsed = value ? new Date(value + "T00:00:00") : new Date();
+  const [viewYear, setViewYear] = useState(parsed.getFullYear());
+  const [viewMonth, setViewMonth] = useState(parsed.getMonth());
+
+  const today = new Date();
+  const todayStr = formatDateStr(today.getFullYear(), today.getMonth(), today.getDate());
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+  const offset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+  const handlePrev = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const handleNext = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const handleSelectDay = (dateStr: string) => {
+    onChange(dateStr);
+    setIsOpen(false);
+  };
+
+  const displayDate = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : "Выберите дату";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setIsOpen(o => !o)}
+        className="flex items-center gap-2 bg-muted/40 border border-border/50 rounded-lg px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors duration-200"
+      >
+        <span className="text-card-foreground">{displayDate}</span>
+        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-300", isOpen && "rotate-180")} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 z-50 bg-card border border-border/50 rounded-xl shadow-2xl p-3 w-[260px]">
+          {/* Month/year header */}
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="font-semibold text-sm text-card-foreground">
+              {MONTHS_RU[viewMonth]} {viewYear}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePrev}
+                className="p-1 rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={handleNext}
+                className="p-1 rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+
+          {/* Weekday headers */}
+          <div className="grid grid-cols-7 mb-1">
+            {WEEKDAYS_SHORT.map(d => (
+              <div key={d} className="text-center text-[11px] font-medium text-muted-foreground py-1">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div className="grid grid-cols-7 gap-y-0.5">
+            {/* Leading cells from prev month */}
+            {Array.from({ length: offset }).map((_, i) => {
+              const day = daysInPrevMonth - offset + 1 + i;
+              return (
+                <div key={`prev-${i}`} className="text-center py-1">
+                  <span className="text-xs text-muted-foreground/40">{day}</span>
+                </div>
+              );
+            })}
+            {/* Current month days */}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const dateStr = formatDateStr(viewYear, viewMonth, day);
+              const isSelected = dateStr === value;
+              const isToday = dateStr === todayStr;
+              return (
+                <div key={day} className="flex items-center justify-center py-0.5">
+                  <button
+                    onClick={() => handleSelectDay(dateStr)}
+                    className={cn(
+                      "h-8 w-8 rounded-full text-xs font-medium transition-all duration-150",
+                      isSelected
+                        ? "bg-primary text-primary-foreground ring-2 ring-primary/40"
+                        : isToday
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-muted/50 text-card-foreground"
+                    )}
+                  >
+                    {day}
+                  </button>
+                </div>
+              );
+            })}
+            {/* Trailing cells for next month */}
+            {(() => {
+              const total = offset + daysInMonth;
+              const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
+              return Array.from({ length: trailing }).map((_, i) => (
+                <div key={`next-${i}`} className="text-center py-1">
+                  <span className="text-xs text-muted-foreground/40">{i + 1}</span>
+                </div>
+              ));
+            })()}
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between mt-3 pt-2 border-t border-border/30">
+            <button
+              onClick={() => { onChange(''); setIsOpen(false); }}
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
+            >
+              Удалить
+            </button>
+            <button
+              onClick={() => handleSelectDay(todayStr)}
+              className="text-xs text-primary hover:opacity-80 transition-colors px-1"
+            >
+              Сегодня
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface UserDataViewerProps {
   isOpen: boolean;
@@ -84,13 +250,7 @@ export const UserDataViewer = ({ isOpen, onClose, targetUserId, targetUserName }
 
         {/* Date selector */}
         <div className="flex items-center gap-2 mb-5">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-auto"
-          />
+          <CalendarPicker value={selectedDate} onChange={setSelectedDate} />
         </div>
 
         {loading ? (

@@ -21,7 +21,8 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
-import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore, loadActivity, deleteDiaryEntry } from "@/lib/firestore";
+import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore, loadActivity, deleteDiaryEntry, saveActivity } from "@/lib/firestore";
+import type { ActivityEntry } from "@/lib/firestore";
 import { recalculateNormWithNewWeight } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
@@ -69,6 +70,10 @@ const Stats = () => {
   const [showUserDataViewer, setShowUserDataViewer] = useState(false);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
+  const [showActivityEdit, setShowActivityEdit] = useState(false);
+  const [activityEditInput, setActivityEditInput] = useState('');
+  const [savingDayActivity, setSavingDayActivity] = useState(false);
+  const ADMIN_UID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
 
   // Control modal animation
   useEffect(() => {
@@ -302,6 +307,8 @@ const Stats = () => {
   }, [productStats]);
 
   const handleDayClick = async (dayNumber: number) => {
+    setShowActivityEdit(false);
+    setActivityEditInput('');
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth();
@@ -321,6 +328,47 @@ const Stats = () => {
       console.error('Error loading day details:', error);
     } finally {
       setLoadingDay(false);
+    }
+  };
+
+  const handleSaveDayActivity = async () => {
+    if (!user || !selectedDay) return;
+    setSavingDayActivity(true);
+    try {
+      const isAdmin = user.uid === ADMIN_UID;
+      let caloriesBurned = 0;
+      let type: ActivityEntry['type'] = 'steps';
+      let value = 0;
+
+      if (isAdmin) {
+        caloriesBurned = Number(activityEditInput) || 0;
+        type = 'calories';
+        value = caloriesBurned;
+      } else {
+        const steps = Number(activityEditInput) || 0;
+        const weights = await loadWeight(user.uid, 1);
+        const weight = weights.length > 0 ? weights[0].weight : 70;
+        caloriesBurned = Math.round(steps * weight * 0.0005);
+        type = 'steps';
+        value = steps;
+      }
+
+      await saveActivity(user.uid, {
+        date: selectedDay,
+        type,
+        value,
+        caloriesBurned,
+      });
+
+      const updated = await loadActivity(user.uid, selectedDay);
+      setDayActivity(updated);
+      setShowActivityEdit(false);
+      setActivityEditInput('');
+      toast.success('Активность сохранена');
+    } catch (error) {
+      toast.error('Ошибка сохранения активности');
+    } finally {
+      setSavingDayActivity(false);
     }
   };
 
@@ -718,8 +766,9 @@ const Stats = () => {
               onClick={() => setSelectedDay(null)} 
               className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`} 
             />
-            <div 
+            <div
               className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
+              style={{ transform: animationState === null ? 'translateY(100%)' : undefined }}
             >
               
               {/* Header */}
@@ -793,18 +842,73 @@ const Stats = () => {
                             </div>
 
                             {/* Activity */}
-                            {dayActivity && dayActivity.caloriesBurned > 0 && (
-                              <div className="rounded-xl bg-muted/30 px-4 py-3 mb-4 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span>{dayActivity.type === 'calories' ? '⌚' : '👣'}</span>
-                                  <span className="text-sm font-medium">
-                                    {dayActivity.type === 'calories' ? 'Apple Watch' : 
-                                     dayActivity.type === 'steps' ? `${dayActivity.value.toLocaleString()} шагов` : 'Дома'}
-                                  </span>
+                            <div className="mb-4">
+                              {dayActivity && dayActivity.caloriesBurned > 0 && (
+                                <div className="rounded-xl bg-muted/30 px-4 py-3 mb-2 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span>{dayActivity.type === 'calories' ? '⌚' : '👣'}</span>
+                                    <span className="text-sm font-medium">
+                                      {dayActivity.type === 'calories' ? 'Apple Watch' : 
+                                       dayActivity.type === 'steps' ? `${dayActivity.value.toLocaleString()} шагов` : 'Дома'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-green-400">+{dayActivity.caloriesBurned} ккал</span>
+                                    <button
+                                      onClick={() => {
+                                        setActivityEditInput(String(dayActivity.value));
+                                        setShowActivityEdit(true);
+                                      }}
+                                      className="text-xs text-muted-foreground hover:text-foreground transition-smooth px-2 py-1 rounded-lg hover:bg-muted/50"
+                                    >
+                                      ✏️
+                                    </button>
+                                  </div>
                                 </div>
-                                <span className="text-sm font-bold text-green-400">+{dayActivity.caloriesBurned} ккал</span>
-                              </div>
-                            )}
+                              )}
+                              {(!dayActivity || dayActivity.caloriesBurned === 0) && !showActivityEdit && (
+                                <button
+                                  onClick={() => { setActivityEditInput(''); setShowActivityEdit(true); }}
+                                  className="w-full rounded-xl border border-dashed border-border/50 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-smooth flex items-center justify-center gap-2"
+                                >
+                                  <span>+</span>
+                                  <span>{user?.uid === ADMIN_UID ? 'Добавить активность Apple Watch' : 'Добавить шаги'}</span>
+                                </button>
+                              )}
+                              {showActivityEdit && (
+                                <div className="rounded-xl bg-muted/30 px-4 py-3 space-y-3">
+                                  <div className="text-sm font-medium">
+                                    {user?.uid === ADMIN_UID ? '⌚ Калории Apple Watch' : '👣 Количество шагов'}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      type="number"
+                                      placeholder={user?.uid === ADMIN_UID ? 'Калории' : 'Шагов'}
+                                      value={activityEditInput}
+                                      onChange={(e) => setActivityEditInput(e.target.value)}
+                                      className="flex-1"
+                                      autoFocus
+                                    />
+                                    <Button
+                                      onClick={handleSaveDayActivity}
+                                      disabled={!activityEditInput || savingDayActivity}
+                                      size="sm"
+                                      className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90"
+                                    >
+                                      {savingDayActivity ? '...' : 'Сохранить'}
+                                    </Button>
+                                    <Button
+                                      onClick={() => { setShowActivityEdit(false); setActivityEditInput(''); }}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="rounded-xl"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
 
                             {/* Deficit */}
                             {norm && dayActivity !== undefined && (
@@ -846,6 +950,50 @@ const Stats = () => {
                     <div className="text-center py-8 text-muted-foreground">
                       <div className="text-4xl mb-3">📭</div>
                       <p className="text-sm">Нет записей за этот день</p>
+                      <div className="mt-4">
+                        {!showActivityEdit && (
+                          <button
+                            onClick={() => { setActivityEditInput(''); setShowActivityEdit(true); }}
+                            className="w-full rounded-xl border border-dashed border-border/50 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-smooth flex items-center justify-center gap-2"
+                          >
+                            <span>+</span>
+                            <span>{user?.uid === ADMIN_UID ? 'Добавить активность Apple Watch' : 'Добавить шаги'}</span>
+                          </button>
+                        )}
+                        {showActivityEdit && (
+                          <div className="rounded-xl bg-muted/30 px-4 py-3 space-y-3 text-left">
+                            <div className="text-sm font-medium">
+                              {user?.uid === ADMIN_UID ? '⌚ Калории Apple Watch' : '👣 Количество шагов'}
+                            </div>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                placeholder={user?.uid === ADMIN_UID ? 'Калории' : 'Шагов'}
+                                value={activityEditInput}
+                                onChange={(e) => setActivityEditInput(e.target.value)}
+                                className="flex-1"
+                                autoFocus
+                              />
+                              <Button
+                                onClick={handleSaveDayActivity}
+                                disabled={!activityEditInput || savingDayActivity}
+                                size="sm"
+                                className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90"
+                              >
+                                {savingDayActivity ? '...' : 'Сохранить'}
+                              </Button>
+                              <Button
+                                onClick={() => { setShowActivityEdit(false); setActivityEditInput(''); }}
+                                size="sm"
+                                variant="ghost"
+                                className="rounded-xl"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>

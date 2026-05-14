@@ -322,6 +322,14 @@ const Index = () => {
               </div>
               <div className="flex flex-col items-center gap-8 mb-6">
                 <MainCalorieRing consumed={selectedDateTotals.calories} total={norm.calories} />
+                {deficitData && (
+                  <div className="flex items-center gap-1.5 -mt-4">
+                    <span className="text-xs text-muted-foreground">Дефицит —</span>
+                    <span className={`text-xs font-bold ${deficitData.deficit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {Math.round(deficitData.deficit)} ккал
+                    </span>
+                  </div>
+                )}
                 <div className="w-full max-w-lg flex flex-row justify-between gap-2 px-2">
                   <MacroProgressBar consumed={selectedDateTotals.protein} total={norm.protein} label="Белки" colorVar="--macro-protein" />
                   <MacroProgressBar consumed={selectedDateTotals.fat} total={norm.fat} label="Жиры" colorVar="--macro-fat" />
@@ -419,17 +427,6 @@ const Index = () => {
               </div>
             )}
 
-            {/* Deficit summary */}
-            {deficitData && (
-              <div className="mt-4 pt-4 border-t border-border/40 text-center">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
-                  <div className={`font-bold text-sm ${deficitData.deficit > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {deficitData.deficit > 0 ? '+' : ''}{Math.round(deficitData.deficit)} ккал
-                  </div>
-                </div>
-              </div>
-            )}
           </Card>
           )}
         </section>

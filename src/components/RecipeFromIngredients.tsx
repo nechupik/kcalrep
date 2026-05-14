@@ -296,7 +296,7 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
                         <Button
                           size="sm"
                           onClick={() => handleSaveGrams(index)}
-                          className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700"
+                          className="h-8 w-8 p-0 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] hover:opacity-90"
                         >
                           <Check className="h-3 w-3" />
                         </Button>
@@ -399,11 +399,6 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
             🍽️ Порция
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {servingType === 'grams'
-            ? 'КБЖУ указывается на 100г. При добавлении в дневник вводите граммовку.'
-            : 'КБЖУ указывается за одну порцию целиком. При добавлении в дневник граммовка не нужна.'}
-        </p>
       </div>
 
       <div className="space-y-2">

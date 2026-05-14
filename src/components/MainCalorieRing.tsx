@@ -45,7 +45,6 @@ export const MainCalorieRing = ({ consumed, total, size = 200 }: MainCalorieRing
         </div>
       </div>
       <div className="text-center">
-        <span className="text-lg font-semibold text-foreground">Калории</span>
         <div className="text-sm text-muted-foreground mt-1">
           осталось {Math.max(0, total - consumed)} ккал
         </div>

@@ -562,6 +562,7 @@ const Recipes = () => {
             />
             <div
               className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
+              style={{ transform: animationState === null ? 'translateY(100%)' : undefined }}
             >
               {editingRecipe ? (
                 // Edit mode - show tabs if recipe has ingredients
@@ -887,7 +888,7 @@ const Recipes = () => {
         <Button
           onClick={handleAddRecipe}
           disabled={!user}
-          className="rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
+          className="rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-12 py-6 text-foreground font-bold text-xl shadow-glow hover:opacity-90 transition-smooth"
         >
           Добавить
         </Button>

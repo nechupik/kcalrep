@@ -192,6 +192,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     {/* Modal panel */}
     <div
       className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
+      style={{ transform: animationState === null ? 'translateY(100%)' : undefined }}
     >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
