@@ -67,23 +67,29 @@ const Products = () => {
     }
   };
 
-  const loadUserProducts = async () => {
+  const loadUserProducts = async (categoryFilter: string | null = null) => {
     setLoading(true);
     setLoadingError(null);
-    
+
     // Set up timeout fallback
     const timeoutId = setTimeout(() => {
       setLoading(false);
       setLoadingError("Не удалось загрузить продукты. Проверьте подключение.");
       toast.error("Не удалось загрузить продукты. Проверьте подключение.");
     }, 8000);
-    
+
     try {
       const userProducts = await loadProducts();
       clearTimeout(timeoutId);
       // Apply category filter if selected
-      const filteredProducts = selectedCategory 
-        ? userProducts.filter(product => product.category === selectedCategory)
+      const filterToUse = categoryFilter !== null ? categoryFilter : selectedCategory;
+      const filteredProducts = filterToUse
+        ? userProducts.filter(product => {
+            if (filterToUse === 'unsorted') {
+              return !product.category || product.category === '';
+            }
+            return product.category === filterToUse;
+          })
         : userProducts;
       setProducts(filteredProducts);
       setLoadingError(null);
@@ -109,7 +115,11 @@ const Products = () => {
       );
       // Apply category filter if selected
       if (selectedCategory) {
-        filteredProducts = filteredProducts.filter(product => product.category === selectedCategory);
+        if (selectedCategory === 'unsorted') {
+          filteredProducts = filteredProducts.filter(product => !product.category || product.category === '');
+        } else {
+          filteredProducts = filteredProducts.filter(product => product.category === selectedCategory);
+        }
       }
       setProducts(filteredProducts);
     } catch (error) {
@@ -288,7 +298,14 @@ const Products = () => {
 
   const handleCategorySelect = (categoryId: string | null) => {
     setSelectedCategory(categoryId);
-    loadUserProducts(); // Reload products with new filter
+    loadUserProducts(categoryId); // Reload products with new filter
+  };
+
+  const getCategoryDisplayName = () => {
+    if (!selectedCategory) return 'Продукты';
+    if (selectedCategory === 'unsorted') return 'Не сортировано';
+    const category = categories.find(cat => cat.id === selectedCategory);
+    return category ? category.name : 'Продукты';
   };
 
   // Reset to first page when products change
@@ -362,9 +379,9 @@ const Products = () => {
         <Card className="bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-8">
           <div className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Продукты</h2>
+              <h2 className="text-lg font-semibold">{getCategoryDisplayName()}</h2>
               <div className="text-sm text-muted-foreground">
-                {pluralize(products.length, 'продукт', 'продукта', 'продуктов')}
+                {products.length} шт
               </div>
             </div>
 
@@ -380,7 +397,7 @@ const Products = () => {
                   {loadingError}
                 </p>
                 <Button
-                  onClick={loadUserProducts}
+                  onClick={() => loadUserProducts()}
                   disabled={!user}
                   className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
                 >

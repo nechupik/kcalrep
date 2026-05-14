@@ -170,7 +170,8 @@ function analyzeDeficit(
   dailyDeficit: number[],
   weightHistory: NutritionAnalyticsInput['weightHistory'],
   avgCalories: number,
-  targetCalories: number
+  targetCalories: number,
+  foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay']
 ): DeficitAnalysisResult {
   if (dailyDeficit.length === 0 || weightHistory.length < 2) {
     return {
@@ -181,13 +182,49 @@ function analyzeDeficit(
     };
   }
 
-  const totalDeficit = dailyDeficit.reduce((sum, d) => sum + d, 0);
+  // Filter to only days from 2026-05-12 onwards with actual food entries
+  const startDate = new Date('2026-05-12');
+  const daysWithData = foodLogsByDay.filter(day => day.entries > 0 && new Date(day.date) >= startDate);
+  if (daysWithData.length === 0) {
+    return {
+      expectedLoss: 0,
+      actualLoss: 0,
+      discrepancy: 0,
+      interpretation: 'Недостаточно данных для анализа',
+    };
+  }
+
+  // Get dates that have data
+  const datesWithData = new Set(daysWithData.map(day => day.date));
+
+  // Filter dailyDeficit to only include days with data and from start date
+  // dailyDeficit is ordered from oldest to newest (29 days ago to today)
+  // foodLogsByDay is also ordered from oldest to newest
+  const filteredDeficit: number[] = [];
+  for (let i = 0; i < dailyDeficit.length; i++) {
+    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
+      filteredDeficit.push(dailyDeficit[i]);
+    }
+  }
+
+  if (filteredDeficit.length === 0) {
+    return {
+      expectedLoss: 0,
+      actualLoss: 0,
+      discrepancy: 0,
+      interpretation: 'Недостаточно данных для анализа',
+    };
+  }
+
+  const totalDeficit = filteredDeficit.reduce((sum, d) => sum + d, 0);
   
-  // Calculate days tracked for adaptation factor
-  const daysTracked = dailyDeficit.length;
+  // Calculate days tracked for adaptation factor (only days with actual data)
+  const daysTracked = filteredDeficit.length;
   let adaptationFactor: number;
-  if (daysTracked < 30) {
+  if (daysTracked < 7) {
     adaptationFactor = 0.55;
+  } else if (daysTracked < 30) {
+    adaptationFactor = 0.60;
   } else if (daysTracked <= 90) {
     adaptationFactor = 0.65;
   } else {
@@ -196,7 +233,49 @@ function analyzeDeficit(
   
   const expectedLoss = (totalDeficit / CALORIES_PER_KG) * adaptationFactor;
 
-  const sortedHistory = [...weightHistory].sort((a, b) => 
+  // Filter weight history to only include dates within the tracked period
+  const firstDateWithData = daysWithData[0].date;
+  const lastDateWithData = daysWithData[daysWithData.length - 1].date;
+  
+  const filteredWeightHistory = weightHistory.filter(w => {
+    const weightDate = w.date;
+    return weightDate >= firstDateWithData && weightDate <= lastDateWithData;
+  });
+
+  if (filteredWeightHistory.length < 2) {
+    // If not enough weight entries in the tracked period, use all available
+    const sortedHistory = [...weightHistory].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const actualLoss = sortedHistory[0].weight - sortedHistory[sortedHistory.length - 1].weight;
+
+    const discrepancy = expectedLoss !== 0 
+      ? Math.abs(((actualLoss - expectedLoss) / expectedLoss) * 100)
+      : 0;
+
+    let interpretation: string;
+    let possibleCause: string | undefined;
+
+    if (discrepancy <= 10) {
+      interpretation = 'Дефицит и потеря веса совпадают отлично';
+    } else if (discrepancy <= 35) {
+      interpretation = 'Результат находится в пределах нормальной физиологической вариативности.';
+    } else if (discrepancy <= 50) {
+      interpretation = 'Наблюдается расхождение в пределах ожидаемого диапазона.';
+    } else {
+      interpretation = 'Значительное отклонение: рекомендуется проверить точность учёта калорий и активности.';
+      
+      if (actualLoss < expectedLoss * 0.8) {
+        possibleCause = 'Возможные причины: недоучёт калорий, задержка воды, нестабильность логов';
+      } else if (actualLoss > expectedLoss * 1.2) {
+        possibleCause = 'Возможные причины: быстрая потеря воды в начале периода';
+      }
+    }
+
+    return { expectedLoss, actualLoss, discrepancy, interpretation, possibleCause };
+  }
+
+  const sortedHistory = [...filteredWeightHistory].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
   const actualLoss = sortedHistory[0].weight - sortedHistory[sortedHistory.length - 1].weight;
@@ -442,13 +521,29 @@ function assessRecoveryRisk(
   targetProtein: number,
   activityCalories: number[],
   weightHistory: NutritionAnalyticsInput['weightHistory'],
-  targetCalories: number
+  targetCalories: number,
+  foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay']
 ): RecoveryRiskResult {
   if (dailyDeficit.length < 7 || weightHistory.length < 2 || targetCalories === 0) {
     return { riskLevel: 'none', explanation: 'Недостаточно данных для оценки' };
   }
 
-  const avgDeficit = dailyDeficit.reduce((sum, d) => sum + d, 0) / dailyDeficit.length;
+  // Filter to only days from 2026-05-12 onwards with actual food entries
+  const startDate = new Date('2026-05-12');
+  const daysWithData = foodLogsByDay.filter(day => day.entries > 0 && new Date(day.date) >= startDate);
+  if (daysWithData.length < 7) {
+    return { riskLevel: 'none', explanation: 'Недостаточно данных для оценки' };
+  }
+
+  // Filter dailyDeficit to only include days with data and from start date
+  const filteredDeficit: number[] = [];
+  for (let i = 0; i < dailyDeficit.length; i++) {
+    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
+      filteredDeficit.push(dailyDeficit[i]);
+    }
+  }
+
+  const avgDeficit = filteredDeficit.reduce((sum, d) => sum + d, 0) / filteredDeficit.length;
   const proteinRatio = targetProtein > 0 ? avgProtein / targetProtein : 1;
   
   // Calculate weight loss rate
@@ -548,7 +643,11 @@ function calculateStreaks(
   targetCalories: number,
   targetProtein: number
 ): StreaksResult {
-  const sortedDays = [...foodLogsByDay].sort((a, b) => 
+  // Filter to only include days from 2026-05-12 onwards
+  const startDate = new Date('2026-05-12');
+  const filteredDays = foodLogsByDay.filter(day => new Date(day.date) >= startDate);
+  
+  const sortedDays = [...filteredDays].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
@@ -576,9 +675,16 @@ function calculateStreaks(
     }
   }
 
-  // Deficit streak (positive deficit)
+  // Deficit streak (positive deficit) - only consider days with data and from 2026-05-12 onwards
   let deficitStreak = 0;
-  const sortedDeficits = [...dailyDeficit].reverse();
+  // Filter dailyDeficit to only include days with data and from start date
+  const filteredDeficit: number[] = [];
+  for (let i = 0; i < dailyDeficit.length; i++) {
+    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
+      filteredDeficit.push(dailyDeficit[i]);
+    }
+  }
+  const sortedDeficits = [...filteredDeficit].reverse();
   for (const deficit of sortedDeficits) {
     if (deficit > 0) {
       deficitStreak++;
@@ -620,12 +726,21 @@ function generateDailyVerdict(
     if (plateu.plateau) {
       return 'Вес стоит на месте уже 2 недели. Сегодня важно точно попасть в норму калорий и белка.';
     }
-    return 'Сегодня ещё нет записей. Начните день с белкового завтрака!';
+    return 'Сегодня ещё нет записей. Начните день с белкового завтраком!';
   }
 
   const calorieRatio = todayLog.calories / targetCalories;
   const proteinRatio = todayLog.protein / targetProtein;
-  const todayDeficit = dailyDeficit.length > 0 ? dailyDeficit[dailyDeficit.length - 1] : 0;
+  
+  // Get today's deficit from the filtered array (last day with data, from 2026-05-12 onwards)
+  const startDate = new Date('2026-05-12');
+  const filteredDeficit: number[] = [];
+  for (let i = 0; i < dailyDeficit.length; i++) {
+    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
+      filteredDeficit.push(dailyDeficit[i]);
+    }
+  }
+  const todayDeficit = filteredDeficit.length > 0 ? filteredDeficit[filteredDeficit.length - 1] : 0;
 
   // Perfect day
   if (calorieRatio >= 0.9 && calorieRatio <= 1.05 && proteinRatio >= 0.9) {
@@ -708,12 +823,12 @@ function calculateNutritionScore(
  */
 export function analyzeNutrition(input: NutritionAnalyticsInput): NutritionAnalyticsResult {
   const proteinCompliance = calculateProteinCompliance(input.foodLogsByDay, input.dailyTargetProtein, input.avgProtein);
-  const deficitAnalysis = analyzeDeficit(input.dailyDeficit, input.weightHistory, input.avgCalories, input.dailyTargetCalories);
+  const deficitAnalysis = analyzeDeficit(input.dailyDeficit, input.weightHistory, input.avgCalories, input.dailyTargetCalories, input.foodLogsByDay);
   const plateau = detectPlateau(input.weightHistory);
   const forecast = forecastProtein(input.foodLogsByDay, input.dailyTargetProtein);
   const stability = analyzeStability(input.foodLogsByDay);
   const patterns = detectPatterns(input.foodLogsByDay, input.timestampsMeals);
-  const recovery = assessRecoveryRisk(input.dailyDeficit, input.avgProtein, input.dailyTargetProtein, input.activityCalories, input.weightHistory, input.dailyTargetCalories);
+  const recovery = assessRecoveryRisk(input.dailyDeficit, input.avgProtein, input.dailyTargetProtein, input.activityCalories, input.weightHistory, input.dailyTargetCalories, input.foodLogsByDay);
   const weightInterpretation = interpretWeight(input.weightHistory);
   const streaks = calculateStreaks(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein);
   const dailyVerdict = generateDailyVerdict(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein, plateau, proteinCompliance);

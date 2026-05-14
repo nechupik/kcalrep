@@ -122,6 +122,22 @@ export const SortModal = ({ isOpen, onClose, onCategorySelect, selectedCategory 
             )}
           </button>
 
+          <button
+            onClick={() => handleCategoryClick('unsorted')}
+            className={`w-full text-left rounded-xl px-4 py-3 transition-smooth flex items-center justify-between ${
+              selectedCategory === 'unsorted'
+                ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-primary-foreground shadow-glow'
+                : 'bg-muted/40 hover:bg-muted/60'
+            }`}
+          >
+            <span className="font-medium">Не сортировано</span>
+            {selectedCategory === 'unsorted' && (
+              <div className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center">
+                <div className="h-2.5 w-2.5 rounded-full bg-white" />
+              </div>
+            )}
+          </button>
+
           {loading ? (
             <div className="text-center py-4 text-sm text-muted-foreground">
               Загрузка...
