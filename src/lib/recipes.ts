@@ -1,4 +1,4 @@
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
 export interface RecipeIngredient {
@@ -27,13 +27,14 @@ export interface Recipe {
   ingredients?: RecipeIngredient[]; // structured ingredients data for editing
   createdBy?: string;
   createdAt?: any;
+  usageCount?: number;
 }
 
 export async function loadRecipes(): Promise<Recipe[]> {
   const col = collection(db, "shared_recipes");
   const q = query(col, orderBy("name", "asc"));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recipe));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), usageCount: doc.data().usageCount || 0 } as Recipe));
 }
 
 export async function saveRecipe(recipe: Omit<Recipe, 'id'>, userId: string): Promise<string> {
@@ -42,8 +43,16 @@ export async function saveRecipe(recipe: Omit<Recipe, 'id'>, userId: string): Pr
     ...recipe,
     createdBy: userId,
     createdAt: Timestamp.now(),
+    usageCount: 0,
   });
   return docRef.id;
+}
+
+export async function incrementRecipeUsage(recipeId: string): Promise<void> {
+  const docRef = doc(db, "shared_recipes", recipeId);
+  await updateDoc(docRef, {
+    usageCount: (await getDoc(docRef)).data().usageCount ? (await getDoc(docRef)).data().usageCount + 1 : 1,
+  });
 }
 
 export async function updateRecipe(recipeId: string, recipe: Omit<Recipe, 'id'>): Promise<void> {
