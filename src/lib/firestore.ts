@@ -236,6 +236,11 @@ export async function loadWeight(userId: string, limit?: number): Promise<Array<
   return limit ? entries.slice(0, limit) : entries;
 }
 
+export async function deleteWeightEntry(userId: string, entryId: string): Promise<void> {
+  const ref = doc(db, "users", userId, "weight", entryId);
+  await deleteDoc(ref);
+}
+
 export async function wasWeightEnteredThisWeek(userId: string): Promise<boolean> {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday...

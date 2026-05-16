@@ -1,18 +1,24 @@
 import { useState } from "react";
-import { Flame, BarChart3, User, Home, Package, BookOpen, X, LogOut } from "lucide-react";
+import { Flame, BarChart3, User, Home, Package, BookOpen, X, LogOut, Weight, Heart } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
-const links = [
+const baseLinks = [
   { to: "/", label: "Главная", icon: Home },
+  { to: "/body", label: "Тело", icon: Weight },
   { to: "/stats", label: "Статистика", icon: BarChart3 },
   { to: "/profile", label: "Профиль", icon: User },
   { to: "/products", label: "Продукты", icon: Package },
   { to: "/recipes", label: "Блюда", icon: BookOpen },
 ];
 
+const cycleLink = { to: "/cycle", label: "Цикл", icon: Heart };
+
 export const AppHeader = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, userGender } = useAuth();
+  const links = userGender === 'female'
+    ? [...baseLinks.slice(0, 2), cycleLink, ...baseLinks.slice(2)]
+    : baseLinks;
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const location = useLocation();

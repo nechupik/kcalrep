@@ -59,6 +59,26 @@ service cloud.firestore {
       match /settings/{settingId} {
         allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.uid == "irXSByiUKYg9S5g3UXF5xSXHijC3");
       }
+      
+      // Cycle tracking
+      match /cycles/{cycleId} {
+        allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.uid == "irXSByiUKYg9S5g3UXF5xSXHijC3");
+      }
+      
+      // Daily survey
+      match /daily_survey/{surveyId} {
+        allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.uid == "irXSByiUKYg9S5g3UXF5xSXHijC3");
+      }
+      
+      // Body composition
+      match /body_composition/{entryId} {
+        allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.uid == "irXSByiUKYg9S5g3UXF5xSXHijC3");
+      }
+      
+      // Metabolic config
+      match /metabolic_config/{configId} {
+        allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.uid == "irXSByiUKYg9S5g3UXF5xSXHijC3");
+      }
     }
     
     // Shared products (readable and writable by all authenticated users)

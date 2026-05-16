@@ -14,6 +14,8 @@ import Profile from "./pages/Profile.tsx";
 import Products from "./pages/Products.tsx";
 import Recipes from "./pages/Recipes.tsx";
 import Admin from "./pages/Admin.tsx";
+import Body from "./pages/Body.tsx";
+import Cycle from "./pages/Cycle.tsx";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,16 @@ const App = () => (
             <Route path="/" element={
               <ProtectedRoute>
                 <Index />
+              </ProtectedRoute>
+            } />
+            <Route path="/body" element={
+              <ProtectedRoute>
+                <Body />
+              </ProtectedRoute>
+            } />
+            <Route path="/cycle" element={
+              <ProtectedRoute>
+                <Cycle />
               </ProtectedRoute>
             } />
             <Route path="/stats" element={

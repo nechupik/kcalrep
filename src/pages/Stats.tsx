@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { UserDataViewer } from "@/components/UserDataViewer";
-import { BarChart3, TrendingUp, Activity, Weight, X, Eye, Brain } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, X, Eye, Brain } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -21,10 +21,9 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
-import { loadDiaryRange, saveWeight, loadWeight, loadFullNormData, saveNorm as saveNormToFirestore, loadActivity, deleteDiaryEntry, saveActivity } from "@/lib/firestore";
+import { loadDiaryRange, loadWeight, loadFullNormData, loadActivity, deleteDiaryEntry, saveActivity } from "@/lib/firestore";
 import { analyzeNutrition, formatStreak, type NutritionAnalyticsInput, type NutritionAnalyticsResult } from "@/lib/nutritionAnalytics";
 import type { ActivityEntry } from "@/lib/firestore";
-import { recalculateNormWithNewWeight } from "@/lib/nutrition";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
 import { toast } from "sonner";
@@ -57,8 +56,6 @@ const Stats = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [weightEntries, setWeightEntries] = useState<WeightData[]>([]);
-  const [weightInput, setWeightInput] = useState("");
-  const [lastWeightPlaceholder, setLastWeightPlaceholder] = useState("75");
   const [loading, setLoading] = useState(true);
   const [isInterestingOpen, setIsInterestingOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -117,9 +114,6 @@ const Stats = () => {
         // Load weight entries
         const weights = await loadWeight(user.uid, 10);
         setWeightEntries(weights);
-        if (weights.length > 0) {
-          setLastWeightPlaceholder(String(weights[0].weight));
-        }
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
@@ -539,51 +533,6 @@ const Stats = () => {
     }
   };
 
-  const handleSaveWeight = async () => {
-    console.log('handleSaveWeight: Starting...');
-    console.log('handleSaveWeight: Current user:', user?.uid);
-    console.log('handleSaveWeight: Weight input:', weightInput);
-    
-    if (!user || !weightInput) return;
-    
-    const weight = parseFloat(weightInput);
-    if (isNaN(weight) || weight <= 0) return;
-
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      console.log('handleSaveWeight: Saving weight:', weight, 'for date:', today, 'user:', user.uid);
-      await saveWeight(user.uid, weight, today);
-      console.log('handleSaveWeight: Weight saved successfully');
-      
-      // Reload weight entries
-      const weights = await loadWeight(user.uid, 10);
-      setWeightEntries(weights);
-      setWeightInput("");
-      
-      // Auto-recalculate norm with new weight
-      const currentNormData = await loadFullNormData(user.uid);
-      if (currentNormData && currentNormData.gender) {
-        const newNormResult = recalculateNormWithNewWeight(currentNormData, weight);
-        await saveNormToFirestore(user.uid, newNormResult, {
-          gender: currentNormData.gender,
-          height: currentNormData.height,
-          age: currentNormData.age,
-          goal: currentNormData.goal,
-        });
-        
-        // Update local norm state
-        setNorm(newNormResult);
-        
-        toast.success(`Вес сохранён. Норма КБЖУ пересчитана: ${newNormResult.calories} ккал`);
-      } else {
-        toast.success('Вес сохранён');
-      }
-    } catch (error) {
-      console.error("Failed to save weight:", error);
-      toast.error('Ошибка сохранения веса');
-    }
-  };
-
   const currentMonth = MONTHS[new Date().getMonth()];
   const currentYear = new Date().getFullYear();
   const firstDayOfMonth = new Date(currentYear, new Date().getMonth(), 1).getDay();
@@ -766,86 +715,6 @@ const Stats = () => {
             </div>
           </Card>
         </div>
-
-        {/* SECTION 4 - Weight Tracking */}
-        <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
-          <div className="flex items-center gap-2 mb-4">
-            <Weight className="h-4 w-4 text-macro-protein" />
-            <h2 className="font-semibold">Мой вес</h2>
-          </div>
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  type="number"
-                  step="0.1"
-                  placeholder={`Вес в кг (последний: ${lastWeightPlaceholder})`}
-                  value={weightInput}
-                  onChange={(e) => setWeightInput(e.target.value.replace(',', '.'))}
-                  className="flex-1"
-                />
-                <Button 
-                  onClick={handleSaveWeight} 
-                  disabled={!weightInput}
-                  className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
-                >
-                  Сохранить вес
-                </Button>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Последние записи</h3>
-                {weightEntries.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Нет данных</p>
-                ) : (
-                  <div className="space-y-1">
-                    {weightEntries.slice(0, 3).map((entry) => (
-                      <div key={entry.id} className="flex justify-between text-sm">
-                        <span>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
-                        <span className="font-medium">{entry.weight} кг</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">График веса</h3>
-              <div className="h-48">
-                {weightChartData.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    Нет данных
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={weightChartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                      <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                      <Tooltip
-                        contentStyle={{
-                          background: "hsl(var(--popover))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "0.75rem",
-                          color: "hsl(var(--popover-foreground))",
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="weight"
-                        stroke="hsl(var(--foreground))"
-                        strokeWidth={2}
-                        dot={{ fill: "hsl(var(--foreground))", r: 3 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-          </div>
-        </Card>
 
         {/* User Data Viewer Button - Only for specific user */}
         {user?.uid === '3DXd9soOLnSZj4Axhg7zWPef2lj2' && (

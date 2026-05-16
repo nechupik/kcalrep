@@ -7,10 +7,12 @@ import {
   signOutUser, 
   onAuthStateChangedCallback 
 } from "@/lib/auth";
+import { loadFullNormData } from "@/lib/firestore";
 
 interface AuthContextType {
   user: FirebaseUser | null;
   loading: boolean;
+  userGender: 'male' | 'female' | null;
   signInWithEmail: (email: string, password: string) => Promise<FirebaseUser>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<FirebaseUser>;
   signInWithGoogle: () => Promise<FirebaseUser>;
@@ -22,6 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userGender, setUserGender] = useState<'male' | 'female' | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChangedCallback((firebaseUser) => {
@@ -31,6 +34,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const loadGender = async () => {
+      if (!user) { setUserGender(null); return; }
+      try {
+        const norm = await loadFullNormData(user.uid);
+        setUserGender(norm?.gender || null);
+      } catch { setUserGender(null); }
+    };
+    loadGender();
+  }, [user]);
 
   const handleSignInWithEmail = async (email: string, password: string) => {
     const user = await signInWithEmail(email, password);
@@ -54,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     loading,
+    userGender,
     signInWithEmail: handleSignInWithEmail,
     signUpWithEmail: handleSignUpWithEmail,
     signInWithGoogle: handleSignInWithGoogle,
