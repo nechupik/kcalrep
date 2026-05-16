@@ -4,8 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { loadProducts, saveProduct, type Product } from '@/lib/products';
-import { loadRecipes, type Recipe } from '@/lib/recipes';
+import { loadProducts, saveProduct, incrementProductUsage, type Product } from '@/lib/products';
+import { loadRecipes, incrementRecipeUsage, type Recipe } from '@/lib/recipes';
 import type { DiaryEntry } from '@/lib/storage';
 
 interface AddFoodModalProps {
@@ -15,19 +15,21 @@ interface AddFoodModalProps {
   selectedDate: string;
 }
 
-type Tab = 'product' | 'dish' | 'manual';
+type Tab = 'search' | 'manual';
 
 export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodModalProps) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('product');
+  const [activeTab, setActiveTab] = useState<Tab>('search');
+  const [showManual, setShowManual] = useState(false);
   const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [dishes, setDishes] = useState<Recipe[]>([]);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Product | Recipe | null>(null);
-  const [grams, setGrams] = useState('100');
+  const [grams, setGrams] = useState('');
   const [loading, setLoading] = useState(true);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
 
   // Manual entry state
   const [manualName, setManualName] = useState('');
@@ -36,19 +38,20 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [manualFat, setManualFat] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
   const [saveToBase, setSaveToBase] = useState(false);
-  const [isTabChanging, setIsTabChanging] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
 
   // Control animation
   useEffect(() => {
     if (isOpen) {
       setAnimationState('enter');
-    } else {
+      wasOpenRef.current = true;
+    } else if (wasOpenRef.current) {
+      // Only run exit animation if modal was previously open
       setAnimationState('exit');
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setAnimationState(null);
-      }, 650);
+        wasOpenRef.current = false;
+      }, 800); // Longer delay to ensure CSS animation completes
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
@@ -64,19 +67,24 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     load();
   }, [isOpen, user]);
 
+  const combinedItems = useMemo(() => {
+    const items = [...products, ...dishes];
+    // Sort by usageCount (most used first), then by name for items with same usage
+    return items.sort((a, b) => {
+      const usageA = (a as any).usageCount || 0;
+      const usageB = (b as any).usageCount || 0;
+      if (usageA !== usageB) {
+        return usageB - usageA; // Descending by usage
+      }
+      return a.name.localeCompare(b.name); // Alphabetical for same usage
+    });
+  }, [products, dishes]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = activeTab === 'product' ? products : dishes;
-    if (!q) return list;
-    return list.filter(item => item.name.toLowerCase().includes(q));
-  }, [query, products, dishes, activeTab]);
-
-  useEffect(() => {
-    if (contentRef.current) {
-      const height = contentRef.current.scrollHeight;
-      setContentHeight(height);
-    }
-  }, [activeTab, selected, isTabChanging, query, filtered, loading]);
+    if (!q) return combinedItems;
+    return combinedItems.filter(item => item.name.toLowerCase().includes(q));
+  }, [query, combinedItems]);
 
   const handleSelect = (item: Product | Recipe) => {
     setSelected(item);
@@ -120,6 +128,13 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
       };
     }
 
+    // Increment usage count
+    if ('servingType' in selected) {
+      await incrementRecipeUsage(selected.id);
+    } else {
+      await incrementProductUsage(selected.id);
+    }
+
     await onAdd(entry);
     resetForm();
     handleClose();
@@ -157,20 +172,19 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const resetForm = () => {
     setQuery('');
     setSelected(null);
-    setGrams('100');
+    setGrams('');
     setManualName('');
     setManualCalories('');
     setManualProtein('');
     setManualFat('');
     setManualCarbs('');
     setSaveToBase(false);
-    setActiveTab('product');
+    setActiveTab('search');
+    setShowManual(false);
   };
 
 
   const tabs = [
-    { id: 'product' as Tab, label: 'Продукт', icon: Package },
-    { id: 'dish' as Tab, label: 'Блюдо', icon: BookOpen },
     { id: 'manual' as Tab, label: 'Вручную', icon: PenLine },
   ];
 
@@ -178,92 +192,37 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && animationState !== 'exit') return null;
+  if (isOpen && !animationState) return null;
 
   return (
-  <div
-    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-  >
-    {/* Overlay */}
     <div
-      ref={overlayRef}
-      onClick={handleClose}
-      className={`absolute inset-0 ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
     >
+      {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black/60"
+        ref={overlayRef}
+        onClick={handleClose}
+        className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : ''}`}
       />
-      <div
-        className="absolute inset-0 backdrop-blur-sm transition-opacity duration-650 ease-in-out"
-        style={{
-          opacity: animationState === 'enter' ? 1 : 0
-        }}
-      />
-    </div>
 
-    {/* Modal panel */}
-    <div
-      className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
-      style={{ transform: animationState === null ? 'translateY(100%)' : undefined }}
-    >
+      {/* Modal panel */}
+      <div
+        className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold">Добавить еду</h2>
-          <button onClick={handleClose} className="rounded-xl p-2 hover:bg-muted/50 transition-smooth">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="grid grid-cols-3 gap-1.5 mb-5 rounded-xl bg-muted/40 p-1">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                const handleTabChange = (tab: Tab) => {
-                  setIsTabChanging(true);
-                  setTimeout(() => {
-                    setActiveTab(tab);
-                    setTimeout(() => setIsTabChanging(false), 300);
-                  }, 300);
-                };
-                handleTabChange(tab.id);
-              }}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-smooth ${
-                activeTab === tab.id
-                  ? 'bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-primary-foreground shadow-glow'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
         </div>
 
         {/* Keep all existing tab content exactly as before */}
-        <div
-          style={{
-            overflow: 'hidden',
-            height: isTabChanging ? contentHeight : (contentHeight === 'auto' ? 'auto' : Math.max(contentHeight, 300)),
-            minHeight: 300,
-            transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          <div
-            ref={contentRef}
-            style={{
-              opacity: isTabChanging ? 0 : 1,
-              transform: isTabChanging ? 'translateY(8px)' : 'translateY(0)',
-              transition: 'opacity 350ms ease-in-out, transform 350ms ease-in-out',
-            }}
-          >
-          {(activeTab === 'product' || activeTab === 'dish') && (
+        <div className="space-y-4">
+          {!showManual && (
             <div className="space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder={activeTab === 'product' ? 'Поиск продуктов...' : 'Поиск блюд...'}
+                  placeholder="Поиск продуктов и блюд..."
                   value={query}
                   onChange={e => { setQuery(e.target.value); setSelected(null); }}
                   className="pl-9"
@@ -312,6 +271,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                         min={1}
                         value={grams}
                         onChange={e => setGrams(e.target.value)}
+                        placeholder="0"
                         autoFocus
                       />
                       <div
@@ -348,11 +308,28 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                   </div>
                 </div>
               )}
+
+              <Button
+                onClick={() => setShowManual(true)}
+                variant="outline"
+                className="w-full flex items-center justify-center gap-1.5"
+              >
+                <PenLine className="h-4 w-4" />
+                Вручную
+              </Button>
             </div>
           )}
 
-          {activeTab === 'manual' && (
+          {showManual && (
             <div className="space-y-4">
+              <Button
+                variant="ghost"
+                onClick={() => setShowManual(false)}
+                className="flex items-center gap-2"
+              >
+                ← Назад к поиску
+              </Button>
+
               <div>
                 <Label>Название</Label>
                 <Input
@@ -406,7 +383,6 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
               </Button>
             </div>
           )}
-          </div>
         </div>
       </div>
     </div>

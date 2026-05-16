@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Flame, BarChart3, User, Home, Package, BookOpen, X } from "lucide-react";
+import { Flame, BarChart3, User, Home, Package, BookOpen, X, LogOut } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -12,12 +12,31 @@ const links = [
 ];
 
 export const AppHeader = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const location = useLocation();
 
   const handleLinkClick = () => {
     setIsOpen(false);
+  };
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleLogoutConfirm = async () => {
+    try {
+      await signOut();
+      setIsOpen(false);
+      setShowLogoutConfirm(false);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const handleLogoutCancel = () => {
+    setShowLogoutConfirm(false);
   };
 
   // Get current tab name based on location
@@ -58,22 +77,13 @@ export const AppHeader = () => {
       )}
 
       <div
-        className={`fixed top-0 right-0 h-full w-72 max-w-[72rem] bg-background/95 backdrop-blur-md border-l border-border/40 z-50 transform transition-transform ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-52 max-w-[72rem] bg-background/95 backdrop-blur-md border-l border-border/40 z-50 transform transition-transform ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         style={{ transitionDuration: '600ms' }}
       >
-        <div className="p-6">
-          <div className="flex justify-end">
-            <button
-              onClick={() => setIsOpen(false)}
-              className="p-2 rounded-lg hover:bg-muted/80 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <nav className="space-y-2">
+        <div className="pt-[50px] pl-[15px] pr-6 pb-6 flex flex-col h-full">
+          <nav className="space-y-2 flex-1">
             {links.map((l) => (
               <NavLink
                 key={l.to}
@@ -81,7 +91,7 @@ export const AppHeader = () => {
                 end={l.to === "/"}
                 onClick={handleLinkClick}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+                  `flex items-center gap-3 pl-[5px] pr-[5px] py-3 rounded-lg text-base font-medium transition-colors ${
                     isActive
                       ? "bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground shadow-glow"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -93,8 +103,40 @@ export const AppHeader = () => {
               </NavLink>
             ))}
           </nav>
+          <button
+            onClick={handleLogoutClick}
+            className="flex items-center gap-3 pl-[5px] pr-[5px] py-3 rounded-lg text-base font-medium text-muted-foreground hover:text-destructive hover:bg-muted/50 transition-colors mt-4"
+          >
+            <LogOut className="h-5 w-5 flex-shrink-0" />
+            <span>Выйти</span>
+          </button>
         </div>
       </div>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-background border border-border/50 rounded-2xl shadow-2xl p-6 w-80 mx-4">
+            <h3 className="text-lg font-semibold mb-2">Подтверждение выхода</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Вы уверены, что хотите выйти из аккаунта?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleLogoutCancel}
+                className="flex-1 px-4 py-2 rounded-lg border border-border/50 text-muted-foreground hover:bg-muted/50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleLogoutConfirm}
+                className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90 transition-colors"
+              >
+                Выйти
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
