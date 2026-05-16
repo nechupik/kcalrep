@@ -30,12 +30,12 @@ const Index = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [activity, setActivity] = useState<ActivityEntry | null>(null);
   const [activityInput, setActivityInput] = useState('');
-  const [activityMode, setActivityMode] = useState<'home' | 'steps'>('home');
   const [savingActivity, setSavingActivity] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [showWeightReminder, setShowWeightReminder] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editModalAnimationState, setEditModalAnimationState] = useState<'enter' | 'exit' | null>(null);
   const [entryToEdit, setEntryToEdit] = useState<DiaryEntry | null>(null);
   const [editGrams, setEditGrams] = useState('');
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -132,6 +132,19 @@ const Index = () => {
     setShowEditModal(true);
   };
 
+  // Control edit modal animation
+  useEffect(() => {
+    if (showEditModal) {
+      setEditModalAnimationState('enter');
+    } else {
+      setEditModalAnimationState('exit');
+      const timer = setTimeout(() => {
+        setEditModalAnimationState(null);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [showEditModal]);
+
   const handleUpdateGrams = async () => {
     if (!entryToEdit || !editGrams) return;
     
@@ -212,17 +225,11 @@ const Index = () => {
         type = 'calories';
         value = caloriesBurned;
       } else {
-        if (activityMode === 'home') {
-          caloriesBurned = 0;
-          type = 'home';
-          value = 0;
-        } else {
-          const steps = Number(activityInput) || 0;
-          const lastWeight = await getLastWeight();
-          caloriesBurned = Math.round(steps * lastWeight * 0.0005);
-          type = 'steps';
-          value = steps;
-        }
+        const steps = Number(activityInput) || 0;
+        const lastWeight = await getLastWeight();
+        caloriesBurned = Math.round(steps * lastWeight * 0.0005);
+        type = 'steps';
+        value = steps;
       }
 
       await saveActivity(user.uid, {
@@ -382,47 +389,22 @@ const Index = () => {
               </div>
             )}
 
-            {/* WIFE: Home or Steps toggle */}
+            {/* WIFE: Steps input */}
             {user?.uid !== ADMIN_UID && (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setActivityMode('home')}
-                    className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
-                      activityMode === 'home'
-                        ? 'bg-gradient-sunset text-primary-foreground border-transparent'
-                        : 'border-border/50 text-muted-foreground'
-                    }`}
-                  >
-                    🏠 Дома
-                  </button>
-                  <button
-                    onClick={() => setActivityMode('steps')}
-                    className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-smooth border ${
-                      activityMode === 'steps'
-                        ? 'bg-gradient-sunset text-primary-foreground border-transparent'
-                        : 'border-border/50 text-muted-foreground'
-                    }`}
-                  >
-                    👣 Выходила
-                  </button>
-                </div>
-
-                {activityMode === 'steps' && (
-                  <Input
-                    type="number"
-                    placeholder="Количество шагов"
-                    value={activityInput}
-                    onChange={e => setActivityInput(e.target.value)}
-                  />
-                )}
-
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Количество шагов"
+                  value={activityInput}
+                  onChange={e => setActivityInput(e.target.value)}
+                  className="w-2/3"
+                />
                 <Button
                   onClick={handleSaveActivity}
-                  disabled={savingActivity || (activityMode === 'steps' && !activityInput)}
-                  className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90"
+                  disabled={savingActivity || !activityInput}
+                  className="w-1/3 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90"
                 >
-                  Сохранить активность
+                  Сохранить
                 </Button>
               </div>
             )}
@@ -452,8 +434,43 @@ const Index = () => {
 
       {/* Edit Grams Modal */}
       {showEditModal && entryToEdit && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-md border border-border/50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ pointerEvents: showEditModal ? 'auto' : 'none' }}
+        >
+          {/* Overlay */}
+          <div
+            onClick={() => {
+              setShowEditModal(false);
+              setEntryToEdit(null);
+              setEditGrams('');
+            }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(4px)',
+              opacity: showEditModal ? 1 : 0,
+              transition: 'opacity 650ms cubic-bezier(0.4, 0, 0.2, 1)',
+              pointerEvents: showEditModal ? 'auto' : 'none',
+            }}
+          />
+
+          {/* Modal panel */}
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '448px',
+              background: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border) / 0.5)',
+              borderRadius: '16px',
+              padding: '24px',
+              transform: showEditModal ? 'translateY(0)' : 'translateY(100%)',
+              transition: 'transform 650ms cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 -4px 40px rgba(0,0,0,0.4)',
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Изменить граммовку</h2>
               <button

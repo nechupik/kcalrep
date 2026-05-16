@@ -58,6 +58,7 @@ const Stats = () => {
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [weightEntries, setWeightEntries] = useState<WeightData[]>([]);
   const [weightInput, setWeightInput] = useState("");
+  const [lastWeightPlaceholder, setLastWeightPlaceholder] = useState("75");
   const [loading, setLoading] = useState(true);
   const [isInterestingOpen, setIsInterestingOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -116,6 +117,9 @@ const Stats = () => {
         // Load weight entries
         const weights = await loadWeight(user.uid, 10);
         setWeightEntries(weights);
+        if (weights.length > 0) {
+          setLastWeightPlaceholder(String(weights[0].weight));
+        }
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
@@ -445,7 +449,7 @@ const Stats = () => {
       }
     });
 
-    return Array.from(map.values()).sort((a, b) => b.totalCalories - a.totalCalories);
+    return Array.from(map.values()).sort((a, b) => b.totalGrams - a.totalGrams);
   }, [monthlyDetailEntries]);
 
   // Monthly totals summary
@@ -776,9 +780,9 @@ const Stats = () => {
                 <Input
                   type="number"
                   step="0.1"
-                  placeholder="Вес в кг"
+                  placeholder={`Вес в кг (последний: ${lastWeightPlaceholder})`}
                   value={weightInput}
-                  onChange={(e) => setWeightInput(e.target.value)}
+                  onChange={(e) => setWeightInput(e.target.value.replace(',', '.'))}
                   className="flex-1"
                 />
                 <Button 
@@ -887,6 +891,7 @@ const Stats = () => {
                     { label: 'Всего съедено', value: `${monthlyTotals.grams.toLocaleString()}г`, icon: '⚖️' },
                     { label: 'Калорий', value: `${monthlyTotals.calories.toLocaleString()} ккал`, icon: '🔥' },
                     { label: 'Белков', value: `${Math.round(monthlyTotals.protein)}г`, icon: '💪' },
+                    { label: 'Жиров', value: `${Math.round(monthlyTotals.fat)}г`, icon: '🧈' },
                     { label: 'Углеводов', value: `${Math.round(monthlyTotals.carbs)}г`, icon: '🌾' },
                   ].map(stat => (
                     <div key={stat.label} className="rounded-xl bg-muted/40 p-3">

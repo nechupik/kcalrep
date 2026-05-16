@@ -3,104 +3,84 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Flame, Target, ArrowRight } from "lucide-react";
+import { Target, ArrowRight } from "lucide-react";
 import {
   GOAL_LABELS,
   calculateMacros,
-  type ActivityMode,
-  type CalcInput,
-  type Gender,
   type Goal,
+  type CalcInput,
   type MacroResult,
+  type Gender,
 } from "@/lib/nutrition";
 import { loadWeight } from "@/lib/firestore";
-import { useAuth } from "@/contexts/AuthContext";
 
-interface CalculatorFormProps {
+interface SimpleCalculatorFormProps {
   onCalculate: (result: MacroResult, input: CalcInput) => void;
   submitLabel?: string;
+  gender: Gender;
+  age: number;
+  height: number;
+  userId: string;
 }
 
-
-export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитать норму" }: CalculatorFormProps) => {
-  const { user } = useAuth();
-  const [gender, setGender] = useState<Gender>("male");
-  const [age, setAge] = useState("");
-  const [height, setHeight] = useState("");
+export const SimpleCalculatorForm = ({
+  onCalculate,
+  submitLabel = "Пересчитать норму",
+  gender,
+  age,
+  height,
+  userId,
+}: SimpleCalculatorFormProps) => {
   const [weight, setWeight] = useState("");
   const [lastWeight, setLastWeight] = useState<string>("");
   const [goal, setGoal] = useState<Goal>("lose");
 
   useEffect(() => {
-    const loadLastWeight = async () => {
-      if (user) {
-        const weightEntries = await loadWeight(user.uid, 1);
+    const loadCurrentWeight = async () => {
+      if (userId) {
+        const weightEntries = await loadWeight(userId, 1);
         if (weightEntries.length > 0) {
-          setLastWeight(String(weightEntries[0].weight));
+          const lastWeightValue = String(weightEntries[0].weight);
+          setLastWeight(lastWeightValue);
+          setWeight(lastWeightValue);
         }
       }
     };
-    loadLastWeight();
-  }, [user]);
+    loadCurrentWeight();
+  }, [userId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const input: CalcInput = {
       gender,
-      age: Number(age),
-      height: Number(height),
+      age,
+      height,
       weight: Number(weight),
-      activityMode: 'steps' as ActivityMode,
-      steps: 0,  // 0 steps = sedentary = 1.2 coefficient
+      activityMode: 'steps',
+      steps: 0, // 0 steps = sedentary = 1.2 coefficient
       goal,
     };
-    if (!input.age || !input.height || !input.weight) return;
+    if (!input.weight) return;
     onCalculate(calculateMacros(input), input);
   };
-
 
   return (
     <Card className="p-6 md:p-8 shadow-card border-border/50 backdrop-blur-sm bg-card/80">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Пол */}
+        {/* Вес */}
         <div className="space-y-2">
-          <Label className="flex items-center gap-2 text-sm font-semibold">
-            <Flame className="h-4 w-4 text-primary" />
-            Пол
-          </Label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["male", "female"] as Gender[]).map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGender(g)}
-                className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-smooth ${
-                  gender === g
-                    ? "border-primary bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground"
-                    : "border-border bg-background text-muted-foreground hover:border-primary/40"
-                }`}
-              >
-                {g === "male" ? "Мужчина" : "Женщина"}
-              </button>
-            ))}
-          </div>
+          <Label htmlFor="weight">Вес, кг</Label>
+          <Input
+            id="weight"
+            type="number"
+            min={30}
+            max={300}
+            value={weight}
+            onChange={(e) => setWeight(e.target.value.replace(',', '.'))}
+            placeholder={lastWeight || "75"}
+            step="0.1"
+          />
         </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="age">Возраст</Label>
-            <Input id="age" type="number" min={10} max={100} value={age} onChange={(e) => setAge(e.target.value)} placeholder="28" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="height">Рост, см</Label>
-            <Input id="height" type="number" min={100} max={250} value={height} onChange={(e) => setHeight(e.target.value)} placeholder="178" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="weight">Вес, кг</Label>
-            <Input id="weight" type="number" min={30} max={300} value={weight} onChange={(e) => setWeight(e.target.value.replace(',', '.'))} placeholder={lastWeight || "75"} step="0.1" />
-          </div>
-        </div>
-
 
         {/* Цель */}
         <div className="space-y-2">

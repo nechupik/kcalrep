@@ -182,49 +182,11 @@ export function recalculateNormWithNewWeight(
     height: currentNorm.height,
     weight: newWeight,
     activityMode: "steps",
-    steps: 0,
+    steps: 0, // Always use sedentary (same as Profile calculator)
     goal: currentNorm.goal as Goal,
   };
-  // Manually set the activity factor instead of recalculating from steps
-  const result = calculateMacros(input);
-  // Override with stored activity factor to preserve original activity level
-  const tdee = Math.round(result.bmr * currentNorm.activityFactor);
-  const calories = Math.round(tdee * currentNorm.goalMultiplier);
-  const bmi = newWeight / ((currentNorm.height / 100) ** 2);
-  const gender = currentNorm.gender as Gender;
-  const proteinPerKg = gender === 'female' ? 1.8 : 2.0;
-  const rawProtein = Math.round(newWeight * proteinPerKg);
-  const protein = bmi > 30 ? Math.round(Math.min(rawProtein, newWeight * 1.6)) : rawProtein;
-  const fatFromPercent = Math.round((calories * 0.27) / 9);
-  const fatFromWeight = Math.round(newWeight * (gender === 'female' ? 1.1 : 1.0));
-  const fat = Math.max(fatFromPercent, fatFromWeight);
-  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
-
-  const minFat = Math.round(newWeight * (gender === 'female' ? 1.1 : 1.0));
-  const finalFat = Math.max(fat, minFat);
-  const minCalories = gender === 'female' ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE;
-  const finalCalories = Math.max(calories, minCalories);
-  const finalCarbs = Math.max(0, Math.round((finalCalories - protein * 4 - finalFat * 9) / 4));
-
-  let warning: string | undefined;
-  if (calories < minCalories) {
-    warning = gender === 'female'
-      ? 'Калораж близок к минимуму для женского здоровья. Рекомендуем увеличить активность до 8–10 тыс. шагов.'
-      : 'Калораж близок к минимуму. Рекомендуем увеличить активность.';
-  }
-
-  return {
-    calories: finalCalories,
-    protein,
-    fat: finalFat,
-    carbs: finalCarbs,
-    bmr: result.bmr,
-    tdee,
-    activityFactor: currentNorm.activityFactor,
-    activityLabel: currentNorm.activityLabel,
-    goalMultiplier: currentNorm.goalMultiplier,
-    warning,
-  };
+  // Use the same calculation as Profile calculator
+  return calculateMacros(input);
 }
 
 // База продуктов (значения на 100 г)

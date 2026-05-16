@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CalculatorForm } from "@/components/CalculatorForm";
+import { SimpleCalculatorForm } from "@/components/SimpleCalculatorForm";
 import { ResultsCard } from "@/components/ResultsCard";
+import { EditProfileDataModal } from "@/components/EditProfileDataModal";
 import {
   User,
   LogIn,
@@ -17,14 +19,16 @@ import {
   CheckCircle2,
   RotateCcw,
   Shield,
+  Edit3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm, saveNorm } from "@/lib/storage";
-import { loadUserSettings, saveUserSettings } from "@/lib/firestore";
+import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight } from "@/lib/firestore";
 import type { CalcInput, MacroResult } from "@/lib/nutrition";
 import { updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { calculateMacros } from "@/lib/nutrition";
 
 const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 
@@ -40,7 +44,7 @@ const Profile = () => {
   const [showCalculator, setShowCalculator] = useState(false);
   const [calcVisible, setCalcVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activityEnabled, setActivityEnabled] = useState(false);
+  const [activityEnabled, setActivityEnabled] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -49,7 +53,9 @@ const Profile = () => {
   const [manualProtein, setManualProtein] = useState('');
   const [manualFat, setManualFat] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
-  
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [storedProfileData, setStoredProfileData] = useState<any>(null);
+
   useEffect(() => {
     const loadNormData = async () => {
       const n = await loadNorm();
@@ -61,14 +67,18 @@ const Profile = () => {
           requestAnimationFrame(() => setCalcVisible(true));
         });
       }
-      
+
       // Load user settings
       if (user) {
         const settings = await loadUserSettings(user.uid);
-        if (settings) setActivityEnabled(settings.activityTrackingEnabled);
+        if (settings) setActivityEnabled(settings.activityTrackingEnabled ?? true);
+
+        // Load stored profile data (gender, age, height)
+        const profileData = await loadFullNormData(user.uid);
+        setStoredProfileData(profileData);
       }
     };
-    
+
     loadNormData();
   }, [user, norm]);
 
@@ -145,16 +155,13 @@ const Profile = () => {
   };
 
   const handleCalculate = async (res: MacroResult, _input: CalcInput) => {
-  console.log('handleCalculate called', res);
   try {
-    console.log('calling saveNorm...');
     await saveNorm(res, {
-      gender: _input.gender,
-      height: _input.height,
-      age: _input.age,
+      gender: storedProfileData?.gender || _input.gender,
+      height: storedProfileData?.height || _input.height,
+      age: storedProfileData?.age || _input.age,
       goal: _input.goal,
     });
-    console.log('saveNorm done');
     setNorm(res);
     setCalcVisible(false);
     setTimeout(() => setShowCalculator(false), 300);
@@ -164,6 +171,14 @@ const Profile = () => {
     toast.error('Ошибка сохранения нормы');
   }
 };
+
+  const handleProfileDataSave = (newNorm: MacroResult) => {
+    setNorm(newNorm);
+    // Reload stored profile data
+    if (user) {
+      loadFullNormData(user.uid).then(setStoredProfileData);
+    }
+  };
 
 
   const handleCloseCalc = () => {
@@ -218,38 +233,24 @@ const Profile = () => {
         {/* Profile card */}
         {user && (
           <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-            <div className="flex items-center gap-4 mb-px">
+            <div className="flex items-center gap-4 mb-2.5">
               <div className="h-12 w-12 rounded-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] flex items-center justify-center text-xl font-bold text-foreground shadow-glow">
                 {(user.displayName || "?").charAt(0).toUpperCase()}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-lg font-bold truncate">{user.displayName || "No name"}</div>
               </div>
-            </div>
-
-            <div className="mb-2">
-              <div className="w-full flex justify-center gap-2">
-                {user && user.uid === ADMIN_UID && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate("/admin")}
-                    className="text-muted-foreground hover:text-primary"
-                  >
-                    <Shield className="h-4 w-4 mr-1" />
-                    Админ
-                  </Button>
-                )}
+              {user && user.uid === ADMIN_UID && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleLogout}
-                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => navigate("/admin")}
+                  className="text-muted-foreground hover:text-primary"
                 >
-                  <LogOut className="h-4 w-4 mr-1" />
-                  Выйти
+                  <Shield className="h-4 w-4 mr-1" />
+                  Админ
                 </Button>
-              </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -277,8 +278,19 @@ const Profile = () => {
         {/* KBJU norm section */}
         {user && (
           <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-lg font-bold">Моя норма КБЖУ</h2>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-lg font-bold">Моя норма</h2>
+              {storedProfileData && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowEditProfileModal(true)}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  <Edit3 className="h-4 w-4 mr-1" />
+                  Изменить данные
+                </Button>
+              )}
             </div>
             {!norm && (
               <p className="text-sm text-muted-foreground mb-5">
@@ -426,10 +438,21 @@ const Profile = () => {
                   transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
-                <CalculatorForm
-                  onCalculate={handleCalculate}
-                  submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
-                />
+                {storedProfileData ? (
+                  <SimpleCalculatorForm
+                    onCalculate={handleCalculate}
+                    submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
+                    gender={storedProfileData.gender}
+                    age={storedProfileData.age}
+                    height={storedProfileData.height}
+                    userId={user!.uid}
+                  />
+                ) : (
+                  <CalculatorForm
+                    onCalculate={handleCalculate}
+                    submitLabel={norm ? "Пересчитать норму" : "Рассчитать норму"}
+                  />
+                )}
               </div>
             )}
 
@@ -450,42 +473,6 @@ const Profile = () => {
           </Card>
         )}
 
-        {/* Activity tracking settings for non-admin users */}
-        {user && user.uid !== 'irXSByiUKYg9S5g3UXF5xSXHijC3' && (
-          <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg">⚙️</span>
-              <h2 className="font-semibold">Настройки активности</h2>
-            </div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm font-medium">Учитывать активность</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Если включено — дефицит считается с учётом шагов. Если выключено — только по съеденным калориям.
-                </p>
-              </div>
-              <button
-                onClick={() => setActivityEnabled(!activityEnabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
-                  activityEnabled ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d]' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 ${
-                    activityEnabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-            <Button
-              onClick={handleSaveSettings}
-              disabled={savingSettings}
-              className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90"
-            >
-              Сохранить настройки
-            </Button>
-          </Card>
-        )}
 
         {/* Login form */}
         {!user && (
@@ -593,6 +580,15 @@ const Profile = () => {
 
               </section>
       <div className="h-8" />
+
+      {user && (
+        <EditProfileDataModal
+          isOpen={showEditProfileModal}
+          onClose={() => setShowEditProfileModal(false)}
+          onSave={handleProfileDataSave}
+          userId={user.uid}
+        />
+      )}
     </div>
   );
 };

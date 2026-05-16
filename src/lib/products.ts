@@ -1,4 +1,4 @@
-﻿import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
+﻿import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
 export interface Product {
@@ -11,13 +11,14 @@ export interface Product {
   category?: string;
   createdBy?: string;
   createdAt?: any;
+  usageCount?: number;
 }
 
 export async function loadProducts(): Promise<Product[]> {
   const col = collection(db, "shared_products");
   const q = query(col, orderBy("name", "asc"));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), usageCount: doc.data().usageCount || 0 } as Product));
 }
 
 export async function saveProduct(product: Omit<Product, 'id'>, userId: string): Promise<string> {
@@ -26,8 +27,16 @@ export async function saveProduct(product: Omit<Product, 'id'>, userId: string):
     ...product,
     createdBy: userId,
     createdAt: Timestamp.now(),
+    usageCount: 0,
   });
   return docRef.id;
+}
+
+export async function incrementProductUsage(productId: string): Promise<void> {
+  const docRef = doc(db, "shared_products", productId);
+  await updateDoc(docRef, {
+    usageCount: (await getDoc(docRef)).data().usageCount ? (await getDoc(docRef)).data().usageCount + 1 : 1,
+  });
 }
 
 export async function updateProduct(productId: string, product: Omit<Product, 'id'>): Promise<void> {
