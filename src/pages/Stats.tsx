@@ -124,6 +124,18 @@ const Stats = () => {
     loadData();
   }, [user]);
 
+  // Reference to current norm data
+  const [currentNorm, setCurrentNorm] = useState<any>(null);
+
+  useEffect(() => {
+    const loadCurrentNorm = async () => {
+      if (!user) return;
+      const normData = await loadFullNormData(user.uid);
+      setCurrentNorm(normData);
+    };
+    loadCurrentNorm();
+  }, [user]);
+
   // Load and calculate analytics when data changes
   useEffect(() => {
     const calculateAnalytics = async () => {
@@ -171,9 +183,13 @@ const Stats = () => {
         }
 
         // Calculate daily deficit
+        // Use max(TDEE, BMR + logged_activity) so we never understate burn below TDEE
+        // When no activity is logged, TDEE accounts for normal daily movement
+        // When activity is logged and exceeds TDEE's activity component, use the higher value
         const dailyDeficit = foodLogsByDay.map(day => {
           const activityEntry = activities.find(a => a?.date === day.date);
-          const burned = (norm.bmr || 0) + (activityEntry?.caloriesBurned || 0);
+          const activityBurned = activityEntry?.caloriesBurned || 0;
+          const burned = Math.max(norm.tdee || 0, (norm.bmr || 0) + activityBurned);
           return burned - day.calories;
         });
 
@@ -256,22 +272,10 @@ const Stats = () => {
       }
     };
 
-    if (entries.length > 0 && norm) {
+    if (norm) {
       calculateAnalytics();
     }
-  }, [entries, norm, user, weightEntries]);
-
-  // Reference to current norm data
-  const [currentNorm, setCurrentNorm] = useState<any>(null);
-
-  useEffect(() => {
-    const loadCurrentNorm = async () => {
-      if (!user) return;
-      const normData = await loadFullNormData(user.uid);
-      setCurrentNorm(normData);
-    };
-    loadCurrentNorm();
-  }, [user]);
+  }, [norm, user, currentNorm]);
 
   useEffect(() => {
     const loadMonthlyDetail = async () => {
@@ -955,7 +959,7 @@ const Stats = () => {
                               <div className="rounded-xl bg-muted/30 px-4 py-3 mb-5 grid grid-cols-3 gap-2 text-center">
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
-                                  <div className="font-bold text-sm">{norm.bmr + (dayActivity?.caloriesBurned || 0)} ккал</div>
+                                  <div className="font-bold text-sm">{Math.max(norm.tdee, norm.bmr + (dayActivity?.caloriesBurned || 0))} ккал</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Съедено</div>
@@ -964,11 +968,11 @@ const Stats = () => {
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
                                   <div className={`font-bold text-sm ${
-                                    (norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories > 0 
+                                    Math.max(norm.tdee, norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories > 0 
                                       ? 'text-green-400' : 'text-red-400'
                                   }`}>
                                     {(() => {
-                                      const d = (norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories;
+                                      const d = Math.max(norm.tdee, norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories;
                                       return `${d > 0 ? '+' : ''}${d} ккал`;
                                     })()}
                                   </div>
@@ -1289,7 +1293,7 @@ const Stats = () => {
                 )}
 
                 {/* Weight Interpretation */}
-                {analytics.weightInterpretation.type !== 'none' && (
+                {analytics.weightInterpretation.explanation !== 'Недостаточно данных' && (
                   <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
                     <div className="flex items-start gap-3">
                       <div className="bg-green-500/20 rounded-full p-2 mt-0.5">
@@ -1323,14 +1327,17 @@ const Stats = () => {
                       return (
                         <>
                           <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <div className="text-xs text-muted-foreground mb-1">Калории</div>
                             <div className="text-2xl font-bold text-green-500">{calorieStreak.value}</div>
                             <div className="text-xs text-muted-foreground">{calorieStreak.label}</div>
                           </div>
                           <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <div className="text-xs text-muted-foreground mb-1">Белок</div>
                             <div className="text-2xl font-bold text-macro-protein">{proteinStreak.value}</div>
                             <div className="text-xs text-muted-foreground">{proteinStreak.label}</div>
                           </div>
                           <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
                             <div className="text-2xl font-bold text-accent">{deficitStreak.value}</div>
                             <div className="text-xs text-muted-foreground">{deficitStreak.label}</div>
                           </div>

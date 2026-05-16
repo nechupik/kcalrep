@@ -75,7 +75,7 @@ export interface BodyCompositionEntry {
   weight: number;       // kg
   bodyFatPercent?: number;
   muscleMassKg?: number;
-  visceralFat?: number; // index 1-59
+  visceralFat?: number; // index 1-20
   bmrFromScale?: number; // kcal, if scale provides it
 }
 

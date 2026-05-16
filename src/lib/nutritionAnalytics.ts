@@ -182,9 +182,8 @@ function analyzeDeficit(
     };
   }
 
-  // Filter to only days from 2026-05-12 onwards with actual food entries
-  const startDate = new Date('2026-05-12');
-  const daysWithData = foodLogsByDay.filter(day => day.entries > 0 && new Date(day.date) >= startDate);
+  // Filter to only days with actual food entries
+  const daysWithData = foodLogsByDay.filter(day => day.entries > 0);
   if (daysWithData.length === 0) {
     return {
       expectedLoss: 0,
@@ -197,12 +196,12 @@ function analyzeDeficit(
   // Get dates that have data
   const datesWithData = new Set(daysWithData.map(day => day.date));
 
-  // Filter dailyDeficit to only include days with data and from start date
+  // Filter dailyDeficit to only include days with data
   // dailyDeficit is ordered from oldest to newest (29 days ago to today)
   // foodLogsByDay is also ordered from oldest to newest
   const filteredDeficit: number[] = [];
   for (let i = 0; i < dailyDeficit.length; i++) {
-    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
+    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0) {
       filteredDeficit.push(dailyDeficit[i]);
     }
   }
@@ -310,7 +309,7 @@ function analyzeDeficit(
  * Detect weight loss plateau
  */
 function detectPlateau(weightHistory: NutritionAnalyticsInput['weightHistory']): PlateauResult {
-  if (weightHistory.length < PLATEAU_DAYS) {
+  if (weightHistory.length < 3) {
     return { plateau: false, daysStuck: 0 };
   }
 
@@ -318,13 +317,18 @@ function detectPlateau(weightHistory: NutritionAnalyticsInput['weightHistory']):
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  const recentWeights = sortedHistory.slice(-PLATEAU_DAYS);
+  const recentWeights = sortedHistory.slice(-Math.min(sortedHistory.length, PLATEAU_DAYS));
   const firstWeight = recentWeights[0].weight;
   const lastWeight = recentWeights[recentWeights.length - 1].weight;
   
-  // Check if weight is essentially flat (within 0.5 kg)
-  const plateau = Math.abs(lastWeight - firstWeight) < 0.5;
-  const daysStuck = plateau ? PLATEAU_DAYS : 0;
+  // Calculate actual day span between first and last weight entry
+  const actualDays = Math.max(1, Math.round(
+    (new Date(recentWeights[recentWeights.length - 1].date).getTime() - new Date(recentWeights[0].date).getTime()) / (1000 * 60 * 60 * 24)
+  ));
+  
+  // Check if weight is essentially flat (within 0.5 kg) over at least PLATEAU_DAYS real days
+  const plateau = Math.abs(lastWeight - firstWeight) < 0.5 && actualDays >= PLATEAU_DAYS;
+  const daysStuck = plateau ? actualDays : 0;
 
   let recommendation: string | undefined;
   if (plateau) {
@@ -362,7 +366,7 @@ function forecastProtein(
   const currentProtein = todayLog.protein;
   const ratio = currentProtein / targetProtein;
 
-  if (ratio >= 0.7) {
+  if (ratio >= 0.9) {
     return null; // Already on track
   }
 
@@ -427,7 +431,8 @@ function analyzeStability(foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay'
  */
 function detectPatterns(
   foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay'],
-  timestampsMeals: NutritionAnalyticsInput['timestampsMeals']
+  timestampsMeals: NutritionAnalyticsInput['timestampsMeals'],
+  targetProtein: number
 ): PatternInsight[] {
   const patterns: PatternInsight[] = [];
 
@@ -435,14 +440,16 @@ function detectPatterns(
     return patterns;
   }
 
-  // Weekend overeating detection
+  // Weekend overeating detection (only days with entries)
   const weekendDays = foodLogsByDay.filter(day => {
+    if (day.entries === 0) return false;
     const date = new Date(day.date);
     const dayOfWeek = date.getDay();
     return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
   });
 
   const weekdayDays = foodLogsByDay.filter(day => {
+    if (day.entries === 0) return false;
     const date = new Date(day.date);
     const dayOfWeek = date.getDay();
     return dayOfWeek >= 1 && dayOfWeek <= 5;
@@ -464,8 +471,7 @@ function detectPatterns(
   // Weekday protein deficit
   if (weekdayDays.length > 0) {
     const avgProteinWeekday = weekdayDays.reduce((sum, d) => sum + d.protein, 0) / weekdayDays.length;
-    // Assuming target protein is available through comparison
-    if (avgProteinWeekday < 80) { // Generic threshold
+    if (avgProteinWeekday < targetProtein * 0.8) {
       patterns.push({
         type: 'weekday',
         description: 'Недобор белка по будням — добавьте перекусы',
@@ -528,17 +534,16 @@ function assessRecoveryRisk(
     return { riskLevel: 'none', explanation: 'Недостаточно данных для оценки' };
   }
 
-  // Filter to only days from 2026-05-12 onwards with actual food entries
-  const startDate = new Date('2026-05-12');
-  const daysWithData = foodLogsByDay.filter(day => day.entries > 0 && new Date(day.date) >= startDate);
+  // Filter to only days with actual food entries
+  const daysWithData = foodLogsByDay.filter(day => day.entries > 0);
   if (daysWithData.length < 7) {
     return { riskLevel: 'none', explanation: 'Недостаточно данных для оценки' };
   }
 
-  // Filter dailyDeficit to only include days with data and from start date
+  // Filter dailyDeficit to only include days with data
   const filteredDeficit: number[] = [];
   for (let i = 0; i < dailyDeficit.length; i++) {
-    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
+    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0) {
       filteredDeficit.push(dailyDeficit[i]);
     }
   }
@@ -643,18 +648,15 @@ function calculateStreaks(
   targetCalories: number,
   targetProtein: number
 ): StreaksResult {
-  // Filter to only include days from 2026-05-12 onwards
-  const startDate = new Date('2026-05-12');
-  const filteredDays = foodLogsByDay.filter(day => new Date(day.date) >= startDate);
-  
-  const sortedDays = [...filteredDays].sort((a, b) => 
+  // Sort days from most recent to oldest
+  const sortedDays = [...foodLogsByDay].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  // Calorie streak (within ±10% of target)
+  // Calorie streak (within ±10% of target) — breaks on untracked days
   let calorieStreak = 0;
   for (const day of sortedDays) {
-    if (day.entries === 0) continue;
+    if (day.entries === 0) break;
     const ratio = day.calories / targetCalories;
     if (ratio >= 0.9 && ratio <= 1.1) {
       calorieStreak++;
@@ -663,10 +665,10 @@ function calculateStreaks(
     }
   }
 
-  // Protein streak (≥90% of target)
+  // Protein streak (≥90% of target) — breaks on untracked days
   let proteinStreak = 0;
   for (const day of sortedDays) {
-    if (day.entries === 0) continue;
+    if (day.entries === 0) break;
     const ratio = day.protein / targetProtein;
     if (ratio >= 0.9) {
       proteinStreak++;
@@ -675,18 +677,11 @@ function calculateStreaks(
     }
   }
 
-  // Deficit streak (positive deficit) - only consider days with data and from 2026-05-12 onwards
+  // Deficit streak (positive deficit) — iterate aligned arrays from newest to oldest
   let deficitStreak = 0;
-  // Filter dailyDeficit to only include days with data and from start date
-  const filteredDeficit: number[] = [];
-  for (let i = 0; i < dailyDeficit.length; i++) {
-    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
-      filteredDeficit.push(dailyDeficit[i]);
-    }
-  }
-  const sortedDeficits = [...filteredDeficit].reverse();
-  for (const deficit of sortedDeficits) {
-    if (deficit > 0) {
+  for (let i = foodLogsByDay.length - 1; i >= 0; i--) {
+    if (foodLogsByDay[i].entries === 0) break;
+    if (i < dailyDeficit.length && dailyDeficit[i] > 0) {
       deficitStreak++;
     } else {
       break;
@@ -726,17 +721,16 @@ function generateDailyVerdict(
     if (plateu.plateau) {
       return 'Вес стоит на месте уже 2 недели. Сегодня важно точно попасть в норму калорий и белка.';
     }
-    return 'Сегодня ещё нет записей. Начните день с белкового завтраком!';
+    return 'Сегодня ещё нет записей. Начните день с белкового завтрака!';
   }
 
   const calorieRatio = todayLog.calories / targetCalories;
   const proteinRatio = todayLog.protein / targetProtein;
   
-  // Get today's deficit from the filtered array (last day with data, from 2026-05-12 onwards)
-  const startDate = new Date('2026-05-12');
+  // Get today's deficit from the filtered array (last day with data)
   const filteredDeficit: number[] = [];
   for (let i = 0; i < dailyDeficit.length; i++) {
-    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0 && new Date(foodLogsByDay[i].date) >= startDate) {
+    if (i < foodLogsByDay.length && foodLogsByDay[i].entries > 0) {
       filteredDeficit.push(dailyDeficit[i]);
     }
   }
@@ -784,7 +778,7 @@ function calculateNutritionScore(
   streaks: StreaksResult,
   recovery: RecoveryRiskResult
 ): number {
-  let score = 50; // Base score
+  let score = 30; // Base score
 
   // Protein compliance (max 25 points)
   score += (proteinCompliance.score / 100) * 25;
@@ -797,7 +791,7 @@ function calculateNutritionScore(
     score += 15;
   } else if (deficitAnalysis.discrepancy <= 20) {
     score += 10;
-  } else {
+  } else if (deficitAnalysis.discrepancy <= 50) {
     score += 5;
   }
 
@@ -827,7 +821,7 @@ export function analyzeNutrition(input: NutritionAnalyticsInput): NutritionAnaly
   const plateau = detectPlateau(input.weightHistory);
   const forecast = forecastProtein(input.foodLogsByDay, input.dailyTargetProtein);
   const stability = analyzeStability(input.foodLogsByDay);
-  const patterns = detectPatterns(input.foodLogsByDay, input.timestampsMeals);
+  const patterns = detectPatterns(input.foodLogsByDay, input.timestampsMeals, input.dailyTargetProtein);
   const recovery = assessRecoveryRisk(input.dailyDeficit, input.avgProtein, input.dailyTargetProtein, input.activityCalories, input.weightHistory, input.dailyTargetCalories, input.foodLogsByDay);
   const weightInterpretation = interpretWeight(input.weightHistory);
   const streaks = calculateStreaks(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein);

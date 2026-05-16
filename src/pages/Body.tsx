@@ -411,7 +411,7 @@ const Body = () => {
                   <Input
                     type="number"
                     step="1"
-                    placeholder="индекс 1-59"
+                    placeholder="индекс 1-20"
                     value={visceralInput}
                     onChange={(e) => setVisceralInput(e.target.value)}
                   />
