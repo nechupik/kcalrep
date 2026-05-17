@@ -14,13 +14,13 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
-import { loadWeight, saveWeight, deleteWeightEntry, loadFullNormData, saveNorm as saveNormToFirestore } from "@/lib/firestore";
+import { loadWeight, saveWeight, deleteWeightEntry, loadFullNormData, saveNorm as saveNormToFirestore, loadActivityRange, loadUserSettings } from "@/lib/firestore";
 import {
   saveBodyComposition,
   loadBodyComposition,
 } from "@/lib/metabolic-firestore";
 import type { BodyCompositionEntry } from "@/lib/metabolic-types";
-import { recalculateNormWithNewWeight } from "@/lib/nutrition";
+import { recalculateNormWithNewWeight, recalculateNormWithBodyComposition, calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 import { toast } from "sonner";
 
 interface WeightData {
@@ -29,6 +29,7 @@ interface WeightData {
   date: string;
 }
 
+const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 const SWIPE_THRESHOLD = 80;
 
 function WeightHistoryRow({
@@ -250,7 +251,54 @@ const Body = () => {
       // Auto-recalculate norm
       const currentNormData = await loadFullNormData(user.uid);
       if (currentNormData && currentNormData.gender) {
-        const newNormResult = recalculateNormWithNewWeight(currentNormData, weight);
+        let newNormResult;
+
+        if (user.uid === ADMIN_UID) {
+          // Admin: use Apple Watch 7-day avg for TDEE
+          const today = new Date();
+          const endDate = today.toISOString().split('T')[0];
+          const startDay = new Date(today);
+          startDay.setDate(today.getDate() - 6);
+          const startDateStr = startDay.toISOString().split('T')[0];
+
+          const [activityEntries, settings] = await Promise.all([
+            loadActivityRange(user.uid, startDateStr, endDate),
+            loadUserSettings(user.uid),
+          ]);
+          const avg = activityEntries.length > 0
+            ? Math.round(activityEntries.reduce((sum, e) => sum + e.caloriesBurned, 0) / activityEntries.length)
+            : 0;
+          const deficitPercent = settings?.deficitPercent ?? 10;
+
+          // Prioritize bmrFromScale: input field → latest saved entry → Mifflin
+          const bmrScaleVal = bmrScaleInput ? parseFloat(bmrScaleInput) : null;
+          const bmrFromSaved = bodyComp.length > 0 && bodyComp[0].bmrFromScale && bodyComp[0].bmrFromScale > 0
+            ? bodyComp[0].bmrFromScale
+            : null;
+          const bmr = (bmrScaleVal && bmrScaleVal > 0)
+            ? bmrScaleVal
+            : bmrFromSaved ?? (currentNormData.gender === 'male'
+              ? 10 * weight + 6.25 * currentNormData.height - 5 * currentNormData.age + 5
+              : 10 * weight + 6.25 * currentNormData.height - 5 * currentNormData.age - 161);
+
+          newNormResult = calculateMacrosWithWatchTDEE(
+            bmr, avg, deficitPercent, weight,
+            currentNormData.gender, currentNormData.height,
+            bodyFatInput ? parseFloat(bodyFatInput) : undefined
+          );
+        } else {
+          const bodyCompForCalc = {
+            bodyFatPercent: bodyFatInput ? parseFloat(bodyFatInput) : undefined,
+            muscleMassKg: muscleInput ? parseFloat(muscleInput) : undefined,
+            visceralFat: visceralInput ? parseFloat(visceralInput) : undefined,
+            bmrFromScale: bmrScaleInput ? parseFloat(bmrScaleInput) : undefined,
+          };
+          const hasBodyComp = Object.values(bodyCompForCalc).some((v) => v != null);
+          newNormResult = hasBodyComp
+            ? recalculateNormWithBodyComposition(currentNormData, weight, bodyCompForCalc)
+            : recalculateNormWithNewWeight(currentNormData, weight);
+        }
+
         await saveNormToFirestore(user.uid, newNormResult, {
           gender: currentNormData.gender,
           height: currentNormData.height,

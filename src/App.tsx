@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -5,17 +6,18 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Index from "./pages/Index.tsx";
-import Auth from "./pages/Auth.tsx";
-import Onboarding from "./pages/Onboarding.tsx";
-import NotFound from "./pages/NotFound.tsx";
-import Stats from "./pages/Stats.tsx";
-import Profile from "./pages/Profile.tsx";
-import Products from "./pages/Products.tsx";
-import Recipes from "./pages/Recipes.tsx";
-import Admin from "./pages/Admin.tsx";
-import Body from "./pages/Body.tsx";
-import Cycle from "./pages/Cycle.tsx";
+
+const Index = lazy(() => import("./pages/Index.tsx"));
+const Auth = lazy(() => import("./pages/Auth.tsx"));
+const Onboarding = lazy(() => import("./pages/Onboarding.tsx"));
+const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const Stats = lazy(() => import("./pages/Stats.tsx"));
+const Profile = lazy(() => import("./pages/Profile.tsx"));
+const Products = lazy(() => import("./pages/Products.tsx"));
+const Recipes = lazy(() => import("./pages/Recipes.tsx"));
+const Admin = lazy(() => import("./pages/Admin.tsx"));
+const Body = lazy(() => import("./pages/Body.tsx"));
+const Cycle = lazy(() => import("./pages/Cycle.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-background"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
@@ -72,6 +75,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

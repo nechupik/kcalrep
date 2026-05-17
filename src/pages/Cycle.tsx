@@ -380,8 +380,6 @@ const Cycle = () => {
                 {config && (
                   <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                     <span>Уверенность: <span className="font-medium">{CONFIDENCE_LABELS[config.predictionConfidence]}</span></span>
-                    <span>·</span>
-                    <span>MAD: {config.mad} дн.</span>
                   </div>
                 )}
               </Card>
@@ -448,7 +446,7 @@ const Cycle = () => {
                   {formatDate(prediction.nextPeriodStart)}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Прогноз: {prediction.predictedCycleLength} дн. цикл, {prediction.predictedBleedingDays} дн. кровотечение
+                  Прогноз: {prediction.predictedCycleLength} дн. цикл, {prediction.predictedBleedingDays} дн.
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   Уверенность: {CONFIDENCE_LABELS[prediction.confidence]} (MAD {prediction.mad} дн.)
@@ -593,7 +591,7 @@ const Cycle = () => {
                             {formatDate(cycle.startDate)} — {formatDate(cycle.endDate)}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5">
-                            {cycle.bleedingDays} дн. кровотечение
+                            {cycle.bleedingDays} дн.
                             {cycle.duration > 0 && ` · Цикл: ${cycle.duration} дн.`}
                             {!cycle.confirmed && (
                               <span className="ml-2 text-yellow-400">прогноз</span>
@@ -630,7 +628,7 @@ const Cycle = () => {
                     <div className="text-xl font-bold">{config.avgCycleLength} дн.</div>
                   </div>
                   <div className="rounded-xl bg-muted/40 p-3 text-center">
-                    <div className="text-xs text-muted-foreground mb-1">Среднее кровотечение</div>
+                    <div className="text-xs text-muted-foreground mb-1">Среднее</div>
                     <div className="text-xl font-bold">{config.avgBleedingDays} дн.</div>
                   </div>
                   <div className="rounded-xl bg-muted/40 p-3 text-center">
@@ -686,7 +684,7 @@ const Cycle = () => {
                     </div>
                     <input
                       type="range"
-                      min={1}
+                      min={0}
                       max={10}
                       value={surveyInputs[key]}
                       onChange={(e) =>
@@ -695,7 +693,10 @@ const Cycle = () => {
                           [key]: Number(e.target.value),
                         }))
                       }
-                      className="w-full accent-foreground"
+                      className="w-full h-2 bg-muted/30 rounded-lg appearance-none cursor-pointer accent-foreground"
+                      style={{
+                        background: 'linear-gradient(to right, #0a0520 0%, #1a0a3d 100%)',
+                      }}
                     />
                     <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
                       <span>
@@ -738,16 +739,6 @@ const Cycle = () => {
               </Button>
             </Card>
 
-            {/* Survey Info */}
-            {cycleState && (
-              <Card className="p-4 bg-card/80 backdrop-blur-sm border-border/50">
-                <p className="text-xs text-muted-foreground">
-                  Данные опроса помогают системе точнее определять фазу цикла и корректировать питание.
-                  Чем чаще вы заполняете опрос, тем точнее прогнозы.
-                  <span className="font-medium"> День цикла: {cycleState.cycleDay}</span>
-                </p>
-              </Card>
-            )}
           </TabsContent>
         </Tabs>
       </section>

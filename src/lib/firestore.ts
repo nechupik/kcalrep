@@ -8,8 +8,10 @@ import {
   query,
   where,
   orderBy,
+  limit,
   getDocs,
   writeBatch,
+  runTransaction,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -66,6 +68,7 @@ export interface ActivityEntry {
 
 export interface UserSettings {
   activityTrackingEnabled: boolean;
+  deficitPercent?: number;
   updatedAt: Timestamp;
 }
 
@@ -212,13 +215,14 @@ export async function saveWeight(userId: string, weight: number, date: string) {
   return docRef.id;
 }
 
-export async function loadWeight(userId: string, limit?: number): Promise<Array<WeightEntry & { id: string }>> {
+export async function loadWeight(userId: string, limitCount?: number): Promise<Array<WeightEntry & { id: string }>> {
   const weightCollection = collection(db, "users", userId, "weight");
-  const q = query(
-    weightCollection,
+  const constraints: Parameters<typeof query>[1][] = [
     orderBy("date", "desc"),
-    orderBy("createdAt", "desc")
-  );
+    orderBy("createdAt", "desc"),
+  ];
+  if (limitCount) constraints.push(limit(limitCount));
+  const q = query(weightCollection, ...constraints);
   
   const querySnapshot = await getDocs(q);
   const entries: Array<WeightEntry & { id: string }> = [];
@@ -233,7 +237,7 @@ export async function loadWeight(userId: string, limit?: number): Promise<Array<
     });
   });
   
-  return limit ? entries.slice(0, limit) : entries;
+  return entries;
 }
 
 export async function deleteWeightEntry(userId: string, entryId: string): Promise<void> {
@@ -308,30 +312,31 @@ export async function updateUsageStat(
   item: { id: string; name: string; type: 'product' | 'recipe'; amount: number }
 ) {
   const statDoc = doc(db, 'users', userId, 'usage_stats', item.id);
-  const existing = await getDoc(statDoc);
-
-  if (existing.exists()) {
-    const data = existing.data() as UsageStat;
-    const newCount = data.usageCount + 1;
-    const newAvg = Math.round((data.avgAmount * data.usageCount + item.amount) / newCount);
-    await setDoc(statDoc, {
-      ...data,
-      usageCount: newCount,
-      lastUsedAt: Timestamp.now(),
-      avgAmount: newAvg,
-      lastAmount: item.amount,
-    });
-  } else {
-    await setDoc(statDoc, {
-      productId: item.id,
-      productName: item.name,
-      productType: item.type,
-      usageCount: 1,
-      lastUsedAt: Timestamp.now(),
-      avgAmount: item.amount,
-      lastAmount: item.amount,
-    });
-  }
+  await runTransaction(db, async (transaction) => {
+    const existing = await transaction.get(statDoc);
+    if (existing.exists()) {
+      const data = existing.data() as UsageStat;
+      const newCount = data.usageCount + 1;
+      const newAvg = Math.round((data.avgAmount * data.usageCount + item.amount) / newCount);
+      transaction.set(statDoc, {
+        ...data,
+        usageCount: newCount,
+        lastUsedAt: Timestamp.now(),
+        avgAmount: newAvg,
+        lastAmount: item.amount,
+      });
+    } else {
+      transaction.set(statDoc, {
+        productId: item.id,
+        productName: item.name,
+        productType: item.type,
+        usageCount: 1,
+        lastUsedAt: Timestamp.now(),
+        avgAmount: item.amount,
+        lastAmount: item.amount,
+      });
+    }
+  });
 }
 
 export async function loadUsageStats(userId: string): Promise<UsageStat[]> {
@@ -420,6 +425,13 @@ export async function loadActivityRange(userId: string, startDate: string, endDa
   return snapshot.docs.map(doc => doc.data() as ActivityEntry);
 }
 
+export async function loadLatestActivityEntries(userId: string, limitCount: number): Promise<ActivityEntry[]> {
+  const activityCol = collection(db, 'users', userId, 'activity');
+  const q = query(activityCol, orderBy('date', 'desc'), limit(limitCount));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as ActivityEntry);
+}
+
 export async function saveUserSettings(userId: string, settings: Omit<UserSettings, 'updatedAt'>): Promise<void> {
   const settingsDoc = doc(db, 'users', userId, 'settings', 'main');
   await setDoc(settingsDoc, {
@@ -438,46 +450,15 @@ export async function loadUserSettings(userId: string): Promise<UserSettings | n
 // Admin functions for deleting all user data
 export async function deleteAllDiaryEntries(): Promise<{ deleted: number; error?: string }> {
   try {
-    console.log('deleteAllDiaryEntries: Starting...');
-    console.log('Firebase config:', {
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
-    });
-    console.log('Database instance:', db);
-    
-    // Проверяем существование коллекции users
     const usersSnap = await getDocs(collection(db, 'users'));
-    console.log(`deleteAllDiaryEntries: Found ${usersSnap.size} users`);
-    console.log('Users query snapshot metadata:', usersSnap.metadata);
-    
-    if (usersSnap.size === 0) {
-      console.log('No users found. Checking if collection exists...');
-      // Проверяем есть ли вообще коллекция users
-      try {
-        const testDoc = await getDoc(doc(db, 'users', '_test'));
-        console.log('Test doc exists:', testDoc.exists());
-      } catch (e) {
-        console.log('Collection users might not exist:', e);
-      }
-      
-      // Проверяем shared collections для сравнения
-      const sharedProductsSnap = await getDocs(collection(db, 'shared_products'));
-      const sharedRecipesSnap = await getDocs(collection(db, 'shared_recipes'));
-      console.log(`Shared products: ${sharedProductsSnap.size}, Shared recipes: ${sharedRecipesSnap.size}`);
-    }
-    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
-      console.log(`deleteAllDiaryEntries: Processing user ${userDoc.id}`);
       const diarySnap = await getDocs(collection(db, 'users', userDoc.id, 'diary'));
       const docs = diarySnap.docs;
-      console.log(`deleteAllDiaryEntries: User ${userDoc.id} has ${docs.length} diary entries`);
       
-      // Разбиваем на чанки по 400
       for (let i = 0; i < docs.length; i += 400) {
         const chunk = docs.slice(i, i + 400);
-        console.log(`deleteAllDiaryEntries: Deleting chunk ${Math.floor(i/400) + 1} with ${chunk.length} documents`);
         const batch = writeBatch(db);
         chunk.forEach(d => batch.delete(d.ref));
         await batch.commit();
@@ -485,7 +466,6 @@ export async function deleteAllDiaryEntries(): Promise<{ deleted: number; error?
       }
     }
     
-    console.log(`deleteAllDiaryEntries: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all diary entries:', error);
@@ -535,22 +515,13 @@ export async function deleteAllRecipes(): Promise<{ deleted: number; error?: str
 
 export async function deleteAllWeight(): Promise<{ deleted: number; error?: string }> {
   try {
-    console.log('deleteAllWeight: Starting...');
     const usersSnap = await getDocs(collection(db, 'users'));
-    console.log(`deleteAllWeight: Found ${usersSnap.size} users`);
-    
-    if (usersSnap.size === 0) {
-      console.log('No users found for weight deletion');
-    }
-    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
       const weightSnap = await getDocs(collection(db, 'users', userDoc.id, 'weight'));
       const docs = weightSnap.docs;
-      console.log(`deleteAllWeight: User ${userDoc.id} has ${docs.length} weight entries`);
       
-      // Разбиваем на чанки по 400
       for (let i = 0; i < docs.length; i += 400) {
         const chunk = docs.slice(i, i + 400);
         const batch = writeBatch(db);
@@ -560,7 +531,6 @@ export async function deleteAllWeight(): Promise<{ deleted: number; error?: stri
       }
     }
     
-    console.log(`deleteAllWeight: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all weight entries:', error);
@@ -570,31 +540,19 @@ export async function deleteAllWeight(): Promise<{ deleted: number; error?: stri
 
 export async function deleteAllNormData(): Promise<{ deleted: number; error?: string }> {
   try {
-    console.log('deleteAllNormData: Starting...');
     const usersSnap = await getDocs(collection(db, 'users'));
-    console.log(`deleteAllNormData: Found ${usersSnap.size} users`);
-    
-    if (usersSnap.size === 0) {
-      console.log('No users found for norm deletion');
-    }
-    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
-      console.log(`deleteAllNormData: Processing user ${userDoc.id}`);
       const normDoc = doc(db, 'users', userDoc.id, 'norm', 'main');
       const normSnap = await getDoc(normDoc);
       
       if (normSnap.exists()) {
         await deleteDoc(normDoc);
         totalDeleted++;
-        console.log(`deleteAllNormData: Deleted norm for user ${userDoc.id}`);
-      } else {
-        console.log(`deleteAllNormData: No norm found for user ${userDoc.id}`);
       }
     }
     
-    console.log(`deleteAllNormData: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all norm data:', error);
@@ -604,22 +562,13 @@ export async function deleteAllNormData(): Promise<{ deleted: number; error?: st
 
 export async function deleteAllActivityData(): Promise<{ deleted: number; error?: string }> {
   try {
-    console.log('deleteAllActivityData: Starting...');
     const usersSnap = await getDocs(collection(db, 'users'));
-    console.log(`deleteAllActivityData: Found ${usersSnap.size} users`);
-    
-    if (usersSnap.size === 0) {
-      console.log('No users found for activity deletion');
-    }
-    
     let totalDeleted = 0;
 
     for (const userDoc of usersSnap.docs) {
       const activitySnap = await getDocs(collection(db, 'users', userDoc.id, 'activity'));
       const docs = activitySnap.docs;
-      console.log(`deleteAllActivityData: User ${userDoc.id} has ${docs.length} activity entries`);
       
-      // Разбиваем на чанки по 400
       for (let i = 0; i < docs.length; i += 400) {
         const chunk = docs.slice(i, i + 400);
         const batch = writeBatch(db);
@@ -629,7 +578,6 @@ export async function deleteAllActivityData(): Promise<{ deleted: number; error?
       }
     }
     
-    console.log(`deleteAllActivityData: Completed. Total deleted: ${totalDeleted}`);
     return { deleted: totalDeleted };
   } catch (error) {
     console.error('Error deleting all activity data:', error);

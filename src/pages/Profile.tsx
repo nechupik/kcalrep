@@ -24,11 +24,12 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm, saveNorm } from "@/lib/storage";
-import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight } from "@/lib/firestore";
+import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight, loadActivityRange } from "@/lib/firestore";
+import { loadBodyComposition } from "@/lib/metabolic-firestore";
 import type { CalcInput, MacroResult } from "@/lib/nutrition";
 import { updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { calculateMacros } from "@/lib/nutrition";
+import { calculateMacros, calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 
 const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 
@@ -55,6 +56,9 @@ const Profile = () => {
   const [manualCarbs, setManualCarbs] = useState('');
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [storedProfileData, setStoredProfileData] = useState<any>(null);
+  const [deficitPercent, setDeficitPercent] = useState(10);
+  const [adminRecalculating, setAdminRecalculating] = useState(false);
+  const [avgWatchCalories, setAvgWatchCalories] = useState<number | null>(null);
 
   useEffect(() => {
     const loadNormData = async () => {
@@ -71,7 +75,10 @@ const Profile = () => {
       // Load user settings
       if (user) {
         const settings = await loadUserSettings(user.uid);
-        if (settings) setActivityEnabled(settings.activityTrackingEnabled ?? true);
+        if (settings) {
+          setActivityEnabled(settings.activityTrackingEnabled ?? true);
+          setDeficitPercent(settings.deficitPercent ?? 10);
+        }
 
         // Load stored profile data (gender, age, height)
         const profileData = await loadFullNormData(user.uid);
@@ -202,12 +209,68 @@ const Profile = () => {
     try {
       await saveUserSettings(user.uid, {
         activityTrackingEnabled: activityEnabled,
+        deficitPercent,
       });
       toast.success('Настройки сохранены');
     } catch (error) {
       toast.error('Ошибка сохранения настроек');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleAdminWatchRecalculate = async () => {
+    if (!user || !storedProfileData) return;
+    setAdminRecalculating(true);
+    try {
+      const today = new Date();
+      const endDate = today.toISOString().split('T')[0];
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 6);
+      const startDateStr = startDate.toISOString().split('T')[0];
+
+      const activityEntries = await loadActivityRange(user.uid, startDateStr, endDate);
+      const avg = activityEntries.length > 0
+        ? Math.round(activityEntries.reduce((sum, e) => sum + e.caloriesBurned, 0) / activityEntries.length)
+        : 0;
+      setAvgWatchCalories(avg);
+
+      const [weightEntries, latestBodyComp] = await Promise.all([
+        loadWeight(user.uid, 1),
+        loadBodyComposition(user.uid, 1),
+      ]);
+      const weight = weightEntries.length > 0 ? weightEntries[0].weight : 80;
+
+      const bmrFromScale = latestBodyComp.length > 0 && latestBodyComp[0].bmrFromScale && latestBodyComp[0].bmrFromScale > 0
+        ? latestBodyComp[0].bmrFromScale
+        : null;
+      const bmr = bmrFromScale ?? (storedProfileData.gender === 'male'
+        ? 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age + 5
+        : 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age - 161);
+
+      const newNorm = calculateMacrosWithWatchTDEE(
+        bmr,
+        avg,
+        deficitPercent,
+        weight,
+        storedProfileData.gender,
+        storedProfileData.height
+      );
+
+      await saveNorm(newNorm, {
+        gender: storedProfileData.gender,
+        height: storedProfileData.height,
+        age: storedProfileData.age,
+        goal: storedProfileData.goal || 'lose',
+      });
+      await saveUserSettings(user.uid, { activityTrackingEnabled: activityEnabled, deficitPercent });
+      setNorm(newNorm);
+      toast.success(`Норма пересчитана: ${newNorm.calories} ккал (${activityEntries.length} дн. Apple Watch, ср. ${avg} ккал)`);
+    } catch (error) {
+      console.error(error);
+      toast.error('Ошибка пересчёта');
+    } finally {
+      setAdminRecalculating(false);
     }
   };
 
@@ -412,6 +475,49 @@ const Profile = () => {
                     <NormStat label="ЖИРЫ" value={`${norm.fat}`} unit="г" colorClass="text-macro-fat" />
                     <NormStat label="УГЛЕВОДЫ" value={`${norm.carbs}`} unit="г" colorClass="text-macro-carbs" />
                   </div>
+
+                  {/* Deficit slider — visible for all users */}
+                  <div className="mb-4 pt-3 border-t border-border/30">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">Дефицит калорий</span>
+                      <span className="text-sm font-bold">{deficitPercent}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={10}
+                      max={15}
+                      step={1}
+                      value={deficitPercent}
+                      onChange={(e) => setDeficitPercent(Number(e.target.value))}
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-foreground"
+                      style={{ background: 'linear-gradient(to right, #0a0520 0%, #1a0a3d 100%)' }}
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
+                      <span>10%</span>
+                      <span>15%</span>
+                    </div>
+                  </div>
+
+                  {/* Apple Watch recalculation — admin only */}
+                  {user?.uid === ADMIN_UID && (
+                    <div className="mb-4 p-3 rounded-xl bg-muted/20 border border-border/30">
+                      <div className="text-xs font-medium mb-0.5">Apple Watch норма</div>
+                      <div className="text-xs text-muted-foreground mb-3">
+                        TDEE = BMR + средняя активность за 7 дней
+                        {avgWatchCalories !== null && (
+                          <span className="ml-1 text-foreground font-medium">(ср. {avgWatchCalories} ккал/день)</span>
+                        )}
+                      </div>
+                      <Button
+                        onClick={handleAdminWatchRecalculate}
+                        disabled={adminRecalculating}
+                        className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground font-semibold shadow-glow hover:opacity-90"
+                      >
+                        {adminRecalculating ? 'Пересчитываю...' : 'Пересчитать с Apple Watch'}
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="flex justify-center items-center">
                     <Button
                       variant="outline"

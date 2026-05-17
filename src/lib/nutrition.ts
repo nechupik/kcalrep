@@ -123,7 +123,7 @@ export function calculateMacros(input: CalcInput): MacroResult {
   const calories = Math.round(tdee * goalMultiplier);
 
   const bmi = weight / ((height / 100) ** 2);
-  const proteinPerKg = gender === 'female' ? 1.8 : 2.0;
+  const proteinPerKg = gender === 'female' ? 1.8 : 2.3;
   const rawProtein = Math.round(weight * proteinPerKg);
   const protein = bmi > 30
     ? Math.round(Math.min(rawProtein, weight * 1.6))
@@ -187,6 +187,158 @@ export function recalculateNormWithNewWeight(
   };
   // Use the same calculation as Profile calculator
   return calculateMacros(input);
+}
+
+export interface BodyCompInput {
+  bodyFatPercent?: number;
+  muscleMassKg?: number;   // stored for trend only, not used in protein calc
+  visceralFat?: number;
+  bmrFromScale?: number;
+}
+
+export function recalculateNormWithBodyComposition(
+  currentNorm: any,
+  newWeight: number,
+  bodyComp: BodyCompInput
+): MacroResult {
+  const gender: Gender = currentNorm.gender;
+  const age: number = currentNorm.age;
+  const height: number = currentNorm.height;
+  const goal: Goal = currentNorm.goal as Goal;
+
+  const { bodyFatPercent, visceralFat, bmrFromScale } = bodyComp;
+
+  // ── Step 1: BMR (priority: scale → Katch-McArdle → Mifflin) ──────────────
+  let bmr: number;
+  let lbm: number | null = null;
+
+  if (bmrFromScale && bmrFromScale > 0) {
+    bmr = bmrFromScale;
+    if (bodyFatPercent != null) {
+      lbm = newWeight * (1 - bodyFatPercent / 100);
+    }
+  } else if (bodyFatPercent != null) {
+    lbm = newWeight * (1 - bodyFatPercent / 100);
+    bmr = 370 + 21.6 * lbm;
+  } else {
+    bmr =
+      gender === "male"
+        ? 10 * newWeight + 6.25 * height - 5 * age + 5
+        : 10 * newWeight + 6.25 * height - 5 * age - 161;
+  }
+
+  // ── Step 2: TDEE (sedentary — same as profile calculator) ────────────────
+  const activityFactor = ACTIVITY_FACTOR["sedentary"];
+  const tdee = bmr * activityFactor;
+
+  // ── Step 3: Calories ──────────────────────────────────────────────────────
+  const goalMultiplier = 1 + GOAL_ADJUSTMENT[goal];
+  let finalCalories = Math.round(tdee * goalMultiplier);
+
+  const minCalories = gender === "female" ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE;
+  let warning: string | undefined;
+  if (finalCalories < minCalories) {
+    finalCalories = minCalories;
+    warning =
+      gender === "female"
+        ? "Калораж близок к минимуму для женского здоровья. Рекомендуем увеличить активность."
+        : "Калораж близок к минимуму. Рекомендуем увеличить активность.";
+  }
+
+  // ── Step 4: Protein ───────────────────────────────────────────────────────
+  // Use LBM (from % fat) for protein — scale "muscle mass" is NOT skeletal muscle.
+  // LBM ≈ scale muscle + bone (~3–4 kg), so using % fat → LBM is more reliable.
+  let protein: number;
+  if (lbm != null) {
+    const lbmProteinPerKg = gender === "female" ? 2.2 : 2.3;
+    protein = Math.round(lbm * lbmProteinPerKg);
+  } else {
+    const bmi = newWeight / (height / 100) ** 2;
+    const proteinPerKg = gender === "female" ? 1.8 : 2.3;
+    const rawProtein = Math.round(newWeight * proteinPerKg);
+    protein = bmi > 30 ? Math.round(Math.min(rawProtein, newWeight * 1.6)) : rawProtein;
+  }
+
+  // ── Step 5: Fat ───────────────────────────────────────────────────────────
+  const fatFromPercent = Math.round((finalCalories * 0.27) / 9);
+  const minFat = Math.round(newWeight * (gender === "female" ? 1.1 : 1.0));
+  const fat = Math.max(fatFromPercent, minFat);
+
+  // ── Step 6: Carbs + visceral fat correction ───────────────────────────────
+  let carbs = Math.max(0, Math.round((finalCalories - protein * 4 - fat * 9) / 4));
+
+  if (visceralFat != null && visceralFat >= 10) {
+    const reduction = visceralFat >= 15 ? 0.70 : 0.85;
+    const newCarbs = Math.max(50, Math.round(carbs * reduction));
+    const savedKcal = (carbs - newCarbs) * 4;
+    carbs = newCarbs;
+    protein = Math.round(protein + savedKcal / 4);
+  }
+
+  return {
+    calories: finalCalories,
+    protein,
+    fat,
+    carbs,
+    bmr: Math.round(bmr),
+    tdee: Math.round(tdee),
+    activityFactor,
+    activityLabel: "sedentary",
+    goalMultiplier,
+    warning,
+  };
+}
+
+export function calculateMacrosWithWatchTDEE(
+  bmr: number,
+  avgWatchCalories: number,
+  deficitPercent: number,
+  weight: number,
+  gender: Gender,
+  height: number,
+  bodyFatPercent?: number
+): MacroResult {
+  const tdee = bmr + avgWatchCalories;
+  const goalMultiplier = 1 - deficitPercent / 100;
+  let finalCalories = Math.round(tdee * goalMultiplier);
+
+  const minCalories = gender === 'female' ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE;
+  let warning: string | undefined;
+  if (finalCalories < minCalories) {
+    finalCalories = minCalories;
+    warning = 'Калораж близок к минимуму. Рекомендуем увеличить активность.';
+  }
+
+  let protein: number;
+  if (bodyFatPercent != null) {
+    const lbm = weight * (1 - bodyFatPercent / 100);
+    const lbmProteinPerKg = gender === 'female' ? 2.2 : 2.3;
+    protein = Math.round(lbm * lbmProteinPerKg);
+  } else {
+    const bmi = weight / ((height / 100) ** 2);
+    const proteinPerKg = gender === 'female' ? 1.8 : 2.3;
+    const rawProtein = Math.round(weight * proteinPerKg);
+    protein = bmi > 30 ? Math.round(Math.min(rawProtein, weight * 1.6)) : rawProtein;
+  }
+
+  const fatFromPercent = Math.round((finalCalories * 0.27) / 9);
+  const minFat = Math.round(weight * (gender === 'female' ? 1.1 : 1.0));
+  const fat = Math.max(fatFromPercent, minFat);
+
+  const carbs = Math.max(0, Math.round((finalCalories - protein * 4 - fat * 9) / 4));
+
+  return {
+    calories: finalCalories,
+    protein,
+    fat,
+    carbs,
+    bmr: Math.round(bmr),
+    tdee: Math.round(tdee),
+    activityFactor: parseFloat((tdee / bmr).toFixed(2)),
+    activityLabel: 'active',
+    goalMultiplier,
+    warning,
+  };
 }
 
 // База продуктов (значения на 100 г)

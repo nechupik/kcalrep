@@ -15,12 +15,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   loadDiary,
   loadNorm,
+  saveNorm,
   addDiaryEntry,
   removeDiaryEntry,
   updateDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
-import { saveActivity, loadActivity, loadWeight, loadFullNormData, loadUserSettings, wasWeightEnteredThisWeek, type ActivityEntry } from "@/lib/firestore";
+import { saveActivity, loadActivity, loadWeight, loadFullNormData, loadUserSettings, wasWeightEnteredThisWeek, loadLatestActivityEntries, type ActivityEntry } from "@/lib/firestore";
+import { loadBodyComposition } from "@/lib/metabolic-firestore";
+import { calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 import type { MacroResult } from "@/lib/nutrition";
 
 const Index = () => {
@@ -32,6 +35,7 @@ const Index = () => {
   const [activityInput, setActivityInput] = useState('');
   const [savingActivity, setSavingActivity] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
+  const [activityCardHiding, setActivityCardHiding] = useState(false);
   const [showWeightReminder, setShowWeightReminder] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -89,6 +93,7 @@ const Index = () => {
       setNorm(normData);
       setEntries(Array.isArray(diaryData) ? diaryData : []);
       setActivity(activityData);
+      setActivityCardHiding(false);
       if (settings) setActivityEnabled(settings.activityTrackingEnabled);
       if (activityData) {
         if (activityData.type === 'calories') setActivityInput(String(activityData.value));
@@ -241,7 +246,48 @@ const Index = () => {
 
       const updated = await loadActivity(user.uid, selectedDate);
       setActivity(updated);
-      toast.success('Активность сохранена');
+
+      // Admin: start hide animation, remove from DOM after 650ms
+      if (user.uid === ADMIN_UID) {
+        setActivityCardHiding(true);
+        setTimeout(() => setActivityCardHiding(false), 650);
+      }
+
+      // Admin: auto-recalculate floating norm from last 7 activity entries
+      if (user.uid === ADMIN_UID) {
+        try {
+          const [latestActivities, normData, weightEntries, latestBodyComp, settings] = await Promise.all([
+            loadLatestActivityEntries(user.uid, 7),
+            loadFullNormData(user.uid),
+            loadWeight(user.uid, 1),
+            loadBodyComposition(user.uid, 1),
+            loadUserSettings(user.uid),
+          ]);
+
+          if (normData && normData.gender && latestActivities.length > 0) {
+            const avg = Math.round(latestActivities.reduce((sum, e) => sum + e.caloriesBurned, 0) / latestActivities.length);
+            const w = weightEntries.length > 0 ? weightEntries[0].weight : 80;
+            const deficitPct = settings?.deficitPercent ?? 10;
+            const bmrFromScale = latestBodyComp.length > 0 && latestBodyComp[0].bmrFromScale && latestBodyComp[0].bmrFromScale > 0
+              ? latestBodyComp[0].bmrFromScale
+              : null;
+            const bmr = bmrFromScale ?? (normData.gender === 'male'
+              ? 10 * w + 6.25 * normData.height - 5 * normData.age + 5
+              : 10 * w + 6.25 * normData.height - 5 * normData.age - 161);
+
+            const newNorm = calculateMacrosWithWatchTDEE(bmr, avg, deficitPct, w, normData.gender, normData.height);
+            await saveNorm(newNorm, { gender: normData.gender, height: normData.height, age: normData.age, goal: normData.goal || 'lose' });
+            setNorm(newNorm);
+            toast.success(`Активность сохранена. Норма обновлена: ${newNorm.calories} ккал (ср. ${avg} ккал/день)`);
+          } else {
+            toast.success('Активность сохранена');
+          }
+        } catch {
+          toast.success('Активность сохранена');
+        }
+      } else {
+        toast.success('Активность сохранена');
+      }
     } catch (error) {
       toast.error('Ошибка сохранения активности');
     } finally {
@@ -358,10 +404,15 @@ const Index = () => {
 
         {/* Activity Tracking */}
         <section className="container max-w-5xl mb-4">
-          {norm && (user?.uid === ADMIN_UID || activityEnabled) && (
+          {norm && (user?.uid === ADMIN_UID || activityEnabled) && !(user?.uid === ADMIN_UID && activity && !activityCardHiding) && (
+            <div style={{
+              opacity: activityCardHiding ? 0 : 1,
+              transform: activityCardHiding ? 'translateY(-6px)' : 'translateY(0)',
+              transition: 'opacity 650ms ease-in-out, transform 650ms ease-in-out',
+            }}>
             <Card className="w-full p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
             <div className="flex items-center gap-2 mb-4">
-              <h3 className="font-semibold">Активность за день</h3>
+              <h3 className="font-semibold">Активность за вчера</h3>
               {activity && (
                 <span className="ml-auto text-sm font-semibold text-green-400">
                   +{activity.caloriesBurned} ккал
@@ -410,6 +461,7 @@ const Index = () => {
             )}
 
           </Card>
+          </div>
           )}
         </section>
 
