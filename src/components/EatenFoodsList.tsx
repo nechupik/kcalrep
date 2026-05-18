@@ -60,6 +60,7 @@ export const EatenFoodsList = ({ entries, onRemove, onEdit, className }: EatenFo
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{e.name}</div>
                 <div className="text-xs text-muted-foreground">
+                  {e.addedAt ? (() => { const d = new Date(e.addedAt); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} · `; })() : ''}
                   {e.grams > 1 ? `${e.grams}г · ` : '1 порция · '}
                   <span className="text-macro-calories font-semibold">{e.calories}</span> ккал ·
                   Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г

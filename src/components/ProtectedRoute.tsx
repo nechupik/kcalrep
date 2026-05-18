@@ -29,8 +29,8 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }, [user, loading, navigate, location.pathname]);
 
   if (loading || checking) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-muted-foreground">Загрузка...</div>
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
