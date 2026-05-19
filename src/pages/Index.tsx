@@ -21,7 +21,7 @@ import {
   updateDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
-import { saveActivity, loadActivity, loadWeight, loadFullNormData, loadUserSettings, wasWeightEnteredThisWeek, loadLatestActivityEntries, type ActivityEntry } from "@/lib/firestore";
+import { saveActivity, loadActivity, loadWeight, loadFullNormData, loadUserSettings, loadLatestActivityEntries, type ActivityEntry } from "@/lib/firestore";
 import { loadBodyComposition } from "@/lib/metabolic-firestore";
 import { calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 import type { MacroResult } from "@/lib/nutrition";
@@ -29,6 +29,7 @@ import type { MacroResult } from "@/lib/nutrition";
 const Index = () => {
   const { user } = useAuth();
   const ADMIN_UID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
+  const [loading, setLoading] = useState(true);
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [activity, setActivity] = useState<ActivityEntry | null>(null);
@@ -36,7 +37,6 @@ const Index = () => {
   const [savingActivity, setSavingActivity] = useState(false);
   const [activityEnabled, setActivityEnabled] = useState(true);
   const [activityCardHiding, setActivityCardHiding] = useState(false);
-  const [showWeightReminder, setShowWeightReminder] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editModalAnimationState, setEditModalAnimationState] = useState<'enter' | 'exit' | null>(null);
@@ -83,26 +83,27 @@ const Index = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user) return;
-      
-      const normData = await loadNorm();
-      const diaryData = await loadDiary(selectedDate);
-      const activityData = await loadActivity(user.uid, selectedDate);
-      const settings = await loadUserSettings(user.uid);
-      
-      setNorm(normData);
-      setEntries(Array.isArray(diaryData) ? diaryData : []);
-      setActivity(activityData);
-      setActivityCardHiding(false);
-      if (settings) setActivityEnabled(settings.activityTrackingEnabled);
-      if (activityData) {
-        if (activityData.type === 'calories') setActivityInput(String(activityData.value));
-        if (activityData.type === 'steps') setActivityInput(String(activityData.value));
+      if (!user) { setLoading(false); return; }
+      try {
+        const [normData, diaryData, activityData, settings] = await Promise.all([
+          loadNorm(),
+          loadDiary(selectedDate),
+          loadActivity(user.uid, selectedDate),
+          loadUserSettings(user.uid),
+        ]);
+        
+        setNorm(normData);
+        setEntries(Array.isArray(diaryData) ? diaryData : []);
+        setActivity(activityData);
+        setActivityCardHiding(false);
+        if (settings) setActivityEnabled(settings.activityTrackingEnabled);
+        if (activityData) {
+          if (activityData.type === 'calories') setActivityInput(String(activityData.value));
+          if (activityData.type === 'steps') setActivityInput(String(activityData.value));
+        }
+      } finally {
+        setLoading(false);
       }
-      
-      // Check if weight reminder should be shown
-      const weightEnteredThisWeek = await wasWeightEnteredThisWeek(user.uid);
-      setShowWeightReminder(!weightEnteredThisWeek);
     };
     
     loadData();
@@ -325,38 +326,28 @@ const Index = () => {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   })();
 
+  if (loading) return (
+    <div className="min-h-screen bg-background">
+      <AppHeader />
+      <div className="container max-w-5xl mt-4 mb-4 space-y-4">
+        <div className="rounded-2xl bg-card/80 border border-border/50 p-6 md:p-8 animate-pulse">
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-44 h-44 rounded-full bg-muted/60" />
+            <div className="w-full space-y-3">
+              <div className="h-3 rounded-full bg-muted/60 w-3/4 mx-auto" />
+              <div className="h-3 rounded-full bg-muted/60 w-1/2 mx-auto" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <div className="min-h-screen">
         <AppHeader />
 
-        
-        {/* Weight Reminder */}
-        {showWeightReminder && (
-          <section className="container max-w-5xl mt-4 mb-4">
-            <Card className="p-4 border-yellow-500/50 bg-yellow-500/10 backdrop-blur-sm shadow-soft">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">⚖️</span>
-                  <div>
-                    <p className="text-sm font-semibold">Не забудь внести вес!</p>
-                    <p className="text-xs text-muted-foreground">
-                      Обновляй вес раз в неделю — это помогает точнее считать норму КБЖУ.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20 shrink-0"
-                >
-                  <Link to="/stats">Внести</Link>
-                </Button>
-              </div>
-            </Card>
-          </section>
-        )}
 
         {/* Daily progress */}
         <section className="container max-w-5xl mt-4 mb-4">

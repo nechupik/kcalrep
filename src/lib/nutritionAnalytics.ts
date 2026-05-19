@@ -519,13 +519,12 @@ function detectPatterns(
  * - deficit >35% TDEE
  * - protein <70% of target
  * - weight loss >1% per week
- * - continues >7 days
+ * - sustained for 14+ tracked days
  */
 function assessRecoveryRisk(
   dailyDeficit: number[],
   avgProtein: number,
   targetProtein: number,
-  activityCalories: number[],
   weightHistory: NutritionAnalyticsInput['weightHistory'],
   targetCalories: number,
   foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay']
@@ -567,7 +566,7 @@ function assessRecoveryRisk(
   if (deficitPercent > 35) riskFactors++;
   if (proteinRatio < 0.70) riskFactors++;
   if (weeklyLossRate > 0.01) riskFactors++; // >1% per week
-  if (daysDiff >= 7) riskFactors++;
+  if (daysWithData.length >= 14) riskFactors++; // sustained for 2+ weeks
 
   let riskLevel: 'none' | 'low' | 'medium' | 'high';
   let explanation: string;
@@ -822,7 +821,7 @@ export function analyzeNutrition(input: NutritionAnalyticsInput): NutritionAnaly
   const forecast = forecastProtein(input.foodLogsByDay, input.dailyTargetProtein);
   const stability = analyzeStability(input.foodLogsByDay);
   const patterns = detectPatterns(input.foodLogsByDay, input.timestampsMeals, input.dailyTargetProtein);
-  const recovery = assessRecoveryRisk(input.dailyDeficit, input.avgProtein, input.dailyTargetProtein, input.activityCalories, input.weightHistory, input.dailyTargetCalories, input.foodLogsByDay);
+  const recovery = assessRecoveryRisk(input.dailyDeficit, input.avgProtein, input.dailyTargetProtein, input.weightHistory, input.dailyTargetCalories, input.foodLogsByDay);
   const weightInterpretation = interpretWeight(input.weightHistory);
   const streaks = calculateStreaks(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein);
   const dailyVerdict = generateDailyVerdict(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein, plateau, proteinCompliance);
