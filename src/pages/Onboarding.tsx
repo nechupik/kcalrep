@@ -21,22 +21,18 @@ export const Onboarding = () => {
   };
 
   const handleSaveNorm = async () => {
-    console.log('handleSaveNorm called', { result, input });
     if (!result || !input) {
-      console.log('No result or input, returning');
       return;
     }
 
     setIsSaving(true);
     try {
-      console.log('Calling saveNorm...');
       await saveNorm(result, {
         gender: input.gender,
         height: input.height,
         age: input.age,
         goal: input.goal,
       });
-      console.log('saveNorm completed successfully');
       setIsSaved(true);
       toast.success("Норма КБЖУ сохранена!");
       

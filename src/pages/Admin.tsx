@@ -79,10 +79,7 @@ const Admin = () => {
   const handleDeleteAllDiaryEntries = async () => {
     setDeleting('diary');
     try {
-      console.log('Starting deleteAllDiaryEntries...');
-      console.log('Current user:', user);
       const result = await deleteAllDiaryEntries();
-      console.log('Delete result:', result);
       if (result.error) {
         toast.error(`Ошибка удаления записей дневника: ${result.error}`);
       } else {
