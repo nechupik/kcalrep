@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { UserDataViewer } from "@/components/UserDataViewer";
-import { BarChart3, TrendingUp, Activity, X, Eye, Brain } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, X, Eye, Brain, Clock } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -124,18 +124,6 @@ const Stats = () => {
     loadData();
   }, [user]);
 
-  // Reference to current norm data
-  const [currentNorm, setCurrentNorm] = useState<any>(null);
-
-  useEffect(() => {
-    const loadCurrentNorm = async () => {
-      if (!user) return;
-      const normData = await loadFullNormData(user.uid);
-      setCurrentNorm(normData);
-    };
-    loadCurrentNorm();
-  }, [user]);
-
   // Load and calculate analytics when data changes
   useEffect(() => {
     const calculateAnalytics = async () => {
@@ -243,9 +231,11 @@ const Stats = () => {
           ? activeDays.reduce((sum, d) => sum + d.carbs, 0) / activeDays.length
           : 0;
 
+        const normData = await loadFullNormData(user.uid);
+
         const analyticsInput: NutritionAnalyticsInput = {
           currentWeight,
-          targetWeight: currentNorm?.goal === 'lose' ? currentWeight - 5 : undefined,
+          targetWeight: normData?.goal === 'lose' ? currentWeight - 5 : undefined,
           avgCalories,
           avgProtein,
           avgFat,
@@ -275,7 +265,7 @@ const Stats = () => {
     if (norm) {
       calculateAnalytics();
     }
-  }, [norm, user, currentNorm]);
+  }, [norm, user]);
 
   useEffect(() => {
     const loadMonthlyDetail = async () => {
@@ -412,6 +402,72 @@ const Stats = () => {
         weight: entry.weight,
       }));
   }, [weightEntries]);
+
+  // Meal timing analytics
+  const mealTimingData = useMemo(() => {
+    if (entries.length === 0) return null;
+
+    const hourTotals: Record<number, number> = {};
+    const activeDays = new Set<string>();
+    const dailyFirstLast: Record<string, { first: number; last: number }> = {};
+
+    entries.forEach(e => {
+      if (!e.addedAt) return;
+      const dt = new Date(e.addedAt);
+      const hour = dt.getHours();
+      const mins = hour * 60 + dt.getMinutes();
+
+      hourTotals[hour] = (hourTotals[hour] || 0) + e.calories;
+      activeDays.add(e.date);
+
+      if (!dailyFirstLast[e.date]) {
+        dailyFirstLast[e.date] = { first: mins, last: mins };
+      } else {
+        if (mins < dailyFirstLast[e.date].first) dailyFirstLast[e.date].first = mins;
+        if (mins > dailyFirstLast[e.date].last) dailyFirstLast[e.date].last = mins;
+      }
+    });
+
+    const daysCount = activeDays.size || 1;
+    const fmt = (mins: number) =>
+      `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+
+    const chartData = Array.from({ length: 19 }, (_, i) => {
+      const h = i + 5;
+      return { hour: `${h}:00`, calories: Math.round((hourTotals[h] || 0) / daysCount) };
+    });
+
+    // Exclude today from avg calculations — today is incomplete (user may not have logged evening meals yet)
+    const todayStr = (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const completedDayValues = Object.entries(dailyFirstLast)
+      .filter(([date]) => date < todayStr)
+      .map(([, times]) => times);
+    const dayValues = completedDayValues.length > 0 ? completedDayValues : Object.values(dailyFirstLast);
+
+    const avgFirstMins = dayValues.length > 0
+      ? Math.round(dayValues.reduce((s, d) => s + d.first, 0) / dayValues.length) : null;
+    const avgLastMins = dayValues.length > 0
+      ? Math.round(dayValues.reduce((s, d) => s + d.last, 0) / dayValues.length) : null;
+    const windowHours = avgFirstMins !== null && avgLastMins !== null
+      ? Math.round((avgLastMins - avgFirstMins) / 60 * 10) / 10 : null;
+
+    const peakEntry = Object.entries(hourTotals)
+      .reduce<{ hour: number; cal: number }>(
+        (best, [h, cal]) => cal > best.cal ? { hour: Number(h), cal } : best,
+        { hour: -1, cal: 0 }
+      );
+
+    return {
+      chartData,
+      avgFirst: avgFirstMins !== null ? fmt(avgFirstMins) : null,
+      avgLast: avgLastMins !== null ? fmt(avgLastMins) : null,
+      windowHours,
+      peakHour: peakEntry.hour >= 0 ? peakEntry.hour : null,
+    };
+  }, [entries]);
 
   // Product statistics for interesting stats section
   const productStats = useMemo(() => {
@@ -631,6 +687,61 @@ const Stats = () => {
             </ResponsiveContainer>
           </div>
         </Card>
+
+        {/* Meal Timing Card */}
+        {mealTimingData && (
+          <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold">Время приёмов пищи</h2>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-xl bg-muted/40 p-3 text-center">
+                <div className="text-xs text-muted-foreground mb-1">Первый приём</div>
+                <div className="font-bold text-sm">{mealTimingData.avgFirst ?? '—'}</div>
+                <div className="text-[10px] text-muted-foreground/60 mt-0.5">в среднем</div>
+              </div>
+              <div className="rounded-xl bg-muted/40 p-3 text-center">
+                <div className="text-xs text-muted-foreground mb-1">Последний приём</div>
+                <div className="font-bold text-sm">{mealTimingData.avgLast ?? '—'}</div>
+                <div className="text-[10px] text-muted-foreground/60 mt-0.5">в среднем</div>
+              </div>
+              <div className="rounded-xl bg-muted/40 p-3 text-center">
+                <div className="text-xs text-muted-foreground mb-1">Окно питания</div>
+                <div className="font-bold text-sm">{mealTimingData.windowHours !== null ? `${mealTimingData.windowHours}ч` : '—'}</div>
+                <div className="text-[10px] text-muted-foreground/60 mt-0.5">в среднем</div>
+              </div>
+            </div>
+
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mealTimingData.chartData} margin={{ top: 5, right: 5, left: -30, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(107, 107, 138, 0.2)" />
+                  <XAxis dataKey="hour" tick={{ fill: '#6B6B8A', fontSize: 9 }} axisLine={false} tickLine={false} interval={1} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(107,107,138,0.1)' }}
+                    contentStyle={{
+                      background: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "0.75rem",
+                      color: "hsl(var(--popover-foreground))",
+                      fontSize: "12px",
+                    }}
+                    formatter={(value: number) => [`${value} ккал`, 'Среднее']}
+                  />
+                  <Bar dataKey="calories" fill="hsl(var(--foreground))" radius={[4, 4, 0, 0]} activeBar={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {mealTimingData.peakHour !== null && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Пиковый час: <span className="font-medium text-foreground">{mealTimingData.peakHour}:00–{mealTimingData.peakHour + 1}:00</span> · среднее за 7 дней
+              </p>
+            )}
+          </Card>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6 mb-4">
           {/* SECTION 2 - Monthly Overview */}
@@ -1150,7 +1261,8 @@ const Stats = () => {
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Расхождение</span>
                       <span className={`font-medium ${
-                        analytics.deficitAnalysis.discrepancy > 20 ? 'text-red-500' : 'text-green-500'
+                        analytics.deficitAnalysis.discrepancy > 50 ? 'text-red-500' :
+                        analytics.deficitAnalysis.discrepancy > 35 ? 'text-yellow-500' : 'text-green-500'
                       }`}>
                         {analytics.deficitAnalysis.discrepancy.toFixed(1)}%
                       </span>
@@ -1293,14 +1405,12 @@ const Stats = () => {
                 )}
 
                 {/* Weight Interpretation */}
-                {analytics.weightInterpretation.explanation !== 'Недостаточно данных' && (
+                {analytics.weightInterpretation.type !== 'none' && (
                   <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
                     <div className="flex items-start gap-3">
                       <div className="bg-green-500/20 rounded-full p-2 mt-0.5">
                         <span className="text-lg">
-                          {analytics.weightInterpretation.type === 'water' ? '💧' :
-                           analytics.weightInterpretation.type === 'fluctuation' ? '📊' :
-                           analytics.weightInterpretation.type === 'real' ? '⚖️' : '📝'}
+                          {analytics.weightInterpretation.type === 'water' ? '💧' : '📊'}
                         </span>
                       </div>
                       <div>
@@ -1360,14 +1470,6 @@ const Stats = () => {
         </Tabs>
       </section>
 
-      {/* Eaten Foods List */}
-      <section className="container max-w-5xl">
-        <EatenFoodsList
-          entries={monthlyDetailEntries}
-          onRemove={handleRemoveEntry}
-          className="p-4 shadow-card"
-        />
-      </section>
       <div className="h-8" />
 
       {/* User Data Viewer Modal */}

@@ -87,7 +87,7 @@ const Profile = () => {
     };
 
     loadNormData();
-  }, [user, norm]);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
