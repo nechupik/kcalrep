@@ -123,7 +123,7 @@ export function calculateMacros(input: CalcInput): MacroResult {
   const calories = Math.round(tdee * goalMultiplier);
 
   const bmi = weight / ((height / 100) ** 2);
-  const proteinPerKg = gender === 'female' ? 1.8 : 2.3;
+  const proteinPerKg = gender === 'female' ? 1.8 : 2.0;
   const rawProtein = Math.round(weight * proteinPerKg);
   const protein = bmi > 30
     ? Math.round(Math.min(rawProtein, weight * 1.6))
@@ -250,11 +250,11 @@ export function recalculateNormWithBodyComposition(
   // LBM ≈ scale muscle + bone (~3–4 kg), so using % fat → LBM is more reliable.
   let protein: number;
   if (lbm != null) {
-    const lbmProteinPerKg = gender === "female" ? 2.2 : 2.3;
+    const lbmProteinPerKg = gender === "female" ? 2.1 : 2.3;
     protein = Math.round(lbm * lbmProteinPerKg);
   } else {
     const bmi = newWeight / (height / 100) ** 2;
-    const proteinPerKg = gender === "female" ? 1.8 : 2.3;
+    const proteinPerKg = gender === "female" ? 1.8 : 2.0;
     const rawProtein = Math.round(newWeight * proteinPerKg);
     protein = bmi > 30 ? Math.round(Math.min(rawProtein, newWeight * 1.6)) : rawProtein;
   }
@@ -312,11 +312,11 @@ export function calculateMacrosWithWatchTDEE(
   let protein: number;
   if (bodyFatPercent != null) {
     const lbm = weight * (1 - bodyFatPercent / 100);
-    const lbmProteinPerKg = gender === 'female' ? 2.2 : 2.3;
+    const lbmProteinPerKg = gender === 'female' ? 2.1 : 2.3;
     protein = Math.round(lbm * lbmProteinPerKg);
   } else {
     const bmi = weight / ((height / 100) ** 2);
-    const proteinPerKg = gender === 'female' ? 1.8 : 2.3;
+    const proteinPerKg = gender === 'female' ? 1.8 : 2.0;
     const rawProtein = Math.round(weight * proteinPerKg);
     protein = bmi > 30 ? Math.round(Math.min(rawProtein, weight * 1.6)) : rawProtein;
   }

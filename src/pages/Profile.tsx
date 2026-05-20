@@ -241,9 +241,11 @@ const Profile = () => {
       ]);
       const weight = weightEntries.length > 0 ? weightEntries[0].weight : 80;
 
-      const bmrFromScale = latestBodyComp.length > 0 && latestBodyComp[0].bmrFromScale && latestBodyComp[0].bmrFromScale > 0
-        ? latestBodyComp[0].bmrFromScale
+      const latestComp = latestBodyComp.length > 0 ? latestBodyComp[0] : null;
+      const bmrFromScale = latestComp?.bmrFromScale && latestComp.bmrFromScale > 0
+        ? latestComp.bmrFromScale
         : null;
+      const bodyFatPercent = latestComp?.bodyFatPercent ?? undefined;
       const bmr = bmrFromScale ?? (storedProfileData.gender === 'male'
         ? 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age + 5
         : 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age - 161);
@@ -254,7 +256,8 @@ const Profile = () => {
         deficitPercent,
         weight,
         storedProfileData.gender,
-        storedProfileData.height
+        storedProfileData.height,
+        bodyFatPercent
       );
 
       await saveNorm(newNorm, {

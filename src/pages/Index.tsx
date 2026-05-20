@@ -269,14 +269,16 @@ const Index = () => {
             const avg = Math.round(latestActivities.reduce((sum, e) => sum + e.caloriesBurned, 0) / latestActivities.length);
             const w = weightEntries.length > 0 ? weightEntries[0].weight : 80;
             const deficitPct = settings?.deficitPercent ?? 10;
-            const bmrFromScale = latestBodyComp.length > 0 && latestBodyComp[0].bmrFromScale && latestBodyComp[0].bmrFromScale > 0
-              ? latestBodyComp[0].bmrFromScale
+            const latestComp = latestBodyComp.length > 0 ? latestBodyComp[0] : null;
+            const bmrFromScale = latestComp?.bmrFromScale && latestComp.bmrFromScale > 0
+              ? latestComp.bmrFromScale
               : null;
+            const bodyFatPercent = latestComp?.bodyFatPercent ?? undefined;
             const bmr = bmrFromScale ?? (normData.gender === 'male'
               ? 10 * w + 6.25 * normData.height - 5 * normData.age + 5
               : 10 * w + 6.25 * normData.height - 5 * normData.age - 161);
 
-            const newNorm = calculateMacrosWithWatchTDEE(bmr, avg, deficitPct, w, normData.gender, normData.height);
+            const newNorm = calculateMacrosWithWatchTDEE(bmr, avg, deficitPct, w, normData.gender, normData.height, bodyFatPercent);
             await saveNorm(newNorm, { gender: normData.gender, height: normData.height, age: normData.age, goal: normData.goal || 'lose' });
             setNorm(newNorm);
             toast.success(`Активность сохранена. Норма обновлена: ${newNorm.calories} ккал (ср. ${avg} ккал/день)`);

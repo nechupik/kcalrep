@@ -18,6 +18,8 @@ import {
   XAxis,
   YAxis,
   ReferenceLine,
+  Area,
+  AreaChart,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
@@ -75,6 +77,8 @@ const Stats = () => {
   const [savingDayActivity, setSavingDayActivity] = useState(false);
   const [analytics, setAnalytics] = useState<NutritionAnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [productPage, setProductPage] = useState(1);
+  const PRODUCTS_PER_PAGE = 10;
   const ADMIN_UID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
 
   // Control modal animation
@@ -276,6 +280,7 @@ const Stats = () => {
       const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
       const entries = await loadDiaryRange(user.uid, startDate, endDate);
       setMonthlyDetailEntries(entries);
+      setProductPage(1); // Reset to page 1 when month changes
     };
     loadMonthlyDetail();
   }, [user, isInterestingOpen, selectedMonth]);
@@ -317,37 +322,37 @@ const Stats = () => {
   // Monthly overview data
   const monthlyData = useMemo(() => {
     if (!norm) return [];
-    
+
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
+
     const days: Array<{ date: number; calories: number; color: string }> = [];
-    
+
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const date = new Date(year, month, day);
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayEntries = entries.filter(entry => entry.date === dateStr);
-      
+
       const calories = dayEntries.reduce((sum, entry) => sum + entry.calories, 0);
       const percentage = norm.calories > 0 ? (calories / norm.calories) * 100 : 0;
-      
-      let color = "bg-gray-200"; // No data
+
+      let color = "bg-purple-950/40"; // No data - very dark purple
       if (dayEntries.length > 0) {
         if (percentage >= 90 && percentage <= 110) {
-          color = "bg-green-500";
+          color = "bg-purple-300"; // On target - light purple
         } else if ((percentage >= 70 && percentage < 90) || (percentage > 110 && percentage <= 130)) {
-          color = "bg-yellow-500";
+          color = "bg-purple-500"; // Close - medium purple
         } else {
-          color = "bg-red-500";
+          color = "bg-purple-900"; // Off - very dark purple
         }
       }
-      
+
       days.push({ date: day, calories, color });
     }
-    
+
     return days;
   }, [entries, norm]);
 
@@ -629,115 +634,132 @@ const Stats = () => {
           <TabsContent value="overview" className="space-y-4">
         
         {/* SECTION 1 - Weekly Chart */}
-        <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 mb-4">
+        <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50 mb-4">
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold">Калории за неделю</h2>
+            <TrendingUp className="h-4 w-4 text-purple-400" />
+            <h2 className="font-semibold text-white">Калории за неделю</h2>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barCategoryGap="5%" barGap={0}>
+              <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="caloriesGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid
                   vertical={true}
                   horizontal={true}
                   strokeDasharray="3 3"
-                  stroke="rgba(107, 107, 138, 0.2)"
+                  stroke="rgba(168, 85, 247, 0.1)"
                   verticalCoordinatesGenerator={(props) => {
                     const { width, offset } = props;
                     const step = (width - offset.left - offset.right) / 7;
                     return Array.from({ length: 6 }, (_, i) => offset.left + step * (i + 1));
                   }}
                 />
-                <XAxis 
-                  dataKey="label" 
-                  tick={{ fill: '#6B6B8A', fontSize: 11 }} 
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: '#a855f7', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   interval={0}
                 />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis stroke="#a855f7" fontSize={12} />
                 <Tooltip
-                  cursor={{ fill: 'transparent' }}
+                  cursor={{ fill: 'rgba(168, 85, 247, 0.1)' }}
                   contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
+                    background: "rgba(10, 5, 32, 0.95)",
+                    border: "1px solid rgba(168, 85, 247, 0.3)",
                     borderRadius: "0.75rem",
-                    color: "hsl(var(--popover-foreground))",
+                    color: "#fff",
                   }}
                 />
                 {norm && (
                   <ReferenceLine
                     y={norm.calories}
-                    stroke="hsl(var(--accent))"
+                    stroke="#a855f7"
                     strokeDasharray="4 4"
-                    label={{ value: "норма", fill: "hsl(var(--accent))", fontSize: 11, position: "right" }}
+                    label={{ value: "норма", fill: "#a855f7", fontSize: 11, position: "right" }}
                   />
                 )}
-                <Bar
+                <Area
+                  type="monotone"
                   dataKey="calories"
-                  fill="hsl(var(--foreground))"
-                  radius={[10, 10, 0, 0]}
-                  activeBar={false}
-                  onClick={(data) => {
-                    // Handle bar click if needed
-                    console.log('Bar clicked:', data);
-                  }}
+                  stroke="#a855f7"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#caloriesGradient)"
                 />
-              </BarChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
         {/* Meal Timing Card */}
         {mealTimingData && (
-          <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 mb-4">
+          <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50 mb-4">
             <div className="flex items-center gap-2 mb-4">
-              <Clock className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold">Время приёмов пищи</h2>
+              <Clock className="h-4 w-4 text-purple-400" />
+              <h2 className="font-semibold text-white">Время приёмов пищи</h2>
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="rounded-xl bg-muted/40 p-3 text-center">
-                <div className="text-xs text-muted-foreground mb-1">Первый приём</div>
-                <div className="font-bold text-sm">{mealTimingData.avgFirst ?? '—'}</div>
-                <div className="text-[10px] text-muted-foreground/60 mt-0.5">в среднем</div>
+              <div className="rounded-xl bg-purple-500/10 p-3 text-center">
+                <div className="text-xs text-purple-300 mb-1">Первый приём</div>
+                <div className="font-bold text-sm text-white">{mealTimingData.avgFirst ?? '—'}</div>
+                <div className="text-[10px] text-purple-300/60 mt-0.5">в среднем</div>
               </div>
-              <div className="rounded-xl bg-muted/40 p-3 text-center">
-                <div className="text-xs text-muted-foreground mb-1">Последний приём</div>
-                <div className="font-bold text-sm">{mealTimingData.avgLast ?? '—'}</div>
-                <div className="text-[10px] text-muted-foreground/60 mt-0.5">в среднем</div>
+              <div className="rounded-xl bg-purple-500/10 p-3 text-center">
+                <div className="text-xs text-purple-300 mb-1">Последний приём</div>
+                <div className="font-bold text-sm text-white">{mealTimingData.avgLast ?? '—'}</div>
+                <div className="text-[10px] text-purple-300/60 mt-0.5">в среднем</div>
               </div>
-              <div className="rounded-xl bg-muted/40 p-3 text-center">
-                <div className="text-xs text-muted-foreground mb-1">Окно питания</div>
-                <div className="font-bold text-sm">{mealTimingData.windowHours !== null ? `${mealTimingData.windowHours}ч` : '—'}</div>
-                <div className="text-[10px] text-muted-foreground/60 mt-0.5">в среднем</div>
+              <div className="rounded-xl bg-purple-500/10 p-3 text-center">
+                <div className="text-xs text-purple-300 mb-1">Окно питания</div>
+                <div className="font-bold text-sm text-white">{mealTimingData.windowHours !== null ? `${mealTimingData.windowHours}ч` : '—'}</div>
+                <div className="text-[10px] text-purple-300/60 mt-0.5">в среднем</div>
               </div>
             </div>
 
             <div className="h-44">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mealTimingData.chartData} margin={{ top: 5, right: 5, left: -30, bottom: 0 }}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(107, 107, 138, 0.2)" />
-                  <XAxis dataKey="hour" tick={{ fill: '#6B6B8A', fontSize: 9 }} axisLine={false} tickLine={false} interval={1} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                <AreaChart data={mealTimingData.chartData} margin={{ top: 5, right: 5, left: -30, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="mealTimingGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(168, 85, 247, 0.1)" />
+                  <XAxis dataKey="hour" tick={{ fill: '#a855f7', fontSize: 9 }} axisLine={false} tickLine={false} interval={1} />
+                  <YAxis stroke="#a855f7" fontSize={10} />
                   <Tooltip
-                    cursor={{ fill: 'rgba(107,107,138,0.1)' }}
+                    cursor={{ fill: 'rgba(168, 85, 247, 0.1)' }}
                     contentStyle={{
-                      background: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
+                      background: "rgba(10, 5, 32, 0.95)",
+                      border: "1px solid rgba(168, 85, 247, 0.3)",
                       borderRadius: "0.75rem",
-                      color: "hsl(var(--popover-foreground))",
+                      color: "#fff",
                       fontSize: "12px",
                     }}
                     formatter={(value: number) => [`${value} ккал`, 'Среднее']}
                   />
-                  <Bar dataKey="calories" fill="hsl(var(--foreground))" radius={[4, 4, 0, 0]} activeBar={false} />
-                </BarChart>
+                  <Area
+                    type="monotone"
+                    dataKey="calories"
+                    stroke="#a855f7"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#mealTimingGradient)"
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
             {mealTimingData.peakHour !== null && (
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                Пиковый час: <span className="font-medium text-foreground">{mealTimingData.peakHour}:00–{mealTimingData.peakHour + 1}:00</span> · среднее за 7 дней
+              <p className="text-xs text-purple-300 mt-2 text-center">
+                Пиковый час: <span className="font-medium text-white">{mealTimingData.peakHour}:00–{mealTimingData.peakHour + 1}:00</span> · среднее за 7 дней
               </p>
             )}
           </Card>
@@ -745,13 +767,13 @@ const Stats = () => {
 
         <div className="grid md:grid-cols-2 gap-6 mb-4">
           {/* SECTION 2 - Monthly Overview */}
-          <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+          <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
             <div className="mb-4 text-left">
-              <h2 className="font-semibold">{currentMonth} {currentYear}</h2>
+              <h2 className="font-semibold text-white">{currentMonth} {currentYear}</h2>
             </div>
             <div className="grid grid-cols-7 gap-1 text-xs">
               {WEEKDAYS.map(day => (
-                <div key={day} className="text-center font-medium text-muted-foreground p-1">
+                <div key={day} className="text-center font-medium text-purple-300 p-1">
                   {day}
                 </div>
               ))}
@@ -774,57 +796,57 @@ const Stats = () => {
             </div>
             <div className="flex gap-4 mt-4 text-xs">
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-green-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
-                <span>90-110%</span>
+                <div className="w-3 h-3 bg-purple-300 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+                <span className="text-purple-300">90-110%</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
-                <span>70-90% / 110-130%</span>
+                <div className="w-3 h-3 bg-purple-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+                <span className="text-purple-300">70-90% / 110-130%</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-red-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
-                <span>&lt;70% / &gt;130%</span>
+                <div className="w-3 h-3 bg-purple-900 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+                <span className="text-purple-300">&lt;70% / &gt;130%</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-gray-200 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
-                <span>Нет данных</span>
+                <div className="w-3 h-3 bg-purple-950/40 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+                <span className="text-purple-300">Нет данных</span>
               </div>
             </div>
           </Card>
 
           {/* SECTION 3 - Averages Card */}
-          <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+          <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="h-4 w-4 text-tertiary" />
-              <h2 className="font-semibold">Средние показатели (7 дней)</h2>
+              <BarChart3 className="h-4 w-4 text-purple-400" />
+              <h2 className="font-semibold text-white">Средние показатели (7 дней)</h2>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Калории</span>
-                <span className="font-semibold">
+                <span className="text-sm text-purple-300">Калории</span>
+                <span className="font-semibold text-white">
                   {averages.avgCalories} {norm && `/ ${norm.calories}`}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Белки</span>
-                <span className="font-semibold">{averages.avgProtein}г</span>
+                <span className="text-sm text-purple-300">Белки</span>
+                <span className="font-semibold text-white">{averages.avgProtein}г</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Жиры</span>
-                <span className="font-semibold">{averages.avgFat}г</span>
+                <span className="text-sm text-purple-300">Жиры</span>
+                <span className="font-semibold text-white">{averages.avgFat}г</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Углеводы</span>
-                <span className="font-semibold">{averages.avgCarbs}г</span>
+                <span className="text-sm text-purple-300">Углеводы</span>
+                <span className="font-semibold text-white">{averages.avgCarbs}г</span>
               </div>
-              <div className="border-t pt-3 space-y-2">
+              <div className="border-t border-purple-500/20 pt-3 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Дней отслежено</span>
-                  <span className="font-semibold">{averages.daysTracked} / 7</span>
+                  <span className="text-sm text-purple-300">Дней отслежено</span>
+                  <span className="font-semibold text-white">{averages.daysTracked} / 7</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">В норме (±10%)</span>
-                  <span className="font-semibold">{averages.withinNormPercent}%</span>
+                  <span className="text-sm text-purple-300">В норме (±10%)</span>
+                  <span className="font-semibold text-white">{averages.withinNormPercent}%</span>
                 </div>
               </div>
             </div>
@@ -845,23 +867,23 @@ const Stats = () => {
         )}
 
         {/* SECTION 5 - Interesting Statistics */}
-        <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+        <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
           <button
             onClick={() => setIsInterestingOpen(!isInterestingOpen)}
             className="w-full flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
               <span className="text-lg">🔍</span>
-              <h2 className="font-semibold">Интересная статистика</h2>
+              <h2 className="font-semibold text-white">Интересная статистика</h2>
             </div>
-            <span className="text-muted-foreground text-sm">{isInterestingOpen ? '▲' : '▼'}</span>
+            <span className="text-purple-300 text-sm">{isInterestingOpen ? '▲' : '▼'}</span>
           </button>
 
           {isInterestingOpen && (
             <div className="mt-4 space-y-4">
               {/* Month selector */}
               <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">Месяц:</label>
+                <label className="text-sm text-purple-300">Месяц:</label>
                 <MonthPicker
                   value={selectedMonth}
                   onChange={setSelectedMonth}
@@ -878,10 +900,10 @@ const Stats = () => {
                     { label: 'Жиров', value: `${Math.round(monthlyTotals.fat)}г`, icon: '🧈' },
                     { label: 'Углеводов', value: `${Math.round(monthlyTotals.carbs)}г`, icon: '🌾' },
                   ].map(stat => (
-                    <div key={stat.label} className="rounded-xl bg-muted/40 p-3">
+                    <div key={stat.label} className="rounded-xl bg-purple-500/10 p-3">
                       <div className="text-lg">{stat.icon}</div>
-                      <div className="font-bold">{stat.value}</div>
-                      <div className="text-xs text-muted-foreground">{stat.label}</div>
+                      <div className="font-bold text-white">{stat.value}</div>
+                      <div className="text-xs text-purple-300">{stat.label}</div>
                     </div>
                   ))}
                 </div>
@@ -889,17 +911,19 @@ const Stats = () => {
 
               {/* Per product breakdown */}
               {productStats.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Нет данных за этот месяц</p>
+                <p className="text-sm text-purple-300 text-center py-4">Нет данных за этот месяц</p>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">По продуктам</p>
-                  {productStats.map(p => (
-                    <div key={p.name} className="rounded-xl bg-muted/30 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-purple-300">По продуктам</p>
+                  {productStats
+                    .slice((productPage - 1) * PRODUCTS_PER_PAGE, productPage * PRODUCTS_PER_PAGE)
+                    .map(p => (
+                    <div key={p.name} className="rounded-xl bg-purple-500/10 px-4 py-3">
                       <div className="flex justify-between items-start mb-[5px]">
-                        <span className="font-medium text-sm">{p.name}</span>
-                        <span className="text-xs text-muted-foreground">{p.count} раз</span>
+                        <span className="font-medium text-sm text-white">{p.name}</span>
+                        <span className="text-xs text-purple-300">{p.count} раз</span>
                       </div>
-                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap gap-2 text-xs text-purple-300">
                         <span>⚖️ {p.totalGrams.toLocaleString()}г</span>
                         <span>🔥 {p.totalCalories.toLocaleString()} ккал</span>
                         <span>💪 Б {Math.round(p.totalProtein)}г</span>
@@ -908,6 +932,28 @@ const Stats = () => {
                       </div>
                     </div>
                   ))}
+                  {/* Pagination controls */}
+                  {productStats.length > PRODUCTS_PER_PAGE && (
+                    <div className="flex items-center justify-center gap-4 pt-4">
+                      <button
+                        onClick={() => setProductPage(p => Math.max(1, p - 1))}
+                        disabled={productPage === 1}
+                        className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Назад
+                      </button>
+                      <span className="text-sm text-purple-300">
+                        {productPage} из {Math.ceil(productStats.length / PRODUCTS_PER_PAGE)}
+                      </span>
+                      <button
+                        onClick={() => setProductPage(p => Math.min(Math.ceil(productStats.length / PRODUCTS_PER_PAGE), p + 1))}
+                        disabled={productPage === Math.ceil(productStats.length / PRODUCTS_PER_PAGE)}
+                        className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Вперёд
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1161,19 +1207,19 @@ const Stats = () => {
           {/* AI Analytics Tab */}
           <TabsContent value="ai-analytics" className="space-y-4">
             {analyticsLoading ? (
-              <Card className="p-8 text-center">
+              <Card className="p-8 text-center bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
                 <div className="animate-pulse">
-                  <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">Анализируем ваши данные...</p>
+                  <Brain className="h-12 w-12 mx-auto mb-4 text-purple-400" />
+                  <p className="text-purple-300">Анализируем ваши данные...</p>
                 </div>
               </Card>
             ) : analytics ? (
               <>
                 {/* Overall Score */}
-                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
                   <div className="flex items-center gap-2 mb-4">
-                    <Brain className="h-5 w-5 text-primary" />
-                    <h2 className="font-semibold">AI Оценка питания</h2>
+                    <Brain className="h-5 w-5 text-purple-400" />
+                    <h2 className="font-semibold text-white">AI Оценка питания</h2>
                   </div>
                   <div className="text-center py-4">
                     <div className={`text-5xl font-bold mb-2 ${
@@ -1184,7 +1230,7 @@ const Stats = () => {
                     }`}>
                       {analytics.nutritionScore}/100
                     </div>
-                    <p className="text-lg text-muted-foreground">
+                    <p className="text-lg text-purple-300">
                       {analytics.nutritionScore >= 90 ? 'Отлично' :
                        analytics.nutritionScore >= 75 ? 'Хорошо' :
                        analytics.nutritionScore >= 60 ? 'Нормально' :
@@ -1194,80 +1240,80 @@ const Stats = () => {
                 </Card>
 
                 {/* Daily Verdict */}
-                <Card className="p-5 md:p-6 bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
+                <Card className="p-5 md:p-6 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20">
                   <div className="flex items-start gap-3">
-                    <div className="bg-primary/20 rounded-full p-2 mt-0.5">
-                      <Activity className="h-5 w-5 text-primary" />
+                    <div className="bg-purple-500/20 rounded-full p-2 mt-0.5">
+                      <Activity className="h-5 w-5 text-purple-400" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">Сводка дня</h3>
-                      <p className="text-muted-foreground">{analytics.dailyVerdict}</p>
+                      <h3 className="font-semibold text-white mb-1">Сводка дня</h3>
+                      <p className="text-purple-300">{analytics.dailyVerdict}</p>
                     </div>
                   </div>
                 </Card>
 
                 {/* Protein Compliance */}
-                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="bg-macro-protein/20 rounded-full p-2">
+                    <div className="bg-purple-500/20 rounded-full p-2">
                       <span className="text-lg">💪</span>
                     </div>
-                    <h3 className="font-semibold">Выполнение белковой нормы</h3>
+                    <h3 className="font-semibold text-white">Выполнение белковой нормы</h3>
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Оценка</span>
-                      <span className="font-medium">{analytics.proteinCompliance.score}%</span>
+                      <span className="text-purple-300">Оценка</span>
+                      <span className="font-medium text-white">{analytics.proteinCompliance.score}%</span>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2">
+                    <div className="w-full bg-purple-500/20 rounded-full h-2">
                       <div 
-                        className="bg-macro-protein h-2 rounded-full transition-all"
+                        className="bg-purple-500 h-2 rounded-full transition-all"
                         style={{ width: `${analytics.proteinCompliance.score}%` }}
                       />
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Успешных дней</span>
-                      <span className="font-medium">{analytics.proteinCompliance.successDays}</span>
+                      <span className="text-purple-300">Успешных дней</span>
+                      <span className="font-medium text-white">{analytics.proteinCompliance.successDays}</span>
                     </div>
                     {analytics.proteinCompliance.avgMiss > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Средний недобор</span>
-                        <span className="font-medium">{analytics.proteinCompliance.avgMiss}%</span>
+                        <span className="text-purple-300">Средний недобор</span>
+                        <span className="font-medium text-white">{analytics.proteinCompliance.avgMiss}%</span>
                       </div>
                     )}
-                    <p className="text-sm text-muted-foreground mt-2">{analytics.proteinCompliance.verdict}</p>
+                    <p className="text-sm text-purple-300 mt-2">{analytics.proteinCompliance.verdict}</p>
                   </div>
                 </Card>
 
                 {/* Deficit Analysis */}
-                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="bg-accent/20 rounded-full p-2">
+                    <div className="bg-purple-500/20 rounded-full p-2">
                       <span className="text-lg">⚖️</span>
                     </div>
-                    <h3 className="font-semibold">Анализ дефицита</h3>
+                    <h3 className="font-semibold text-white">Анализ дефицита</h3>
                   </div>
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-muted/50 rounded-lg">
-                        <div className="text-sm text-muted-foreground">Ожидаемая потеря</div>
-                        <div className="text-lg font-semibold">{analytics.deficitAnalysis.expectedLoss.toFixed(2)} кг</div>
+                      <div className="text-center p-3 bg-purple-500/10 rounded-lg">
+                        <div className="text-sm text-purple-300">Ожидаемая потеря</div>
+                        <div className="text-lg font-semibold text-white">{analytics.deficitAnalysis.expectedLoss.toFixed(2)} кг</div>
                       </div>
-                      <div className="text-center p-3 bg-muted/50 rounded-lg">
-                        <div className="text-sm text-muted-foreground">Фактическая потеря</div>
-                        <div className="text-lg font-semibold">{analytics.deficitAnalysis.actualLoss.toFixed(2)} кг</div>
+                      <div className="text-center p-3 bg-purple-500/10 rounded-lg">
+                        <div className="text-sm text-purple-300">Фактическая потеря</div>
+                        <div className="text-lg font-semibold text-white">{analytics.deficitAnalysis.actualLoss.toFixed(2)} кг</div>
                       </div>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Расхождение</span>
-                      <span className={`font-medium ${
+                      <span className="text-purple-300">Расхождение</span>
+                      <span className={`font-medium text-white ${
                         analytics.deficitAnalysis.discrepancy > 50 ? 'text-red-500' :
                         analytics.deficitAnalysis.discrepancy > 35 ? 'text-yellow-500' : 'text-green-500'
                       }`}>
                         {analytics.deficitAnalysis.discrepancy.toFixed(1)}%
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{analytics.deficitAnalysis.interpretation}</p>
+                    <p className="text-sm text-purple-300">{analytics.deficitAnalysis.interpretation}</p>
                     {analytics.deficitAnalysis.possibleCause && (
                       <p className="text-sm text-yellow-500">{analytics.deficitAnalysis.possibleCause}</p>
                     )}
@@ -1283,11 +1329,11 @@ const Stats = () => {
                       </div>
                       <div>
                         <h3 className="font-semibold text-red-400 mb-1">Обнаружено плато</h3>
-                        <p className="text-sm text-muted-foreground mb-2">
+                        <p className="text-sm text-purple-300 mb-2">
                           Вес не снижается уже {analytics.plateau.daysStuck} дней
                         </p>
                         {analytics.plateau.recommendation && (
-                          <p className="text-sm text-muted-foreground">{analytics.plateau.recommendation}</p>
+                          <p className="text-sm text-purple-300">{analytics.plateau.recommendation}</p>
                         )}
                       </div>
                     </div>
@@ -1306,28 +1352,28 @@ const Stats = () => {
                         <span className="text-lg">⏰</span>
                       </div>
                       <div>
-                        <h3 className="font-semibold mb-1">Прогноз белка</h3>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Осталось набрать: <span className="font-medium">{analytics.forecast.remainingProtein}г</span>
+                        <h3 className="font-semibold text-white mb-1">Прогноз белка</h3>
+                        <p className="text-sm text-purple-300 mb-2">
+                          Осталось набрать: <span className="font-medium text-white">{analytics.forecast.remainingProtein}г</span>
                         </p>
-                        <p className="text-sm">{analytics.forecast.practicalAdvice}</p>
+                        <p className="text-sm text-purple-300">{analytics.forecast.practicalAdvice}</p>
                       </div>
                     </div>
                   </Card>
                 )}
 
                 {/* Calorie Stability */}
-                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="bg-blue-500/20 rounded-full p-2">
                       <span className="text-lg">📊</span>
                     </div>
-                    <h3 className="font-semibold">Стабильность калорий</h3>
+                    <h3 className="font-semibold text-white">Стабильность калорий</h3>
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Оценка стабильности</span>
-                      <span className="font-medium">{analytics.stability.stabilityScore}/100</span>
+                      <span className="text-purple-300">Оценка стабильности</span>
+                      <span className="font-medium text-white">{analytics.stability.stabilityScore}/100</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div 
@@ -1336,8 +1382,8 @@ const Stats = () => {
                       />
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Разброс (σ)</span>
-                      <span className="font-medium">{analytics.stability.variance} ккал</span>
+                      <span className="text-purple-300">Разброс (σ)</span>
+                      <span className="font-medium text-white">{analytics.stability.variance} ккал</span>
                     </div>
                     <p className="text-sm text-muted-foreground">{analytics.stability.explanation}</p>
                   </div>
@@ -1421,41 +1467,6 @@ const Stats = () => {
                   </Card>
                 )}
 
-                {/* Streaks */}
-                <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="bg-green-500/20 rounded-full p-2">
-                      <span className="text-lg">🔥</span>
-                    </div>
-                    <h3 className="font-semibold">Серии</h3>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    {(() => {
-                      const calorieStreak = formatStreak(analytics.streaks.calorieStreak);
-                      const proteinStreak = formatStreak(analytics.streaks.proteinStreak);
-                      const deficitStreak = formatStreak(analytics.streaks.deficitStreak);
-                      return (
-                        <>
-                          <div className="text-center p-3 bg-muted/50 rounded-lg">
-                            <div className="text-xs text-muted-foreground mb-1">Калории</div>
-                            <div className="text-2xl font-bold text-green-500">{calorieStreak.value}</div>
-                            <div className="text-xs text-muted-foreground">{calorieStreak.label}</div>
-                          </div>
-                          <div className="text-center p-3 bg-muted/50 rounded-lg">
-                            <div className="text-xs text-muted-foreground mb-1">Белок</div>
-                            <div className="text-2xl font-bold text-macro-protein">{proteinStreak.value}</div>
-                            <div className="text-xs text-muted-foreground">{proteinStreak.label}</div>
-                          </div>
-                          <div className="text-center p-3 bg-muted/50 rounded-lg">
-                            <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
-                            <div className="text-2xl font-bold text-accent">{deficitStreak.value}</div>
-                            <div className="text-xs text-muted-foreground">{deficitStreak.label}</div>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </Card>
               </>
             ) : (
               <Card className="p-8 text-center">
