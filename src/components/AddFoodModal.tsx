@@ -28,6 +28,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [selected, setSelected] = useState<Product | Recipe | null>(null);
   const [grams, setGrams] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(false);
 
@@ -96,7 +97,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   };
 
   const handleAdd = async () => {
-    if (!selected) return;
+    if (!selected || isAdding) return;
     const isPortionType = isPortion(selected);
 
     let entry: Omit<DiaryEntry, 'id' | 'addedAt'>;
@@ -128,45 +129,53 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
       };
     }
 
-    // Increment usage count
-    if ('servingType' in selected) {
-      await incrementRecipeUsage(selected.id);
-    } else {
-      await incrementProductUsage(selected.id);
+    setIsAdding(true);
+    try {
+      if ('servingType' in selected) {
+        await incrementRecipeUsage(selected.id);
+      } else {
+        await incrementProductUsage(selected.id);
+      }
+      await onAdd(entry);
+      handleClose();
+      resetForm();
+    } finally {
+      setIsAdding(false);
     }
-
-    await onAdd(entry);
-    resetForm();
-    handleClose();
   };
 
   const handleManualAdd = async () => {
-    if (!manualName || !manualCalories) return;
-    
-    if (saveToBase && user) {
-      await saveProduct({
+    if (!manualName || !manualCalories || isAdding) return;
+
+    setIsAdding(true);
+    try {
+      if (saveToBase && user) {
+        await saveProduct({
+          name: manualName,
+          calories: Number(manualCalories) || 0,
+          protein: Number(manualProtein) || 0,
+          fat: Number(manualFat) || 0,
+          carbs: Number(manualCarbs) || 0,
+        }, user.uid);
+      }
+
+      const entry: Omit<DiaryEntry, 'id' | 'addedAt'> = {
+        foodId: saveToBase ? manualName : 'manual-' + Date.now(),
         name: manualName,
+        grams: 100,
         calories: Number(manualCalories) || 0,
         protein: Number(manualProtein) || 0,
         fat: Number(manualFat) || 0,
         carbs: Number(manualCarbs) || 0,
-      }, user.uid);
-    }
+        date: selectedDate,
+      };
 
-    const entry: Omit<DiaryEntry, 'id' | 'addedAt'> = {
-      foodId: saveToBase ? manualName : 'manual-' + Date.now(),
-      name: manualName,
-      grams: 100,
-      calories: Number(manualCalories) || 0,
-      protein: Number(manualProtein) || 0,
-      fat: Number(manualFat) || 0,
-      carbs: Number(manualCarbs) || 0,
-      date: selectedDate,
-    };
-    
-    await onAdd(entry);
-    resetForm();
-    handleClose();
+      await onAdd(entry);
+      handleClose();
+      resetForm();
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const resetForm = () => {
@@ -181,6 +190,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     setSaveToBase(false);
     setActiveTab('search');
     setShowManual(false);
+    setIsAdding(false);
   };
 
 
@@ -298,9 +308,10 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                   <div className="flex gap-2">
                     <Button
                       onClick={handleAdd}
-                      className="flex-1 bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
+                      disabled={isAdding}
+                      className="flex-1 bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90 disabled:opacity-60"
                     >
-                      Добавить
+                      {isAdding ? 'Добавление...' : 'Добавить'}
                     </Button>
                     <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}>
                       Отмена
@@ -376,10 +387,10 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
 
               <Button
                 onClick={handleManualAdd}
-                disabled={!manualName || !manualCalories}
-                className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90"
+                disabled={!manualName || !manualCalories || isAdding}
+                className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90 disabled:opacity-60"
               >
-                Добавить запись
+                {isAdding ? 'Добавление...' : 'Добавить запись'}
               </Button>
             </div>
           )}

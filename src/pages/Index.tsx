@@ -313,7 +313,7 @@ const Index = () => {
   const deficitData = useMemo(() => {
     if (!norm) return null;
     const activityCalories = (activityEnabled && activity?.caloriesBurned) ? activity.caloriesBurned : 0;
-    const burned = norm.bmr * 1.2 + activityCalories;
+    const burned = norm.bmr + activityCalories;
     const deficit = burned - selectedDateTotals.calories;
     return {
       burned,
