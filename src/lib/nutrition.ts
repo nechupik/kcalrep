@@ -6,21 +6,12 @@ const MIN_CALORIES_MALE = 1500;
 export type Gender = "male" | "female";
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "veryActive";
 export type Goal = "lose" | "maintain" | "gain";
-export type ActivityMode = "steps" | "workouts" | "both";
-
-export interface WorkoutsInfo {
-  perWeek: number; // 0..14
-  intensity: "light" | "moderate" | "hard";
-}
 
 export interface CalcInput {
   gender: Gender;
   age: number;
   height: number;
   weight: number;
-  activityMode: ActivityMode;
-  steps?: number;
-  workouts?: WorkoutsInfo;
   goal: Goal;
 }
 
@@ -37,13 +28,7 @@ export interface MacroResult {
   warning?: string;
 }
 
-const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
-  sedentary: 1.2,
-  light: 1.375,
-  moderate: 1.55,
-  active: 1.725,
-  veryActive: 1.9,
-};
+const ACTIVITY_FACTOR = 1.2;
 
 const GOAL_ADJUSTMENT: Record<Goal, number> = {
   lose: -0.10,
@@ -51,62 +36,11 @@ const GOAL_ADJUSTMENT: Record<Goal, number> = {
   gain: 0.10,
 };
 
-export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
-  sedentary: "Минимальная",
-  light: "Лёгкая",
-  moderate: "Средняя",
-  active: "Высокая",
-  veryActive: "Очень высокая",
-};
-
 export const GOAL_LABELS: Record<Goal, string> = {
   lose: "Снижение веса",
   maintain: "Поддержание",
   gain: "Набор массы",
 };
-
-export const ACTIVITY_MODE_LABELS: Record<ActivityMode, string> = {
-  steps: "По шагам в день",
-  workouts: "По тренировкам",
-  both: "Шаги + тренировки",
-};
-
-function levelFromSteps(steps: number): ActivityLevel {
-  if (steps < 4000) return "sedentary";
-  if (steps < 7500) return "light";
-  if (steps < 10500) return "moderate";
-  if (steps < 13500) return "active";
-  return "active"; // Cap at active (1.725), not veryActive (1.9) for steps alone
-}
-
-function levelFromWorkouts(w: WorkoutsInfo): ActivityLevel {
-  const order: ActivityLevel[] = ["sedentary", "light", "moderate", "active", "veryActive"];
-  let level: ActivityLevel = "sedentary";
-  if (w.perWeek <= 0) level = "sedentary";
-  else if (w.perWeek <= 2) level = "light";
-  else if (w.perWeek <= 4) level = "moderate";
-  else if (w.perWeek <= 6) level = "active";
-  else level = "veryActive";
-  const idx = order.indexOf(level);
-  const shift = w.intensity === "hard" ? 1 : w.intensity === "light" ? -1 : 0;
-  return order[Math.max(0, Math.min(order.length - 1, idx + shift))];
-}
-
-function combineLevels(a: ActivityLevel, b: ActivityLevel): ActivityLevel {
-  const order: ActivityLevel[] = ["sedentary", "light", "moderate", "active", "veryActive"];
-  const ia = order.indexOf(a);
-  const ib = order.indexOf(b);
-  return order[Math.min(Math.max(ia, ib), order.length - 1)];
-}
-
-export function resolveActivityLevel(input: CalcInput): ActivityLevel {
-  if (input.activityMode === "steps") return levelFromSteps(input.steps ?? 0);
-  if (input.activityMode === "workouts")
-    return levelFromWorkouts(input.workouts ?? { perWeek: 0, intensity: "moderate" });
-  const fromSteps = levelFromSteps(input.steps ?? 0);
-  const fromWorkouts = levelFromWorkouts(input.workouts ?? { perWeek: 0, intensity: "moderate" });
-  return combineLevels(fromSteps, fromWorkouts);
-}
 
 export function calculateMacros(input: CalcInput): MacroResult {
   const { gender, age, height, weight, goal } = input;
@@ -116,8 +50,7 @@ export function calculateMacros(input: CalcInput): MacroResult {
       ? 10 * weight + 6.25 * height - 5 * age + 5
       : 10 * weight + 6.25 * height - 5 * age - 161;
 
-  const level = resolveActivityLevel(input);
-  const factor = ACTIVITY_FACTOR[level];
+  const factor = ACTIVITY_FACTOR;
   const tdee = bmr * factor;
   const goalMultiplier = 1 + GOAL_ADJUSTMENT[goal];
   const calories = Math.round(tdee * goalMultiplier);
@@ -152,10 +85,10 @@ export function calculateMacros(input: CalcInput): MacroResult {
     // Recalculate carbs with new calorie floor
     finalCarbs = Math.max(0, Math.round((finalCalories - protein * 4 - finalFat * 9) / 4));
     warning = gender === 'female'
-      ? 'Калораж близок к минимуму для женского здоровья. Чтобы худеть без вреда для гормонов, рекомендуем увеличить активность до 8–10 тыс. шагов в день — это поднимет норму калорий.'
-      : 'Калораж близок к минимуму. Рекомендуем увеличить активность, чтобы не снижать обмен веществ.';
+      ? 'Калораж близок к минимуму для женского здоровья. Рекомендуем скорректировать цель или обратиться к специалисту.'
+      : 'Калораж близок к минимуму. Рекомендуем скорректировать параметры.';
   } else if (gender === 'female' && calories < 1400) {
-    warning = 'Калораж невысокий. Регулярная активность (8–10 тыс. шагов) позволит поднять норму и худеть комфортнее.';
+    warning = 'Калораж невысокий. Рекомендуем скорректировать цель для комфортного снижения веса.';
   }
 
   return {
@@ -166,7 +99,7 @@ export function calculateMacros(input: CalcInput): MacroResult {
     bmr: Math.round(bmr),
     tdee: Math.round(tdee),
     activityFactor: factor,
-    activityLabel: level,
+    activityLabel: "sedentary" as ActivityLevel,
     goalMultiplier,
     warning,
   };
@@ -181,8 +114,6 @@ export function recalculateNormWithNewWeight(
     age: currentNorm.age,
     height: currentNorm.height,
     weight: newWeight,
-    activityMode: "steps",
-    steps: 0, // Always use sedentary (same as Profile calculator)
     goal: currentNorm.goal as Goal,
   };
   // Use the same calculation as Profile calculator
@@ -191,8 +122,7 @@ export function recalculateNormWithNewWeight(
 
 export interface BodyCompInput {
   bodyFatPercent?: number;
-  muscleMassKg?: number;   // stored for trend only, not used in protein calc
-  visceralFat?: number;
+  lbmKg?: number;          // lean body mass (kg) — used for BMR and protein
   bmrFromScale?: number;
 }
 
@@ -206,19 +136,21 @@ export function recalculateNormWithBodyComposition(
   const height: number = currentNorm.height;
   const goal: Goal = currentNorm.goal as Goal;
 
-  const { bodyFatPercent, visceralFat, bmrFromScale } = bodyComp;
+  const { bodyFatPercent, lbmKg, bmrFromScale } = bodyComp;
 
-  // ── Step 1: BMR (priority: scale → Katch-McArdle → Mifflin) ──────────────
-  let bmr: number;
+  // ── Step 1: LBM (priority: direct input → derived from % fat → none) ────
   let lbm: number | null = null;
-
-  if (bmrFromScale && bmrFromScale > 0) {
-    bmr = bmrFromScale;
-    if (bodyFatPercent != null) {
-      lbm = newWeight * (1 - bodyFatPercent / 100);
-    }
+  if (lbmKg != null && lbmKg > 0) {
+    lbm = lbmKg;
   } else if (bodyFatPercent != null) {
     lbm = newWeight * (1 - bodyFatPercent / 100);
+  }
+
+  // ── Step 2: BMR (priority: scale → Katch-McArdle via LBM → Mifflin) ─────
+  let bmr: number;
+  if (bmrFromScale && bmrFromScale > 0) {
+    bmr = bmrFromScale;
+  } else if (lbm != null) {
     bmr = 370 + 21.6 * lbm;
   } else {
     bmr =
@@ -227,11 +159,11 @@ export function recalculateNormWithBodyComposition(
         : 10 * newWeight + 6.25 * height - 5 * age - 161;
   }
 
-  // ── Step 2: TDEE (sedentary — same as profile calculator) ────────────────
-  const activityFactor = ACTIVITY_FACTOR["sedentary"];
+  // ── Step 3: TDEE (sedentary — same as profile calculator) ────────────────
+  const activityFactor = ACTIVITY_FACTOR;
   const tdee = bmr * activityFactor;
 
-  // ── Step 3: Calories ──────────────────────────────────────────────────────
+  // ── Step 4: Calories ──────────────────────────────────────────────────────
   const goalMultiplier = 1 + GOAL_ADJUSTMENT[goal];
   let finalCalories = Math.round(tdee * goalMultiplier);
 
@@ -245,9 +177,8 @@ export function recalculateNormWithBodyComposition(
         : "Калораж близок к минимуму. Рекомендуем увеличить активность.";
   }
 
-  // ── Step 4: Protein ───────────────────────────────────────────────────────
-  // Use LBM (from % fat) for protein — scale "muscle mass" is NOT skeletal muscle.
-  // LBM ≈ scale muscle + bone (~3–4 kg), so using % fat → LBM is more reliable.
+  // ── Step 5: Protein ───────────────────────────────────────────────────────
+  // Use LBM for protein — either direct input or derived from % fat.
   let protein: number;
   if (lbm != null) {
     const lbmProteinPerKg = gender === "female" ? 2.1 : 2.3;
@@ -259,21 +190,13 @@ export function recalculateNormWithBodyComposition(
     protein = bmi > 30 ? Math.round(Math.min(rawProtein, newWeight * 1.6)) : rawProtein;
   }
 
-  // ── Step 5: Fat ───────────────────────────────────────────────────────────
+  // ── Step 6: Fat ───────────────────────────────────────────────────────────
   const fatFromPercent = Math.round((finalCalories * 0.27) / 9);
   const minFat = Math.round(newWeight * (gender === "female" ? 1.1 : 1.0));
   const fat = Math.max(fatFromPercent, minFat);
 
-  // ── Step 6: Carbs + visceral fat correction ───────────────────────────────
-  let carbs = Math.max(0, Math.round((finalCalories - protein * 4 - fat * 9) / 4));
-
-  if (visceralFat != null && visceralFat >= 10) {
-    const reduction = visceralFat >= 15 ? 0.70 : 0.85;
-    const newCarbs = Math.max(50, Math.round(carbs * reduction));
-    const savedKcal = (carbs - newCarbs) * 4;
-    carbs = newCarbs;
-    protein = Math.round(protein + savedKcal / 4);
-  }
+  // ── Step 7: Carbs ─────────────────────────────────────────────────────────
+  const carbs = Math.max(0, Math.round((finalCalories - protein * 4 - fat * 9) / 4));
 
   return {
     calories: finalCalories,
@@ -296,7 +219,8 @@ export function calculateMacrosWithWatchTDEE(
   weight: number,
   gender: Gender,
   height: number,
-  bodyFatPercent?: number
+  bodyFatPercent?: number,
+  lbmKg?: number
 ): MacroResult {
   const tdee = bmr + avgWatchCalories;
   const goalMultiplier = 1 - deficitPercent / 100;
@@ -310,8 +234,10 @@ export function calculateMacrosWithWatchTDEE(
   }
 
   let protein: number;
-  if (bodyFatPercent != null) {
-    const lbm = weight * (1 - bodyFatPercent / 100);
+  const lbm = (lbmKg != null && lbmKg > 0)
+    ? lbmKg
+    : (bodyFatPercent != null ? weight * (1 - bodyFatPercent / 100) : null);
+  if (lbm != null) {
     const lbmProteinPerKg = gender === 'female' ? 2.1 : 2.3;
     protein = Math.round(lbm * lbmProteinPerKg);
   } else {

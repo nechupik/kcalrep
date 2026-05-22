@@ -12,7 +12,7 @@ export interface NutritionAnalyticsInput {
   dailyTargetProtein: number;
   dailyTargetFat: number;
   dailyTargetCarbs: number;
-  activityCalories: number[];
+  activityCalories?: number[];
   dailyDeficit: number[];
   weightHistory: { date: string; weight: number }[];
   foodLogsByDay: {

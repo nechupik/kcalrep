@@ -7,7 +7,6 @@ import { Flame, Target, ArrowRight } from "lucide-react";
 import {
   GOAL_LABELS,
   calculateMacros,
-  type ActivityMode,
   type CalcInput,
   type Gender,
   type Goal,
@@ -50,8 +49,6 @@ export const CalculatorForm = ({ onCalculate, submitLabel = "Рассчитат�
       age: Number(age),
       height: Number(height),
       weight: Number(weight),
-      activityMode: 'steps' as ActivityMode,
-      steps: 0,  // 0 steps = sedentary = 1.2 coefficient
       goal,
     };
     if (!input.age || !input.height || !input.weight) return;

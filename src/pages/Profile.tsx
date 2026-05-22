@@ -246,9 +246,16 @@ const Profile = () => {
         ? latestComp.bmrFromScale
         : null;
       const bodyFatPercent = latestComp?.bodyFatPercent ?? undefined;
-      const bmr = bmrFromScale ?? (storedProfileData.gender === 'male'
-        ? 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age + 5
-        : 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age - 161);
+      const lbmKg = latestComp?.lbmKg ?? undefined;
+      // BMR priority: scale → Katch-McArdle (via LBM or bodyFat) → Mifflin
+      const lbmForBmr = (lbmKg != null && lbmKg > 0)
+        ? lbmKg
+        : (bodyFatPercent != null ? weight * (1 - bodyFatPercent / 100) : null);
+      const bmr = bmrFromScale
+        ?? (lbmForBmr != null ? 370 + 21.6 * lbmForBmr : null)
+        ?? (storedProfileData.gender === 'male'
+          ? 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age + 5
+          : 10 * weight + 6.25 * storedProfileData.height - 5 * storedProfileData.age - 161);
 
       const newNorm = calculateMacrosWithWatchTDEE(
         bmr,
@@ -257,7 +264,8 @@ const Profile = () => {
         weight,
         storedProfileData.gender,
         storedProfileData.height,
-        bodyFatPercent
+        bodyFatPercent,
+        lbmKg
       );
 
       await saveNorm(newNorm, {

@@ -23,9 +23,8 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm } from "@/lib/storage";
-import { loadDiaryRange, loadWeight, loadFullNormData, loadActivity, deleteDiaryEntry, saveActivity } from "@/lib/firestore";
+import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry } from "@/lib/firestore";
 import { analyzeNutrition, formatStreak, type NutritionAnalyticsInput, type NutritionAnalyticsResult } from "@/lib/nutritionAnalytics";
-import type { ActivityEntry } from "@/lib/firestore";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
 import { toast } from "sonner";
@@ -67,14 +66,10 @@ const Stats = () => {
   const [monthlyDetailEntries, setMonthlyDetailEntries] = useState<DiaryEntry[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dayEntries, setDayEntries] = useState<DiaryEntry[]>([]);
-  const [dayActivity, setDayActivity] = useState<any | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
   const [showUserDataViewer, setShowUserDataViewer] = useState(false);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
-  const [showActivityEdit, setShowActivityEdit] = useState(false);
-  const [activityEditInput, setActivityEditInput] = useState('');
-  const [savingDayActivity, setSavingDayActivity] = useState(false);
   const [analytics, setAnalytics] = useState<NutritionAnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [productPage, setProductPage] = useState(1);
@@ -143,17 +138,9 @@ const Stats = () => {
         const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
         const endDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-        const [diaryEntries, weights, activities] = await Promise.all([
+        const [diaryEntries, weights] = await Promise.all([
           loadDiaryRange(user.uid, startDateStr, endDateStr),
           loadWeight(user.uid, 30),
-          Promise.all(
-            Array.from({ length: 30 }, (_, i) => {
-              const d = new Date(today);
-              d.setDate(d.getDate() - i);
-              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              return loadActivity(user.uid, dateStr);
-            })
-          ),
         ]);
 
         // Build foodLogsByDay
@@ -175,13 +162,8 @@ const Stats = () => {
         }
 
         // Calculate daily deficit
-        // Use max(TDEE, BMR + logged_activity) so we never understate burn below TDEE
-        // When no activity is logged, TDEE accounts for normal daily movement
-        // When activity is logged and exceeds TDEE's activity component, use the higher value
         const dailyDeficit = foodLogsByDay.map(day => {
-          const activityEntry = activities.find(a => a?.date === day.date);
-          const activityBurned = activityEntry?.caloriesBurned || 0;
-          const burned = Math.max(norm.tdee || 0, (norm.bmr || 0) + activityBurned);
+          const burned = norm.tdee || 0;
           return burned - day.calories;
         });
 
@@ -215,11 +197,6 @@ const Stats = () => {
           weight: w.weight,
         }));
 
-        // Get activity calories
-        const activityCalories = activities
-          .filter(a => a !== null)
-          .map(a => a.caloriesBurned);
-
         // Calculate averages
         const activeDays = foodLogsByDay.filter(d => d.entries > 0);
         const avgCalories = activeDays.length > 0
@@ -248,7 +225,6 @@ const Stats = () => {
           dailyTargetProtein: norm.protein,
           dailyTargetFat: norm.fat,
           dailyTargetCarbs: norm.carbs,
-          activityCalories,
           dailyDeficit,
           weightHistory,
           foodLogsByDay,
@@ -523,8 +499,6 @@ const Stats = () => {
   }, [productStats]);
 
   const handleDayClick = async (dayNumber: number) => {
-    setShowActivityEdit(false);
-    setActivityEditInput('');
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth();
@@ -534,57 +508,12 @@ const Stats = () => {
     setLoadingDay(true);
     
     try {
-      const [entries, activity] = await Promise.all([
-        loadDiaryRange(user!.uid, dateStr, dateStr),
-        loadActivity(user!.uid, dateStr),
-      ]);
+      const entries = await loadDiaryRange(user!.uid, dateStr, dateStr);
       setDayEntries(entries);
-      setDayActivity(activity);
     } catch (error) {
       console.error('Error loading day details:', error);
     } finally {
       setLoadingDay(false);
-    }
-  };
-
-  const handleSaveDayActivity = async () => {
-    if (!user || !selectedDay) return;
-    setSavingDayActivity(true);
-    try {
-      const isAdmin = user.uid === ADMIN_UID;
-      let caloriesBurned = 0;
-      let type: ActivityEntry['type'] = 'steps';
-      let value = 0;
-
-      if (isAdmin) {
-        caloriesBurned = Number(activityEditInput) || 0;
-        type = 'calories';
-        value = caloriesBurned;
-      } else {
-        const steps = Number(activityEditInput) || 0;
-        const weights = await loadWeight(user.uid, 1);
-        const weight = weights.length > 0 ? weights[0].weight : 70;
-        caloriesBurned = Math.round(steps * weight * 0.0005);
-        type = 'steps';
-        value = steps;
-      }
-
-      await saveActivity(user.uid, {
-        date: selectedDay,
-        type,
-        value,
-        caloriesBurned,
-      });
-
-      const updated = await loadActivity(user.uid, selectedDay);
-      setDayActivity(updated);
-      setShowActivityEdit(false);
-      setActivityEditInput('');
-      toast.success('Активность сохранена');
-    } catch (error) {
-      toast.error('Ошибка сохранения активности');
-    } finally {
-      setSavingDayActivity(false);
     }
   };
 
@@ -1042,81 +971,12 @@ const Stats = () => {
                               ))}
                             </div>
 
-                            {/* Activity */}
-                            <div className="mb-4">
-                              {dayActivity && dayActivity.caloriesBurned > 0 && (
-                                <div className="rounded-xl bg-muted/30 px-4 py-3 mb-2 flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <span>{dayActivity.type === 'calories' ? '⌚' : '👣'}</span>
-                                    <span className="text-sm font-medium">
-                                      {dayActivity.type === 'calories' ? 'Apple Watch' : 
-                                       dayActivity.type === 'steps' ? `${dayActivity.value.toLocaleString()} шагов` : 'Дома'}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-green-400">+{dayActivity.caloriesBurned} ккал</span>
-                                    <button
-                                      onClick={() => {
-                                        setActivityEditInput(String(dayActivity.value));
-                                        setShowActivityEdit(true);
-                                      }}
-                                      className="text-xs text-muted-foreground hover:text-foreground transition-smooth px-2 py-1 rounded-lg hover:bg-muted/50"
-                                    >
-                                      ✏️
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                              {(!dayActivity || dayActivity.caloriesBurned === 0) && !showActivityEdit && (
-                                <button
-                                  onClick={() => { setActivityEditInput(''); setShowActivityEdit(true); }}
-                                  className="w-full rounded-xl border border-dashed border-border/50 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-smooth flex items-center justify-center gap-2"
-                                >
-                                  <span>+</span>
-                                  <span>{user?.uid === ADMIN_UID ? 'Добавить активность Apple Watch' : 'Добавить шаги'}</span>
-                                </button>
-                              )}
-                              {showActivityEdit && (
-                                <div className="rounded-xl bg-muted/30 px-4 py-3 space-y-3">
-                                  <div className="text-sm font-medium">
-                                    {user?.uid === ADMIN_UID ? '⌚ Калории Apple Watch' : '👣 Количество шагов'}
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Input
-                                      type="number"
-                                      placeholder={user?.uid === ADMIN_UID ? 'Калории' : 'Шагов'}
-                                      value={activityEditInput}
-                                      onChange={(e) => setActivityEditInput(e.target.value)}
-                                      className="flex-1"
-                                      autoFocus
-                                    />
-                                    <Button
-                                      onClick={handleSaveDayActivity}
-                                      disabled={!activityEditInput || savingDayActivity}
-                                      size="sm"
-                                      className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90"
-                                    >
-                                      {savingDayActivity ? '...' : 'Сохранить'}
-                                    </Button>
-                                    <Button
-                                      onClick={() => { setShowActivityEdit(false); setActivityEditInput(''); }}
-                                      size="sm"
-                                      variant="ghost"
-                                      className="rounded-xl"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
                             {/* Deficit */}
-                            {norm && dayActivity !== undefined && (
+                            {norm && (
                               <div className="rounded-xl bg-muted/30 px-4 py-3 mb-5 grid grid-cols-3 gap-2 text-center">
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
-                                  <div className="font-bold text-sm">{Math.max(norm.tdee, norm.bmr + (dayActivity?.caloriesBurned || 0))} ккал</div>
+                                  <div className="font-bold text-sm">{norm.tdee} ккал</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Съедено</div>
@@ -1125,11 +985,10 @@ const Stats = () => {
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
                                   <div className={`font-bold text-sm ${
-                                    Math.max(norm.tdee, norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories > 0 
-                                      ? 'text-green-400' : 'text-red-400'
+                                    norm.tdee - totals.calories > 0 ? 'text-green-400' : 'text-red-400'
                                   }`}>
                                     {(() => {
-                                      const d = Math.max(norm.tdee, norm.bmr + (dayActivity?.caloriesBurned || 0)) - totals.calories;
+                                      const d = norm.tdee - totals.calories;
                                       return `${d > 0 ? '+' : ''}${d} ккал`;
                                     })()}
                                   </div>
@@ -1151,50 +1010,6 @@ const Stats = () => {
                     <div className="text-center py-8 text-muted-foreground">
                       <div className="text-4xl mb-3">📭</div>
                       <p className="text-sm">Нет записей за этот день</p>
-                      <div className="mt-4">
-                        {!showActivityEdit && (
-                          <button
-                            onClick={() => { setActivityEditInput(''); setShowActivityEdit(true); }}
-                            className="w-full rounded-xl border border-dashed border-border/50 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-smooth flex items-center justify-center gap-2"
-                          >
-                            <span>+</span>
-                            <span>{user?.uid === ADMIN_UID ? 'Добавить активность Apple Watch' : 'Добавить шаги'}</span>
-                          </button>
-                        )}
-                        {showActivityEdit && (
-                          <div className="rounded-xl bg-muted/30 px-4 py-3 space-y-3 text-left">
-                            <div className="text-sm font-medium">
-                              {user?.uid === ADMIN_UID ? '⌚ Калории Apple Watch' : '👣 Количество шагов'}
-                            </div>
-                            <div className="flex gap-2">
-                              <Input
-                                type="number"
-                                placeholder={user?.uid === ADMIN_UID ? 'Калории' : 'Шагов'}
-                                value={activityEditInput}
-                                onChange={(e) => setActivityEditInput(e.target.value)}
-                                className="flex-1"
-                                autoFocus
-                              />
-                              <Button
-                                onClick={handleSaveDayActivity}
-                                disabled={!activityEditInput || savingDayActivity}
-                                size="sm"
-                                className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90"
-                              >
-                                {savingDayActivity ? '...' : 'Сохранить'}
-                              </Button>
-                              <Button
-                                onClick={() => { setShowActivityEdit(false); setActivityEditInput(''); }}
-                                size="sm"
-                                variant="ghost"
-                                className="rounded-xl"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   )}
                 </>

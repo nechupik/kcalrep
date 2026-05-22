@@ -56,8 +56,6 @@ export const SimpleCalculatorForm = ({
       age,
       height,
       weight: Number(weight),
-      activityMode: 'steps',
-      steps: 0, // 0 steps = sedentary = 1.2 coefficient
       goal,
     };
     if (!input.weight) return;

@@ -73,8 +73,6 @@ export const EditProfileDataModal = ({ isOpen, onClose, onSave, userId }: EditPr
         age: parsedAge,
         height: parsedHeight,
         weight: currentWeight,
-        activityMode: "steps",
-        steps: 0,
         goal: currentNormData.goal as Goal || "maintain",
       };
 

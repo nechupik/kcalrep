@@ -21,9 +21,8 @@ import {
   updateDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
-import { saveActivity, loadActivity, loadWeight, loadFullNormData, loadUserSettings, loadLatestActivityEntries, type ActivityEntry } from "@/lib/firestore";
+import { loadWeight, loadFullNormData, loadUserSettings } from "@/lib/firestore";
 import { loadBodyComposition } from "@/lib/metabolic-firestore";
-import { calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 import type { MacroResult } from "@/lib/nutrition";
 
 const Index = () => {
@@ -32,11 +31,6 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
-  const [activity, setActivity] = useState<ActivityEntry | null>(null);
-  const [activityInput, setActivityInput] = useState('');
-  const [savingActivity, setSavingActivity] = useState(false);
-  const [activityEnabled, setActivityEnabled] = useState(true);
-  const [activityCardHiding, setActivityCardHiding] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editModalAnimationState, setEditModalAnimationState] = useState<'enter' | 'exit' | null>(null);
@@ -85,22 +79,13 @@ const Index = () => {
     const loadData = async () => {
       if (!user) { setLoading(false); return; }
       try {
-        const [normData, diaryData, activityData, settings] = await Promise.all([
+        const [normData, diaryData] = await Promise.all([
           loadNorm(),
           loadDiary(selectedDate),
-          loadActivity(user.uid, selectedDate),
-          loadUserSettings(user.uid),
         ]);
         
         setNorm(normData);
         setEntries(Array.isArray(diaryData) ? diaryData : []);
-        setActivity(activityData);
-        setActivityCardHiding(false);
-        if (settings) setActivityEnabled(settings.activityTrackingEnabled);
-        if (activityData) {
-          if (activityData.type === 'calories') setActivityInput(String(activityData.value));
-          if (activityData.type === 'steps') setActivityInput(String(activityData.value));
-        }
       } finally {
         setLoading(false);
       }
@@ -217,87 +202,6 @@ const Index = () => {
     toast.success(`Скопировано ${yesterdayEntries.length} записей из вчера`);
   };
 
-  const handleSaveActivity = async () => {
-    if (!user) return;
-    setSavingActivity(true);
-    try {
-      let caloriesBurned = 0;
-      let type: ActivityEntry['type'] = 'home';
-      let value = 0;
-
-      if (user.uid === ADMIN_UID) {
-        // Admin: direct calorie input from Apple Watch
-        caloriesBurned = Number(activityInput) || 0;
-        type = 'calories';
-        value = caloriesBurned;
-      } else {
-        const steps = Number(activityInput) || 0;
-        const lastWeight = await getLastWeight();
-        caloriesBurned = Math.round(steps * lastWeight * 0.0005);
-        type = 'steps';
-        value = steps;
-      }
-
-      await saveActivity(user.uid, {
-        date: selectedDate,
-        type,
-        value,
-        caloriesBurned,
-      });
-
-      const updated = await loadActivity(user.uid, selectedDate);
-      setActivity(updated);
-
-      // Admin: start hide animation, remove from DOM after 650ms
-      if (user.uid === ADMIN_UID) {
-        setActivityCardHiding(true);
-        setTimeout(() => setActivityCardHiding(false), 650);
-      }
-
-      // Admin: auto-recalculate floating norm from last 7 activity entries
-      if (user.uid === ADMIN_UID) {
-        try {
-          const [latestActivities, normData, weightEntries, latestBodyComp, settings] = await Promise.all([
-            loadLatestActivityEntries(user.uid, 7),
-            loadFullNormData(user.uid),
-            loadWeight(user.uid, 1),
-            loadBodyComposition(user.uid, 1),
-            loadUserSettings(user.uid),
-          ]);
-
-          if (normData && normData.gender && latestActivities.length > 0) {
-            const avg = Math.round(latestActivities.reduce((sum, e) => sum + e.caloriesBurned, 0) / latestActivities.length);
-            const w = weightEntries.length > 0 ? weightEntries[0].weight : 80;
-            const deficitPct = settings?.deficitPercent ?? 10;
-            const latestComp = latestBodyComp.length > 0 ? latestBodyComp[0] : null;
-            const bmrFromScale = latestComp?.bmrFromScale && latestComp.bmrFromScale > 0
-              ? latestComp.bmrFromScale
-              : null;
-            const bodyFatPercent = latestComp?.bodyFatPercent ?? undefined;
-            const bmr = bmrFromScale ?? (normData.gender === 'male'
-              ? 10 * w + 6.25 * normData.height - 5 * normData.age + 5
-              : 10 * w + 6.25 * normData.height - 5 * normData.age - 161);
-
-            const newNorm = calculateMacrosWithWatchTDEE(bmr, avg, deficitPct, w, normData.gender, normData.height, bodyFatPercent);
-            await saveNorm(newNorm, { gender: normData.gender, height: normData.height, age: normData.age, goal: normData.goal || 'lose' });
-            setNorm(newNorm);
-            toast.success(`Активность сохранена. Норма обновлена: ${newNorm.calories} ккал (ср. ${avg} ккал/день)`);
-          } else {
-            toast.success('Активность сохранена');
-          }
-        } catch {
-          toast.success('Активность сохранена');
-        }
-      } else {
-        toast.success('Активность сохранена');
-      }
-    } catch (error) {
-      toast.error('Ошибка сохранения активности');
-    } finally {
-      setSavingActivity(false);
-    }
-  };
-
   const selectedDateTotals = useMemo(() => {
     return entries.reduce(
       (acc, e) => ({
@@ -312,15 +216,13 @@ const Index = () => {
 
   const deficitData = useMemo(() => {
     if (!norm) return null;
-    const activityCalories = (activityEnabled && activity?.caloriesBurned) ? activity.caloriesBurned : 0;
-    const burned = norm.bmr + activityCalories;
+    const burned = norm.tdee;
     const deficit = burned - selectedDateTotals.calories;
     return {
       burned,
       deficit,
-      activityCalories,
     };
-  }, [norm, selectedDateTotals, activity, activityEnabled]);
+  }, [norm, selectedDateTotals]);
 
 
   const isToday = selectedDate === (() => {
@@ -395,68 +297,6 @@ const Index = () => {
           ) : null}
         </section>
 
-        {/* Activity Tracking */}
-        <section className="container max-w-5xl mb-4">
-          {norm && (user?.uid === ADMIN_UID || activityEnabled) && !(user?.uid === ADMIN_UID && activity && !activityCardHiding) && (
-            <div style={{
-              opacity: activityCardHiding ? 0 : 1,
-              transform: activityCardHiding ? 'translateY(-6px)' : 'translateY(0)',
-              transition: 'opacity 650ms ease-in-out, transform 650ms ease-in-out',
-            }}>
-            <Card className="w-full p-6 md:p-8 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="font-semibold">Активность за вчера</h3>
-              {activity && (
-                <span className="ml-auto text-sm font-semibold text-green-400">
-                  +{activity.caloriesBurned} ккал
-                </span>
-              )}
-            </div>
-
-            {/* ADMIN: Apple Watch calories input */}
-            {user?.uid === ADMIN_UID && (
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder="Kcal from Apple Watch"
-                  value={activityInput}
-                  onChange={e => setActivityInput(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleSaveActivity}
-                  disabled={savingActivity || !activityInput}
-                  className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
-                >
-                  Сохранить
-                </Button>
-              </div>
-            )}
-
-            {/* WIFE: Steps input */}
-            {user?.uid !== ADMIN_UID && (
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder="Количество шагов"
-                  value={activityInput}
-                  onChange={e => setActivityInput(e.target.value)}
-                  className="w-2/3"
-                />
-                <Button
-                  onClick={handleSaveActivity}
-                  disabled={savingActivity || !activityInput}
-                  className="w-1/3 bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90"
-                >
-                  Сохранить
-                </Button>
-              </div>
-            )}
-
-          </Card>
-          </div>
-          )}
-        </section>
 
         {/* Eaten Foods List */}
         <section className="container max-w-5xl">

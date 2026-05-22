@@ -74,8 +74,7 @@ export interface BodyCompositionEntry {
   date: string;         // YYYY-MM-DD
   weight: number;       // kg
   bodyFatPercent?: number;
-  muscleMassKg?: number;
-  visceralFat?: number; // index 1-20
+  lbmKg?: number;       // lean body mass (kg) — used for BMR and protein
   bmrFromScale?: number; // kcal, if scale provides it
 }
 

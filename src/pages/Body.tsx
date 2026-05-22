@@ -124,8 +124,7 @@ function WeightHistoryRow({
           {bodyComp && (
             <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
               {bodyComp.bodyFatPercent != null && <span>Жир {bodyComp.bodyFatPercent}%</span>}
-              {bodyComp.muscleMassKg != null && <span>Мышцы {bodyComp.muscleMassKg}кг</span>}
-              {bodyComp.visceralFat != null && <span>Висц. {bodyComp.visceralFat}</span>}
+              {bodyComp.lbmKg != null && <span>ЛБМ {bodyComp.lbmKg}кг</span>}
             </div>
           )}
         </div>
@@ -185,10 +184,8 @@ const Body = () => {
   // Body composition
   const [bodyCompEntries, setBodyCompEntries] = useState<BodyCompositionEntry[]>([]);
   const [bodyFatInput, setBodyFatInput] = useState("");
-  const [muscleInput, setMuscleInput] = useState("");
-  const [visceralInput, setVisceralInput] = useState("");
+  const [lbmInput, setLbmInput] = useState("");
   const [bmrScaleInput, setBmrScaleInput] = useState("");
-  const [showBodyComp, setShowBodyComp] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [historyPage, setHistoryPage] = useState(0);
@@ -228,14 +225,13 @@ const Body = () => {
       await saveWeight(user.uid, weight, today);
 
       // Save body composition if any fields are filled
-      const hasBodyComp = bodyFatInput || muscleInput || visceralInput || bmrScaleInput;
+      const hasBodyComp = bodyFatInput || lbmInput || bmrScaleInput;
       if (hasBodyComp) {
         await saveBodyComposition(user.uid, {
           date: today,
           weight,
           bodyFatPercent: bodyFatInput ? parseFloat(bodyFatInput) : undefined,
-          muscleMassKg: muscleInput ? parseFloat(muscleInput) : undefined,
-          visceralFat: visceralInput ? parseFloat(visceralInput) : undefined,
+          lbmKg: lbmInput ? parseFloat(lbmInput) : undefined,
           bmrFromScale: bmrScaleInput ? parseFloat(bmrScaleInput) : undefined,
         });
       }
@@ -284,13 +280,13 @@ const Body = () => {
           newNormResult = calculateMacrosWithWatchTDEE(
             bmr, avg, deficitPercent, weight,
             currentNormData.gender, currentNormData.height,
-            bodyFatInput ? parseFloat(bodyFatInput) : undefined
+            bodyFatInput ? parseFloat(bodyFatInput) : undefined,
+            lbmInput ? parseFloat(lbmInput) : undefined
           );
         } else {
           const bodyCompForCalc = {
             bodyFatPercent: bodyFatInput ? parseFloat(bodyFatInput) : undefined,
-            muscleMassKg: muscleInput ? parseFloat(muscleInput) : undefined,
-            visceralFat: visceralInput ? parseFloat(visceralInput) : undefined,
+            lbmKg: lbmInput ? parseFloat(lbmInput) : undefined,
             bmrFromScale: bmrScaleInput ? parseFloat(bmrScaleInput) : undefined,
           };
           const hasBodyComp = Object.values(bodyCompForCalc).some((v) => v != null);
@@ -313,10 +309,8 @@ const Body = () => {
       // Reset inputs
       setWeightInput("");
       setBodyFatInput("");
-      setMuscleInput("");
-      setVisceralInput("");
+      setLbmInput("");
       setBmrScaleInput("");
-      setShowBodyComp(false);
     } catch (error) {
       console.error("Failed to save:", error);
       toast.error("Ошибка сохранения");
@@ -367,7 +361,7 @@ const Body = () => {
           month: "2-digit",
         }),
         bodyFat: entry.bodyFatPercent,
-        muscle: entry.muscleMassKg,
+        lbm: entry.lbmKg,
       }));
   }, [bodyCompEntries]);
 
@@ -416,18 +410,9 @@ const Body = () => {
               />
             </div>
 
-            {/* Toggle body composition fields */}
-            {!showBodyComp && (
-              <button
-                onClick={() => setShowBodyComp(true)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                + Дополнительные данные
-              </button>
-            )}
-
-            {showBodyComp && (
-              <div className="grid grid-cols-2 gap-2">
+            {/* Body composition fields — admin only */}
+            {user?.uid === ADMIN_UID && (
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">
                     % жира
@@ -442,26 +427,14 @@ const Body = () => {
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">
-                    Мышцы (кг)
+                    Безжировая масса (кг)
                   </label>
                   <Input
                     type="number"
                     step="0.1"
-                    placeholder="напр. 42.0"
-                    value={muscleInput}
-                    onChange={(e) => setMuscleInput(e.target.value.replace(",", "."))}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    Висцеральный жир
-                  </label>
-                  <Input
-                    type="number"
-                    step="1"
-                    placeholder="индекс 1-20"
-                    value={visceralInput}
-                    onChange={(e) => setVisceralInput(e.target.value)}
+                    placeholder="напр. 52.0"
+                    value={lbmInput}
+                    onChange={(e) => setLbmInput(e.target.value.replace(",", "."))}
                   />
                 </div>
                 <div>
@@ -512,8 +485,8 @@ const Body = () => {
               )}
             </Card>
 
-            {/* Body fat */}
-            {latestBodyComp?.bodyFatPercent != null && (
+            {/* Body fat — admin only */}
+            {user?.uid === ADMIN_UID && latestBodyComp?.bodyFatPercent != null && (
               <Card className="p-4 bg-card/80 backdrop-blur-sm border-border/50">
                 <div className="text-xs text-muted-foreground mb-1">% жира</div>
                 <div className="text-2xl font-bold">
@@ -528,29 +501,12 @@ const Body = () => {
               </Card>
             )}
 
-            {/* Muscle mass */}
-            {latestBodyComp?.muscleMassKg != null && (
+            {/* Lean body mass — admin only */}
+            {user?.uid === ADMIN_UID && latestBodyComp?.lbmKg != null && (
               <Card className="p-4 bg-card/80 backdrop-blur-sm border-border/50">
-                <div className="text-xs text-muted-foreground mb-1">Мышцы</div>
+                <div className="text-xs text-muted-foreground mb-1">Безжировая масса</div>
                 <div className="text-2xl font-bold">
-                  {latestBodyComp.muscleMassKg} кг
-                </div>
-              </Card>
-            )}
-
-            {/* Visceral fat */}
-            {latestBodyComp?.visceralFat != null && (
-              <Card className="p-4 bg-card/80 backdrop-blur-sm border-border/50">
-                <div className="text-xs text-muted-foreground mb-1">
-                  Висцеральный жир
-                </div>
-                <div className="text-2xl font-bold">{latestBodyComp.visceralFat}</div>
-                <div className={`text-xs mt-1 ${
-                  latestBodyComp.visceralFat <= 9 ? "text-green-400" :
-                  latestBodyComp.visceralFat <= 14 ? "text-yellow-400" : "text-red-400"
-                }`}>
-                  {latestBodyComp.visceralFat <= 9 ? "Норма" :
-                   latestBodyComp.visceralFat <= 14 ? "Повышенный" : "Высокий"}
+                  {latestBodyComp.lbmKg} кг
                 </div>
               </Card>
             )}
@@ -592,8 +548,8 @@ const Body = () => {
           </Card>
         )}
 
-        {/* Body Composition Chart */}
-        {bodyCompChartData.length > 1 && (
+        {/* Body Composition Chart — admin only */}
+        {user?.uid === ADMIN_UID && bodyCompChartData.length > 1 && (
           <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
             <h2 className="font-semibold mb-4">Состав тела</h2>
             <div className="h-48">
@@ -618,14 +574,14 @@ const Body = () => {
                     dot={{ fill: "#f97316", r: 3 }}
                     name="% жира"
                   />
-                  {bodyCompChartData.some((d) => d.muscle != null) && (
+                  {bodyCompChartData.some((d) => d.lbm != null) && (
                     <Line
                       type="monotone"
-                      dataKey="muscle"
+                      dataKey="lbm"
                       stroke="#22c55e"
                       strokeWidth={2}
                       dot={{ fill: "#22c55e", r: 3 }}
-                      name="Мышцы (кг)"
+                      name="Безжировая масса (кг)"
                     />
                   )}
                 </LineChart>
@@ -646,7 +602,7 @@ const Body = () => {
               {/* First 5 entries always visible */}
               <div className="space-y-2">
                 {weightEntries.slice(0, 5).map((entry, idx) => {
-                  const bc = bodyCompEntries.find((b) => b.date === entry.date);
+                  const bc = user?.uid === ADMIN_UID ? bodyCompEntries.find((b) => b.date === entry.date) : undefined;
                   return (
                     <WeightHistoryRow
                       key={entry.id}
@@ -677,7 +633,7 @@ const Body = () => {
                       <div className="space-y-2 mt-2">
                         {weightEntries.slice(5 + historyPage * 10, 5 + (historyPage + 1) * 10).map((entry, i) => {
                           const globalIdx = 5 + historyPage * 10 + i;
-                          const bc = bodyCompEntries.find((b) => b.date === entry.date);
+                          const bc = user?.uid === ADMIN_UID ? bodyCompEntries.find((b) => b.date === entry.date) : undefined;
                           return (
                             <WeightHistoryRow
                               key={entry.id}
