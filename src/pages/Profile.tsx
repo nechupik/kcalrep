@@ -24,7 +24,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm, saveNorm } from "@/lib/storage";
-import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight, loadActivityRange } from "@/lib/firestore";
+import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight, loadActivityRange, saveActivity, loadActivity } from "@/lib/firestore";
 import { loadBodyComposition } from "@/lib/metabolic-firestore";
 import type { CalcInput, MacroResult } from "@/lib/nutrition";
 import { updateProfile } from "firebase/auth";
@@ -59,6 +59,10 @@ const Profile = () => {
   const [deficitPercent, setDeficitPercent] = useState(10);
   const [adminRecalculating, setAdminRecalculating] = useState(false);
   const [avgWatchCalories, setAvgWatchCalories] = useState<number | null>(null);
+  const [watchInputDate, setWatchInputDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [watchInputCalories, setWatchInputCalories] = useState('');
+  const [savingActivity, setSavingActivity] = useState(false);
+  const [todayActivity, setTodayActivity] = useState<number | null>(null);
 
   useEffect(() => {
     const loadNormData = async () => {
@@ -92,6 +96,16 @@ const Profile = () => {
   useEffect(() => {
     if (user) {
       setDisplayName(user.displayName || '');
+    }
+  }, [user]);
+
+  // Load today's activity for admin
+  useEffect(() => {
+    if (user?.uid === ADMIN_UID) {
+      const today = new Date().toISOString().split('T')[0];
+      loadActivity(user.uid, today).then(entry => {
+        setTodayActivity(entry?.caloriesBurned ?? null);
+      });
     }
   }, [user]);
 
@@ -216,6 +230,38 @@ const Profile = () => {
       toast.error('Ошибка сохранения настроек');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleSaveWatchActivity = async () => {
+    if (!user || !watchInputCalories) return;
+    setSavingActivity(true);
+    try {
+      const cal = Number(watchInputCalories);
+      if (isNaN(cal) || cal <= 0) {
+        toast.error('Введите корректное число калорий');
+        return;
+      }
+      await saveActivity(user.uid, {
+        date: watchInputDate,
+        type: 'calories',
+        value: cal,
+        caloriesBurned: cal,
+      });
+      toast.success(`Активность ${cal} ккал сохранена за ${watchInputDate}`);
+      setWatchInputCalories('');
+      // Update today's activity display if saved for today
+      if (watchInputDate === new Date().toISOString().split('T')[0]) {
+        setTodayActivity(cal);
+      }
+
+      // Auto-recalculate norm after saving activity
+      await handleAdminWatchRecalculate();
+    } catch (error) {
+      console.error(error);
+      toast.error('Ошибка сохранения активности');
+    } finally {
+      setSavingActivity(false);
     }
   };
 
@@ -509,23 +555,59 @@ const Profile = () => {
                     </div>
                   </div>
 
-                  {/* Apple Watch recalculation — admin only */}
+                  {/* Apple Watch activity input + recalculation — admin only */}
                   {user?.uid === ADMIN_UID && (
-                    <div className="mb-4 p-3 rounded-xl bg-muted/20 border border-border/30">
-                      <div className="text-xs font-medium mb-0.5">Apple Watch норма</div>
-                      <div className="text-xs text-muted-foreground mb-3">
-                        TDEE = BMR + средняя активность за 7 дней
-                        {avgWatchCalories !== null && (
-                          <span className="ml-1 text-foreground font-medium">(ср. {avgWatchCalories} ккал/день)</span>
+                    <div className="mb-4 p-3 rounded-xl bg-muted/20 border border-border/30 space-y-3">
+                      <div className="text-xs font-medium mb-0.5">Apple Watch</div>
+
+                      {/* Activity input */}
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            type="date"
+                            value={watchInputDate}
+                            onChange={(e) => setWatchInputDate(e.target.value)}
+                            className="flex-1 text-xs h-8"
+                          />
+                          <Input
+                            type="number"
+                            placeholder="ккал активности"
+                            value={watchInputCalories}
+                            onChange={(e) => setWatchInputCalories(e.target.value)}
+                            className="flex-1 text-xs h-8"
+                          />
+                        </div>
+                        <Button
+                          onClick={handleSaveWatchActivity}
+                          disabled={savingActivity || !watchInputCalories}
+                          size="sm"
+                          className="w-full text-xs h-7 rounded-lg bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90"
+                        >
+                          {savingActivity ? 'Сохранение...' : 'Добавить активность'}
+                        </Button>
+                        {todayActivity !== null && (
+                          <div className="text-xs text-muted-foreground">
+                            Сегодня: <span className="text-foreground font-medium">{todayActivity} ккал</span>
+                          </div>
                         )}
                       </div>
-                      <Button
-                        onClick={handleAdminWatchRecalculate}
-                        disabled={adminRecalculating}
-                        className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground font-semibold shadow-glow hover:opacity-90"
-                      >
-                        {adminRecalculating ? 'Пересчитываю...' : 'Пересчитать с Apple Watch'}
-                      </Button>
+
+                      {/* Recalculate */}
+                      <div className="border-t border-border/30 pt-2">
+                        <div className="text-xs text-muted-foreground mb-2">
+                          TDEE = BMR + средняя активность за 7 дней
+                          {avgWatchCalories !== null && (
+                            <span className="ml-1 text-foreground font-medium">(ср. {avgWatchCalories} ккал/день)</span>
+                          )}
+                        </div>
+                        <Button
+                          onClick={handleAdminWatchRecalculate}
+                          disabled={adminRecalculating}
+                          className="w-full flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground font-semibold shadow-glow hover:opacity-90"
+                        >
+                          {adminRecalculating ? 'Пересчитываю...' : 'Пересчитать с Apple Watch'}
+                        </Button>
+                      </div>
                     </div>
                   )}
 

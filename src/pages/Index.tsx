@@ -21,9 +21,10 @@ import {
   updateDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
-import { loadWeight, loadFullNormData, loadUserSettings } from "@/lib/firestore";
+import { loadWeight, loadFullNormData, loadUserSettings, saveActivity, loadActivity, loadActivityRange } from "@/lib/firestore";
 import { loadBodyComposition } from "@/lib/metabolic-firestore";
 import type { MacroResult } from "@/lib/nutrition";
+import { calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 
 const Index = () => {
   const { user } = useAuth();
@@ -40,6 +41,11 @@ const Index = () => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   });
+  const [watchInputDate, setWatchInputDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [watchInputCalories, setWatchInputCalories] = useState('');
+  const [savingActivity, setSavingActivity] = useState(false);
+  const [recalculatingNorm, setRecalculatingNorm] = useState(false);
+  const [todayActivity, setTodayActivity] = useState<number | null>(null);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -47,6 +53,16 @@ const Index = () => {
     const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
     return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
   };
+
+  // Load today's activity for admin
+  useEffect(() => {
+    if (user?.uid === ADMIN_UID) {
+      const today = new Date().toISOString().split('T')[0];
+      loadActivity(user.uid, today).then(entry => {
+        setTodayActivity(entry?.caloriesBurned ?? null);
+      });
+    }
+  }, [user]);
 
   const navigateDate = (direction: 'prev' | 'next') => {
     const currentDate = new Date(selectedDate + 'T00:00:00');
@@ -121,6 +137,103 @@ const Index = () => {
     setEntryToEdit(entry);
     setEditGrams(entry.grams.toString());
     setShowEditModal(true);
+  };
+
+  const handleSaveWatchActivity = async () => {
+    if (!user || !watchInputCalories) return;
+    setSavingActivity(true);
+    try {
+      const cal = Number(watchInputCalories);
+      if (isNaN(cal) || cal <= 0) {
+        toast.error('Введите корректное число калорий');
+        return;
+      }
+      await saveActivity(user.uid, {
+        date: watchInputDate,
+        type: 'calories',
+        value: cal,
+        caloriesBurned: cal,
+      });
+      toast.success(`Активность ${cal} ккал сохранена за ${watchInputDate}`);
+      setWatchInputCalories('');
+      // Update today's activity display if saved for today
+      if (watchInputDate === new Date().toISOString().split('T')[0]) {
+        setTodayActivity(cal);
+      }
+
+      // Auto-recalculate norm for admin after saving activity
+      if (user.uid === ADMIN_UID) {
+        setRecalculatingNorm(true);
+        try {
+          const today = new Date();
+          const endDate = today.toISOString().split('T')[0];
+          const startDate = new Date(today);
+          startDate.setDate(today.getDate() - 6);
+          const startDateStr = startDate.toISOString().split('T')[0];
+
+          const activityEntries = await loadActivityRange(user.uid, startDateStr, endDate);
+          const avg = activityEntries.length > 0
+            ? Math.round(activityEntries.reduce((sum, e) => sum + e.caloriesBurned, 0) / activityEntries.length)
+            : 0;
+
+          const [weightEntries, latestBodyComp, fullNormData, userSettings] = await Promise.all([
+            loadWeight(user.uid, 1),
+            loadBodyComposition(user.uid, 1),
+            loadFullNormData(user.uid),
+            loadUserSettings(user.uid),
+          ]);
+
+          const weight = weightEntries.length > 0 ? weightEntries[0].weight : 80;
+          const deficitPercent = userSettings?.deficitPercent ?? 20;
+
+          const latestComp = latestBodyComp.length > 0 ? latestBodyComp[0] : null;
+          const bmrFromScale = latestComp?.bmrFromScale && latestComp.bmrFromScale > 0
+            ? latestComp.bmrFromScale
+            : null;
+          const bodyFatPercent = latestComp?.bodyFatPercent ?? undefined;
+          const lbmKg = latestComp?.lbmKg ?? undefined;
+
+          const lbmForBmr = (lbmKg != null && lbmKg > 0)
+            ? lbmKg
+            : (bodyFatPercent != null ? weight * (1 - bodyFatPercent / 100) : null);
+          const bmr = bmrFromScale
+            ?? (lbmForBmr != null ? 370 + 21.6 * lbmForBmr : null)
+            ?? (fullNormData?.gender === 'male'
+              ? 10 * weight + 6.25 * (fullNormData?.height || 180) - 5 * (fullNormData?.age || 30) + 5
+              : 10 * weight + 6.25 * (fullNormData?.height || 165) - 5 * (fullNormData?.age || 30) - 161);
+
+          const newNorm = calculateMacrosWithWatchTDEE(
+            bmr,
+            avg,
+            deficitPercent,
+            weight,
+            fullNormData?.gender || 'male',
+            fullNormData?.height || 180,
+            bodyFatPercent,
+            lbmKg
+          );
+
+          await saveNorm(newNorm, {
+            gender: fullNormData?.gender || 'male',
+            height: fullNormData?.height || 180,
+            age: fullNormData?.age || 30,
+            goal: fullNormData?.goal || 'lose',
+          });
+          setNorm(newNorm);
+          toast.success(`Норма пересчитана: ${newNorm.calories} ккал (ср. ${avg} ккал/день)`);
+        } catch (error) {
+          console.error(error);
+          toast.error('Ошибка пересчёта нормы');
+        } finally {
+          setRecalculatingNorm(false);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Ошибка сохранения активности');
+    } finally {
+      setSavingActivity(false);
+    }
   };
 
   // Control edit modal animation
@@ -296,6 +409,43 @@ const Index = () => {
             </Card>
           ) : null}
         </section>
+
+        {/* Apple Watch activity input — admin only */}
+        {user?.uid === ADMIN_UID && (
+          <section className="container max-w-5xl mb-4">
+            <Card className="p-4 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
+              <div className="text-xs font-medium mb-2">Apple Watch активность</div>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="date"
+                  value={watchInputDate}
+                  onChange={(e) => setWatchInputDate(e.target.value)}
+                  className="w-32 text-xs h-8"
+                />
+                <Input
+                  type="number"
+                  placeholder="ккал"
+                  value={watchInputCalories}
+                  onChange={(e) => setWatchInputCalories(e.target.value)}
+                  className="flex-1 text-xs h-8"
+                />
+                <Button
+                  onClick={handleSaveWatchActivity}
+                  disabled={savingActivity || !watchInputCalories}
+                  size="sm"
+                  className="h-8 text-xs rounded-lg bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90"
+                >
+                  {savingActivity ? '...' : 'Добавить'}
+                </Button>
+                {todayActivity !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    Сегодня: <span className="text-foreground font-medium">{todayActivity} ккал</span>
+                  </span>
+                )}
+              </div>
+            </Card>
+          </section>
+        )}
 
 
         {/* Eaten Foods List */}
