@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { loadNorm } from "@/lib/storage";
@@ -8,19 +8,29 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [checking, setChecking] = useState(true);
+  const normCheckedRef = useRef(false);
 
   useEffect(() => {
     const check = async () => {
       if (loading) return;
       if (!user) {
+        normCheckedRef.current = false;
         navigate("/auth");
         return;
       }
       if (location.pathname !== "/onboarding") {
-        const norm = await loadNorm();
-        if (!norm) {
-          navigate("/onboarding");
-          return;
+        if (!normCheckedRef.current) {
+          try {
+            const norm = await loadNorm();
+            if (!norm) {
+              navigate("/onboarding");
+              return;
+            }
+            normCheckedRef.current = true;
+          } catch {
+            setChecking(false);
+            return;
+          }
         }
       }
       setChecking(false);

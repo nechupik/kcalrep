@@ -26,6 +26,13 @@ export interface NutritionAnalyticsInput {
   trackedDays: number;
   streakDays: number;
   timestampsMeals: { hour: number; calories: number }[];
+  todayLog?: {
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    entries: number;
+  };
 }
 
 export interface ProteinComplianceResult {
@@ -47,12 +54,6 @@ export interface PlateauResult {
   plateau: boolean;
   daysStuck: number;
   recommendation?: string;
-}
-
-export interface ProteinForecastResult {
-  remainingProtein: number;
-  urgency: 'low' | 'medium' | 'high';
-  practicalAdvice: string;
 }
 
 export interface StabilityResult {
@@ -88,7 +89,6 @@ export interface NutritionAnalyticsResult {
   proteinCompliance: ProteinComplianceResult;
   deficitAnalysis: DeficitAnalysisResult;
   plateau: PlateauResult;
-  forecast: ProteinForecastResult | null;
   stability: StabilityResult;
   patterns: PatternInsight[];
   recovery: RecoveryRiskResult;
@@ -336,57 +336,6 @@ function detectPlateau(weightHistory: NutritionAnalyticsInput['weightHistory']):
   }
 
   return { plateau, daysStuck, recommendation };
-}
-
-/**
- * Forecast protein needs for today
- */
-function forecastProtein(
-  foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay'],
-  targetProtein: number
-): ProteinForecastResult | null {
-  const now = new Date();
-  const currentHour = now.getHours();
-
-  if (currentHour <= 16) {
-    return null; // Only show after 16:00
-  }
-
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const todayLog = foodLogsByDay.find(day => day.date === today);
-
-  if (!todayLog || todayLog.entries === 0) {
-    return {
-      remainingProtein: targetProtein,
-      urgency: 'high',
-      practicalAdvice: 'Сегодня ещё нет записей. Добавьте белковый ужин, чтобы набрать норму.',
-    };
-  }
-
-  const currentProtein = todayLog.protein;
-  const ratio = currentProtein / targetProtein;
-
-  if (ratio >= 0.9) {
-    return null; // Already on track
-  }
-
-  const remainingProtein = Math.round(targetProtein - currentProtein);
-  
-  let urgency: 'low' | 'medium' | 'high';
-  let practicalAdvice: string;
-
-  if (ratio < 0.5) {
-    urgency = 'high';
-    practicalAdvice = `Срочно нужно ${remainingProtein}г белка. Варианты: 200г творога + протеиновый коктейль, или 300г куриной грудки.`;
-  } else if (ratio < 0.7) {
-    urgency = 'medium';
-    practicalAdvice = `Осталось набрать ${remainingProtein}г белка. Добавьте на ужин: 150г рыбы или 200г творога.`;
-  } else {
-    urgency = 'low';
-    practicalAdvice = `Немного не хватает: ${remainingProtein}г. Достаточно добавить 100г куриной грудки.`;
-  }
-
-  return { remainingProtein, urgency, practicalAdvice };
 }
 
 /**
@@ -709,12 +658,9 @@ function generateDailyVerdict(
   targetCalories: number,
   targetProtein: number,
   plateu: PlateauResult,
-  proteinCompliance: ProteinComplianceResult
+  proteinCompliance: ProteinComplianceResult,
+  todayLog?: NutritionAnalyticsInput['todayLog']
 ): string {
-  const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const todayLog = foodLogsByDay.find(day => day.date === todayKey);
-
   // Check if today has data
   if (!todayLog || todayLog.entries === 0) {
     if (plateu.plateau) {
@@ -818,13 +764,12 @@ export function analyzeNutrition(input: NutritionAnalyticsInput): NutritionAnaly
   const proteinCompliance = calculateProteinCompliance(input.foodLogsByDay, input.dailyTargetProtein, input.avgProtein);
   const deficitAnalysis = analyzeDeficit(input.dailyDeficit, input.weightHistory, input.avgCalories, input.dailyTargetCalories, input.foodLogsByDay);
   const plateau = detectPlateau(input.weightHistory);
-  const forecast = forecastProtein(input.foodLogsByDay, input.dailyTargetProtein);
   const stability = analyzeStability(input.foodLogsByDay);
   const patterns = detectPatterns(input.foodLogsByDay, input.timestampsMeals, input.dailyTargetProtein);
   const recovery = assessRecoveryRisk(input.dailyDeficit, input.avgProtein, input.dailyTargetProtein, input.weightHistory, input.dailyTargetCalories, input.foodLogsByDay);
   const weightInterpretation = interpretWeight(input.weightHistory);
   const streaks = calculateStreaks(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein);
-  const dailyVerdict = generateDailyVerdict(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein, plateau, proteinCompliance);
+  const dailyVerdict = generateDailyVerdict(input.foodLogsByDay, input.dailyDeficit, input.dailyTargetCalories, input.dailyTargetProtein, plateau, proteinCompliance, input.todayLog);
   const nutritionScore = calculateNutritionScore(proteinCompliance, stability, deficitAnalysis, streaks, recovery);
 
   return {
@@ -832,7 +777,6 @@ export function analyzeNutrition(input: NutritionAnalyticsInput): NutritionAnaly
     proteinCompliance,
     deficitAnalysis,
     plateau,
-    forecast,
     stability,
     patterns,
     recovery,

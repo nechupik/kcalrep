@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { ADMIN_UID } from "@/lib/config";
+import { toDateStr } from "@/lib/utils";
 import {
   loadDiary,
   loadNorm,
@@ -28,7 +30,6 @@ import { calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 
 const Index = () => {
   const { user } = useAuth();
-  const ADMIN_UID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
   const [loading, setLoading] = useState(true);
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -37,15 +38,11 @@ const Index = () => {
   const [editModalAnimationState, setEditModalAnimationState] = useState<'enter' | 'exit' | null>(null);
   const [entryToEdit, setEntryToEdit] = useState<DiaryEntry | null>(null);
   const [editGrams, setEditGrams] = useState('');
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  });
-  const [watchInputDate, setWatchInputDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
   const [watchInputCalories, setWatchInputCalories] = useState('');
   const [savingActivity, setSavingActivity] = useState(false);
   const [recalculatingNorm, setRecalculatingNorm] = useState(false);
-  const [todayActivity, setTodayActivity] = useState<number | null>(null);
+  const [watchCardVisible, setWatchCardVisible] = useState(false);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -54,12 +51,14 @@ const Index = () => {
     return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
   };
 
-  // Load today's activity for admin
+  // Show Watch card if yesterday has no activity entry
   useEffect(() => {
     if (user?.uid === ADMIN_UID) {
-      const today = new Date().toISOString().split('T')[0];
-      loadActivity(user.uid, today).then(entry => {
-        setTodayActivity(entry?.caloriesBurned ?? null);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = toDateStr(yesterday);
+      loadActivity(user.uid, yesterdayStr).then(entry => {
+        setWatchCardVisible(!entry);
       });
     }
   }, [user]);
@@ -72,14 +71,12 @@ const Index = () => {
     } else {
       newDate.setDate(newDate.getDate() + 1);
     }
-    const newDateString = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, "0")}-${String(newDate.getDate()).padStart(2, "0")}`;
-    setSelectedDate(newDateString);
+    setSelectedDate(toDateStr(newDate));
   };
 
   const goToToday = () => {
     const today = new Date();
-    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    setSelectedDate(todayString);
+    setSelectedDate(toDateStr(today));
   };
 
   const getLastWeight = async (): Promise<number> => {
@@ -142,6 +139,9 @@ const Index = () => {
   const handleSaveWatchActivity = async () => {
     if (!user || !watchInputCalories) return;
     setSavingActivity(true);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = toDateStr(yesterday);
     try {
       const cal = Number(watchInputCalories);
       if (isNaN(cal) || cal <= 0) {
@@ -149,17 +149,14 @@ const Index = () => {
         return;
       }
       await saveActivity(user.uid, {
-        date: watchInputDate,
+        date: yesterdayStr,
         type: 'calories',
         value: cal,
         caloriesBurned: cal,
       });
-      toast.success(`Активность ${cal} ккал сохранена за ${watchInputDate}`);
+      toast.success(`Активность за вчера: ${cal} ккал сохранена`);
       setWatchInputCalories('');
-      // Update today's activity display if saved for today
-      if (watchInputDate === new Date().toISOString().split('T')[0]) {
-        setTodayActivity(cal);
-      }
+      setWatchCardVisible(false);
 
       // Auto-recalculate norm for admin after saving activity
       if (user.uid === ADMIN_UID) {
@@ -338,10 +335,7 @@ const Index = () => {
   }, [norm, selectedDateTotals]);
 
 
-  const isToday = selectedDate === (() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  })();
+  const isToday = selectedDate === toDateStr(new Date());
 
   if (loading) return (
     <div className="min-h-screen bg-background">
@@ -410,38 +404,29 @@ const Index = () => {
           ) : null}
         </section>
 
-        {/* Apple Watch activity input — admin only */}
-        {user?.uid === ADMIN_UID && (
+        {/* Apple Watch activity input — admin only, shown when yesterday has no entry */}
+        {user?.uid === ADMIN_UID && watchCardVisible && (
           <section className="container max-w-5xl mb-4">
             <Card className="p-4 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
-              <div className="text-xs font-medium mb-2">Apple Watch активность</div>
+              <div className="text-xs font-medium mb-2 text-muted-foreground">⌚ Сколько ккал сожгла вчера по часам?</div>
               <div className="flex gap-2 items-center">
                 <Input
-                  type="date"
-                  value={watchInputDate}
-                  onChange={(e) => setWatchInputDate(e.target.value)}
-                  className="w-32 text-xs h-8"
-                />
-                <Input
                   type="number"
-                  placeholder="ккал"
+                  placeholder="ккал с Apple Watch"
                   value={watchInputCalories}
                   onChange={(e) => setWatchInputCalories(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveWatchActivity()}
                   className="flex-1 text-xs h-8"
+                  autoFocus
                 />
                 <Button
                   onClick={handleSaveWatchActivity}
-                  disabled={savingActivity || !watchInputCalories}
+                  disabled={savingActivity || recalculatingNorm || !watchInputCalories}
                   size="sm"
                   className="h-8 text-xs rounded-lg bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90"
                 >
-                  {savingActivity ? '...' : 'Добавить'}
+                  {savingActivity || recalculatingNorm ? '...' : 'Сохранить'}
                 </Button>
-                {todayActivity !== null && (
-                  <span className="text-xs text-muted-foreground">
-                    Сегодня: <span className="text-foreground font-medium">{todayActivity} ккал</span>
-                  </span>
-                )}
               </div>
             </Card>
           </section>

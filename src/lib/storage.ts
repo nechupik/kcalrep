@@ -79,37 +79,6 @@ export async function loadDiary(date?: string): Promise<DiaryEntry[]> {
   }
 }
 
-export async function saveDiary(entries: DiaryEntry[]) {
-  const user = getCurrentUser();
-  if (user) {
-    try {
-      const todayEntries = entries.filter(entry => entry.date === todayKey());
-      const existingEntries = await loadDiaryFromFirestore(user.uid, todayKey());
-      
-      for (const entry of todayEntries) {
-        if (!entry.id || !existingEntries.find(e => e.id === entry.id)) {
-          await saveDiaryEntry(user.uid, {
-            foodId: entry.foodId,
-            name: entry.name,
-            grams: entry.grams,
-            calories: entry.calories,
-            protein: entry.protein,
-            fat: entry.fat,
-            carbs: entry.carbs,
-            date: entry.date,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Failed to save diary to Firestore:", error);
-      // Fallback to localStorage
-      localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
-    }
-  } else {
-    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
-  }
-}
-
 // Helper function to add a single diary entry
 export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'addedAt'>) {
   const user = getCurrentUser();

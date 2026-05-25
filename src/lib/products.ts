@@ -1,4 +1,4 @@
-﻿import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, getDoc } from "firebase/firestore";
+﻿import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, increment } from "firebase/firestore";
 import { db } from "./firebase";
 
 export interface Product {
@@ -34,9 +34,7 @@ export async function saveProduct(product: Omit<Product, 'id'>, userId: string):
 
 export async function incrementProductUsage(productId: string): Promise<void> {
   const docRef = doc(db, "shared_products", productId);
-  await updateDoc(docRef, {
-    usageCount: (await getDoc(docRef)).data().usageCount ? (await getDoc(docRef)).data().usageCount + 1 : 1,
-  });
+  await updateDoc(docRef, { usageCount: increment(1) });
 }
 
 export async function updateProduct(productId: string, product: Omit<Product, 'id'>): Promise<void> {

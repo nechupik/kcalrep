@@ -342,6 +342,13 @@ const Recipes = () => {
     setCurrentPage(prev => Math.min(totalPages, prev + 1));
   };
 
+  const getPageNumbers = (current: number, total: number): (number | '...')[] => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 4) return [1, 2, 3, 4, 5, '...', total];
+    if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    return [1, '...', current - 1, current, current + 1, '...', total];
+  };
+
   const handleCancelEdit = () => {
     setEditingRecipe(null);
     setEditingRecipeIngredients(null);
@@ -502,8 +509,7 @@ const Recipes = () => {
                 
                 {/* Pagination controls */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center pt-4 border-t border-border/30">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-border/30">
                       <Button
                         variant="outline"
                         size="sm"
@@ -515,25 +521,35 @@ const Recipes = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
                       </Button>
-                      
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                          <Button
-                            key={page}
-                            variant={currentPage === page ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => goToPage(page)}
-                            className={`h-8 w-8 p-0 ${
-                              currentPage === page
-                                ? "bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-0"
-                                : "border-border/50 hover:bg-muted/50"
-                            }`}
-                          >
-                            {page}
-                          </Button>
-                        ))}
+
+                      {/* Mobile: compact current/total */}
+                      <span className="sm:hidden text-sm text-muted-foreground min-w-[4rem] text-center">
+                        {currentPage} / {totalPages}
+                      </span>
+
+                      {/* Desktop: numbered buttons */}
+                      <div className="hidden sm:flex items-center gap-1">
+                        {getPageNumbers(currentPage, totalPages).map((page, idx) =>
+                          page === '...'
+                            ? <span key={`ellipsis-${idx}`} className="h-8 w-6 flex items-center justify-center text-xs text-muted-foreground select-none">…</span>
+                            : (
+                              <Button
+                                key={page}
+                                variant={currentPage === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => goToPage(page as number)}
+                                className={`h-8 w-8 p-0 ${
+                                  currentPage === page
+                                    ? "bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-0"
+                                    : "border-border/50 hover:bg-muted/50"
+                                }`}
+                              >
+                                {page}
+                              </Button>
+                            )
+                        )}
                       </div>
-                      
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -545,7 +561,6 @@ const Recipes = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </Button>
-                    </div>
                   </div>
                 )}
               </div>

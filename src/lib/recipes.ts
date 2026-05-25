@@ -1,4 +1,4 @@
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, getDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, increment } from "firebase/firestore";
 import { db } from "./firebase";
 
 export interface RecipeIngredient {
@@ -50,9 +50,7 @@ export async function saveRecipe(recipe: Omit<Recipe, 'id'>, userId: string): Pr
 
 export async function incrementRecipeUsage(recipeId: string): Promise<void> {
   const docRef = doc(db, "shared_recipes", recipeId);
-  await updateDoc(docRef, {
-    usageCount: (await getDoc(docRef)).data().usageCount ? (await getDoc(docRef)).data().usageCount + 1 : 1,
-  });
+  await updateDoc(docRef, { usageCount: increment(1) });
 }
 
 export async function updateRecipe(recipeId: string, recipe: Omit<Recipe, 'id'>): Promise<void> {

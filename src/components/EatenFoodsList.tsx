@@ -38,10 +38,10 @@ export const EatenFoodsList = ({ entries, onRemove, onEdit, className }: EatenFo
 
   if (entries.length === 0) return null;
 
-  const reversed = entries.slice().reverse();
-  const hasMore = reversed.length > VISIBLE_COUNT;
-  const visible = expanded ? reversed : reversed.slice(0, VISIBLE_COUNT);
-  const hiddenCount = reversed.length - VISIBLE_COUNT;
+  const sorted = entries.slice().sort((a, b) => b.addedAt - a.addedAt);
+  const hasMore = sorted.length > VISIBLE_COUNT;
+  const visible = expanded ? sorted : sorted.slice(0, VISIBLE_COUNT);
+  const hiddenCount = sorted.length - VISIBLE_COUNT;
 
   return (
     <>
@@ -60,22 +60,25 @@ export const EatenFoodsList = ({ entries, onRemove, onEdit, className }: EatenFo
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{e.name}</div>
                 <div className="text-xs text-muted-foreground">
-                  {e.addedAt ? (() => { const d = new Date(e.addedAt); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} · `; })() : ''}
-                  {e.grams > 1 ? `${e.grams}г · ` : '1 порция · '}
                   <span className="text-macro-calories font-semibold">{e.calories}</span> ккал ·
                   Б {e.protein}г · Ж {e.fat}г · У {e.carbs}г
                 </div>
               </div>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleRemoveEntry(e.id);
-                }}
-                className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1 shrink-0"
-                aria-label="Удалить"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex flex-col items-center gap-1 shrink-0">
+                <div className="text-xs text-muted-foreground">
+                  {e.addedAt ? (() => { const d = new Date(e.addedAt); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })() : ''}
+                </div>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleRemoveEntry(e.id);
+                  }}
+                  className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-smooth p-1"
+                  aria-label="Удалить"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

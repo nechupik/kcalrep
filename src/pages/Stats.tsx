@@ -22,6 +22,8 @@ import {
   AreaChart,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
+import { ADMIN_UID } from "@/lib/config";
+import { toDateStr } from "@/lib/utils";
 import { loadNorm } from "@/lib/storage";
 import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry } from "@/lib/firestore";
 import { analyzeNutrition, formatStreak, type NutritionAnalyticsInput, type NutritionAnalyticsResult } from "@/lib/nutritionAnalytics";
@@ -74,8 +76,6 @@ const Stats = () => {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [productPage, setProductPage] = useState(1);
   const PRODUCTS_PER_PAGE = 10;
-  const ADMIN_UID = 'irXSByiUKYg9S5g3UXF5xSXHijC3';
-
   // Control modal animation
   useEffect(() => {
     if (selectedDay) {
@@ -99,19 +99,19 @@ const Stats = () => {
         const userNorm = await loadNorm();
         setNorm(userNorm);
 
-        // Load diary entries for last 7 days
+        // Load diary entries for last 30 days (covers both weekly chart and analytics)
         const today = new Date();
         const startDate = new Date(today);
-        startDate.setDate(today.getDate() - 6);
-        
-        const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-        const endDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        
-        const diaryEntries = await loadDiaryRange(user.uid, startDateStr, endDateStr);
-        setEntries(diaryEntries);
+        startDate.setDate(today.getDate() - 29);
 
-        // Load weight entries
-        const weights = await loadWeight(user.uid, 10);
+        const startDateStr = toDateStr(startDate);
+        const endDateStr = toDateStr(today);
+
+        const [diaryEntries, weights] = await Promise.all([
+          loadDiaryRange(user.uid, startDateStr, endDateStr),
+          loadWeight(user.uid, 30),
+        ]);
+        setEntries(diaryEntries);
         setWeightEntries(weights);
       } catch (error) {
         console.error("Failed to load data:", error);
@@ -130,26 +130,17 @@ const Stats = () => {
 
       setAnalyticsLoading(true);
       try {
-        // Load extended data for analytics (last 30 days)
+        // Use already-loaded entries and weightEntries from state (30-day range)
         const today = new Date();
-        const startDate = new Date(today);
-        startDate.setDate(today.getDate() - 29);
 
-        const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-        const endDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        const [diaryEntries, weights] = await Promise.all([
-          loadDiaryRange(user.uid, startDateStr, endDateStr),
-          loadWeight(user.uid, 30),
-        ]);
-
-        // Build foodLogsByDay
+        // Build foodLogsByDay (exclude today — window is still open)
+        const todayStr = toDateStr(today);
         const foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay'] = [];
-        for (let i = 29; i >= 0; i--) {
+        for (let i = 29; i >= 1; i--) {
           const d = new Date(today);
           d.setDate(d.getDate() - i);
-          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          const dayEntries = diaryEntries.filter(e => e.date === dateStr);
+          const dateStr = toDateStr(d);
+          const dayEntries = entries.filter(e => e.date === dateStr);
 
           foodLogsByDay.push({
             date: dateStr,
@@ -167,9 +158,9 @@ const Stats = () => {
           return burned - day.calories;
         });
 
-        // Build timestampsMeals
+        // Build timestampsMeals (exclude today)
         const timestampsMeals: NutritionAnalyticsInput['timestampsMeals'] = [];
-        diaryEntries.forEach(entry => {
+        entries.filter(e => e.date !== todayStr).forEach(entry => {
           const hour = new Date(entry.addedAt || Date.now()).getHours();
           timestampsMeals.push({
             hour,
@@ -189,10 +180,10 @@ const Stats = () => {
         }
 
         // Get current weight
-        const currentWeight = weights.length > 0 ? weights[0].weight : 70;
+        const currentWeight = weightEntries.length > 0 ? weightEntries[0].weight : 70;
 
         // Build weight history
-        const weightHistory = weights.map(w => ({
+        const weightHistory = weightEntries.map(w => ({
           date: w.date,
           weight: w.weight,
         }));
@@ -214,6 +205,15 @@ const Stats = () => {
 
         const normData = await loadFullNormData(user.uid);
 
+        const todayEntries = entries.filter(e => e.date === todayStr);
+        const todayLog = {
+          calories: todayEntries.reduce((sum, e) => sum + e.calories, 0),
+          protein: todayEntries.reduce((sum, e) => sum + e.protein, 0),
+          fat: todayEntries.reduce((sum, e) => sum + e.fat, 0),
+          carbs: todayEntries.reduce((sum, e) => sum + e.carbs, 0),
+          entries: todayEntries.length,
+        };
+
         const analyticsInput: NutritionAnalyticsInput = {
           currentWeight,
           targetWeight: normData?.goal === 'lose' ? currentWeight - 5 : undefined,
@@ -231,6 +231,7 @@ const Stats = () => {
           trackedDays,
           streakDays,
           timestampsMeals,
+          todayLog,
         };
 
         const result = analyzeNutrition(analyticsInput);
@@ -242,10 +243,10 @@ const Stats = () => {
       }
     };
 
-    if (norm) {
+    if (norm && !loading) {
       calculateAnalytics();
     }
-  }, [norm, user]);
+  }, [norm, user, entries, weightEntries]);
 
   useEffect(() => {
     const loadMonthlyDetail = async () => {
@@ -269,7 +270,7 @@ const Stats = () => {
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const dateStr = toDateStr(date);
       const dayOfWeek = date.getDay();
       const weekdayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Monday=0 index
       
@@ -309,7 +310,7 @@ const Stats = () => {
 
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const date = new Date(year, month, day);
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateStr = toDateStr(new Date(year, month, day));
       const dayEntries = entries.filter(entry => entry.date === dateStr);
 
       const calories = dayEntries.reduce((sum, entry) => sum + entry.calories, 0);
@@ -1150,28 +1151,6 @@ const Stats = () => {
                         {analytics.plateau.recommendation && (
                           <p className="text-sm text-purple-300">{analytics.plateau.recommendation}</p>
                         )}
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-                {/* Protein Forecast */}
-                {analytics.forecast && (
-                  <Card className={`p-5 md:p-6 border-l-4 ${
-                    analytics.forecast.urgency === 'high' ? 'border-red-500 bg-red-500/5' :
-                    analytics.forecast.urgency === 'medium' ? 'border-yellow-500 bg-yellow-500/5' :
-                    'border-green-500 bg-green-500/5'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-full p-2 mt-0.5">
-                        <span className="text-lg">⏰</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-white mb-1">Прогноз белка</h3>
-                        <p className="text-sm text-purple-300 mb-2">
-                          Осталось набрать: <span className="font-medium text-white">{analytics.forecast.remainingProtein}г</span>
-                        </p>
-                        <p className="text-sm text-purple-300">{analytics.forecast.practicalAdvice}</p>
                       </div>
                     </div>
                   </Card>

@@ -14,6 +14,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
+import { ADMIN_UID } from "@/lib/config";
 import { loadWeight, saveWeight, deleteWeightEntry, loadFullNormData, saveNorm as saveNormToFirestore, loadActivityRange, loadUserSettings } from "@/lib/firestore";
 import {
   saveBodyComposition,
@@ -29,7 +30,6 @@ interface WeightData {
   date: string;
 }
 
-const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 const SWIPE_THRESHOLD = 80;
 
 function WeightHistoryRow({
@@ -412,7 +412,7 @@ const Body = () => {
 
             {/* Body composition fields — admin only */}
             {user?.uid === ADMIN_UID && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">
                     % жира

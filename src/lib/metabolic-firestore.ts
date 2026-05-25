@@ -10,6 +10,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -176,16 +177,17 @@ export async function deleteBodyComposition(
 
 export async function loadBodyComposition(
   userId: string,
-  limit?: number
+  limitCount?: number
 ): Promise<BodyCompositionEntry[]> {
   const col = collection(db, "users", userId, "body_composition");
-  const q = query(col, orderBy("date", "desc"));
+  const q = limitCount
+    ? query(col, orderBy("date", "desc"), limit(limitCount))
+    : query(col, orderBy("date", "desc"));
   const snapshot = await getDocs(q);
-  const entries = snapshot.docs.map((d) => ({
+  return snapshot.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<BodyCompositionEntry, "id">),
   }));
-  return limit ? entries.slice(0, limit) : entries;
 }
 
 export async function loadBodyCompositionInRange(

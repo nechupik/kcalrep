@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm, saveNorm } from "@/lib/storage";
+import { ADMIN_UID } from "@/lib/config";
 import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight, loadActivityRange, saveActivity, loadActivity } from "@/lib/firestore";
 import { loadBodyComposition } from "@/lib/metabolic-firestore";
 import type { CalcInput, MacroResult } from "@/lib/nutrition";
@@ -31,7 +32,6 @@ import { updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { calculateMacros, calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
 
-const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 
 const Profile = () => {
   const { user, loading, signInWithEmail, signUpWithEmail, signInWithGoogle, signOut } = useAuth();
@@ -497,12 +497,13 @@ const Profile = () => {
                       activityFactor: 1.2,
                       activityLabel: 'sedentary' as const,
                       goalMultiplier: 1.0,
-                      gender: 'male' as const,
-                      height: 0,
-                      age: 0,
-                      goal: 'maintain' as const,
                     };
-                    await saveNorm(manualNorm);
+                    await saveNorm(manualNorm, {
+                      gender: storedProfileData?.gender || 'male',
+                      height: storedProfileData?.height || 170,
+                      age: storedProfileData?.age || 25,
+                      goal: storedProfileData?.goal || 'maintain',
+                    });
                     setNorm(manualNorm);
                     toast.success('Норма КБЖУ сохранена');
                   }}

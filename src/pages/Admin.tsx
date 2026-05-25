@@ -16,9 +16,8 @@ import {
   deleteAllActivityData 
 } from "@/lib/firestore";
 import { Shield, Users, Database, Activity, Trash2, AlertTriangle } from "lucide-react";
+import { ADMIN_UID } from "@/lib/config";
 import { toast } from "sonner";
-
-const ADMIN_UID = "irXSByiUKYg9S5g3UXF5xSXHijC3";
 
 const Admin = () => {
   const { user } = useAuth();
