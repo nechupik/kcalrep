@@ -103,10 +103,12 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     let entry: Omit<DiaryEntry, 'id' | 'addedAt'>;
 
     if (isPortionType) {
+      // Use totalGrams for portion-type recipes (sum of ingredient weights)
+      const portionGrams = (selected as any).totalGrams || 1;
       entry = {
         foodId: selected.id,
         name: selected.name,
-        grams: 1,
+        grams: portionGrams,
         calories: selected.calories,
         protein: selected.protein,
         fat: selected.fat,

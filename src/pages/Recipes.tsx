@@ -231,18 +231,36 @@ const Recipes = () => {
           };
         }, { calories: 0, protein: 0, fat: 0, carbs: 0 });
 
+        // Calculate total grams of all ingredients
+        const totalGrams = editingRecipeIngredients.reduce((sum, ing) => sum + ing.grams, 0);
+
         const ingredientsList = editingRecipeIngredients
           .map(ing => `${ing.productName} - ${ing.grams}г`)
           .join('\n');
 
+        const currentServingType = editingRecipe.servingType || 'grams';
+        const savedCalories = currentServingType === 'grams' && totalGrams > 0
+          ? Math.round((totals.calories / totalGrams) * 100)
+          : Math.round(totals.calories);
+        const savedProtein = currentServingType === 'grams' && totalGrams > 0
+          ? Math.round((totals.protein / totalGrams) * 100 * 10) / 10
+          : Math.round(totals.protein * 10) / 10;
+        const savedFat = currentServingType === 'grams' && totalGrams > 0
+          ? Math.round((totals.fat / totalGrams) * 100 * 10) / 10
+          : Math.round(totals.fat * 10) / 10;
+        const savedCarbs = currentServingType === 'grams' && totalGrams > 0
+          ? Math.round((totals.carbs / totalGrams) * 100 * 10) / 10
+          : Math.round(totals.carbs * 10) / 10;
+
         await updateRecipe(editingRecipe.id!, {
           name: editingRecipe.name,
-          calories: Math.round(totals.calories),
-          protein: Math.round(totals.protein * 10) / 10,
-          fat: Math.round(totals.fat * 10) / 10,
-          carbs: Math.round(totals.carbs * 10) / 10,
+          calories: savedCalories,
+          protein: savedProtein,
+          fat: savedFat,
+          carbs: savedCarbs,
           text: editingRecipe.text || `Ингредиенты:\n${ingredientsList}`,
-          servingType: editingRecipe.servingType || 'grams',
+          servingType: currentServingType,
+          totalGrams: currentServingType === 'portion' ? totalGrams : undefined,
           ingredients: editingRecipeIngredients,
         });
       } else {

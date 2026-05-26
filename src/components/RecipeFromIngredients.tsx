@@ -5,9 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { loadProducts, type Product } from "@/lib/products";
-import { Search, Plus, Trash2, Calculator, Edit2, Check, X } from "lucide-react";
+import { loadProducts, saveProduct, type Product } from "@/lib/products";
+import { useAuth } from "@/contexts/AuthContext";
+import { Search, Plus, Trash2, Calculator, Edit2, Check, X, PackagePlus } from "lucide-react";
 import type { RecipeIngredient as RecipeIngredientType } from "@/lib/recipes";
+
+const DRAFT_KEY = 'recipe_ingredients_draft';
 
 interface RecipeIngredient {
   product: Product;
@@ -23,6 +26,7 @@ interface RecipeFromIngredientsProps {
     carbs: number;
     text: string;
     servingType: 'grams' | 'portion';
+    totalGrams?: number;
     ingredients?: RecipeIngredientType[];
   }) => void;
   onCancel: () => void;
@@ -31,6 +35,7 @@ interface RecipeFromIngredientsProps {
     ingredients: RecipeIngredientType[];
     description: string;
     servingType: 'grams' | 'portion';
+    totalGrams?: number;
   };
 }
 
@@ -47,6 +52,15 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
   const [servingType, setServingType] = useState<'grams' | 'portion'>(initialData?.servingType || 'grams');
   const [editingGramsIndex, setEditingGramsIndex] = useState<number | null>(null);
   const [editingGramsValue, setEditingGramsValue] = useState("");
+  const [hasDraft, setHasDraft] = useState(false);
+  const [showAddProductForm, setShowAddProductForm] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductCalories, setNewProductCalories] = useState("");
+  const [newProductProtein, setNewProductProtein] = useState("");
+  const [newProductFat, setNewProductFat] = useState("");
+  const [newProductCarbs, setNewProductCarbs] = useState("");
+  const [savingProduct, setSavingProduct] = useState(false);
+  const { user } = useAuth();
 
   // Load products on component mount
   useEffect(() => {
@@ -80,6 +94,34 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
     }
   }, [searchQuery, products]);
 
+  // Check for existing draft on mount (only when not editing)
+  useEffect(() => {
+    if (!initialData) {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved);
+          if (draft.recipeName || (draft.ingredients && draft.ingredients.length > 0)) {
+            setHasDraft(true);
+          }
+        } catch {}
+      }
+    }
+  }, []);
+
+  // Auto-save draft whenever form has content
+  useEffect(() => {
+    if (!initialData && (recipeName || ingredients.length > 0 || description)) {
+      const draft = {
+        recipeName,
+        ingredients: ingredients.map(ing => ({ product: ing.product, grams: ing.grams })),
+        description,
+        servingType,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }
+  }, [recipeName, ingredients, description, servingType, initialData]);
+
   const loadProductsList = async () => {
     setLoading(true);
     try {
@@ -90,6 +132,60 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
       toast.error("Ошибка загрузки продуктов");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDraft = () => {
+    const saved = localStorage.getItem(DRAFT_KEY);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        setRecipeName(draft.recipeName || "");
+        setIngredients(draft.ingredients || []);
+        setDescription(draft.description || "");
+        setServingType(draft.servingType || 'grams');
+        setHasDraft(false);
+      } catch {
+        toast.error("Ошибка загрузки черновика");
+      }
+    }
+  };
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setHasDraft(false);
+  };
+
+  const handleSaveNewProduct = async () => {
+    if (!user || !newProductName.trim() || !newProductCalories) return;
+    setSavingProduct(true);
+    try {
+      const newProductId = await saveProduct({
+        name: newProductName.trim(),
+        calories: Number(newProductCalories) || 0,
+        protein: Number(newProductProtein) || 0,
+        fat: Number(newProductFat) || 0,
+        carbs: Number(newProductCarbs) || 0,
+      }, user.uid);
+      const updatedProducts = await loadProducts();
+      setProducts(updatedProducts);
+      const addedProduct = updatedProducts.find(p => p.id === newProductId);
+      if (addedProduct) {
+        setSelectedProduct(addedProduct);
+        setSearchQuery(addedProduct.name);
+        setFilteredProducts([]);
+      }
+      setShowAddProductForm(false);
+      setNewProductName("");
+      setNewProductCalories("");
+      setNewProductProtein("");
+      setNewProductFat("");
+      setNewProductCarbs("");
+      toast.success(`«${newProductName.trim()}» добавлен в базу`);
+    } catch {
+      toast.error("Ошибка добавления продукта");
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -106,6 +202,7 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
   };
 
   const totals = calculateTotals();
+  const totalGrams = ingredients.reduce((sum, ing) => sum + ing.grams, 0);
 
   const handleAddIngredient = () => {
     if (!selectedProduct || !grams || Number(grams) <= 0) {
@@ -182,14 +279,30 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
       carbs: ing.product.carbs,
     }));
 
+    // For grams-based recipes store per-100g values; for portion store absolute totals
+    const savedCalories = servingType === 'grams' && totalGrams > 0
+      ? Math.round((totals.calories / totalGrams) * 100)
+      : Math.round(totals.calories);
+    const savedProtein = servingType === 'grams' && totalGrams > 0
+      ? Math.round((totals.protein / totalGrams) * 100 * 10) / 10
+      : Math.round(totals.protein * 10) / 10;
+    const savedFat = servingType === 'grams' && totalGrams > 0
+      ? Math.round((totals.fat / totalGrams) * 100 * 10) / 10
+      : Math.round(totals.fat * 10) / 10;
+    const savedCarbs = servingType === 'grams' && totalGrams > 0
+      ? Math.round((totals.carbs / totalGrams) * 100 * 10) / 10
+      : Math.round(totals.carbs * 10) / 10;
+
+    clearDraft();
     onSave({
       name: recipeName,
-      calories: Math.round(totals.calories),
-      protein: Math.round(totals.protein * 10) / 10,
-      fat: Math.round(totals.fat * 10) / 10,
-      carbs: Math.round(totals.carbs * 10) / 10,
+      calories: savedCalories,
+      protein: savedProtein,
+      fat: savedFat,
+      carbs: savedCarbs,
       text: fullDescription,
       servingType,
+      totalGrams: servingType === 'portion' ? totalGrams : undefined,
       ingredients: ingredientsData
     });
   };
@@ -202,6 +315,19 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
 
   return (
     <div className="space-y-6">
+      {hasDraft && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-amber-400">Есть несохранённый черновик</p>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={loadDraft} className="text-xs border-amber-500/30 text-amber-400 h-7">
+              Восстановить
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearDraft} className="text-xs text-muted-foreground h-7">
+              Отклонить
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="recipeName">Название блюда</Label>
         <Input
@@ -246,6 +372,55 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* No results — offer to add product to database */}
+            {searchQuery.trim() && !selectedProduct && filteredProducts.length === 0 && !loading && (
+              <div className="border border-border/30 rounded-md p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">Продукт не найден в базе</p>
+                {!showAddProductForm ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setNewProductName(searchQuery.trim()); setShowAddProductForm(true); }}
+                    className="w-full text-xs flex items-center gap-2 h-8"
+                  >
+                    <PackagePlus className="h-3 w-3" />
+                    Добавить «{searchQuery}» в базу продуктов
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">{newProductName} — КБЖУ на 100г</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input type="number" placeholder="Калории" value={newProductCalories} onChange={e => setNewProductCalories(e.target.value)} className="h-8 text-xs" />
+                      <Input type="number" placeholder="Белки" value={newProductProtein} onChange={e => setNewProductProtein(e.target.value)} className="h-8 text-xs" />
+                      <Input type="number" placeholder="Жиры" value={newProductFat} onChange={e => setNewProductFat(e.target.value)} className="h-8 text-xs" />
+                      <Input type="number" placeholder="Углеводы" value={newProductCarbs} onChange={e => setNewProductCarbs(e.target.value)} className="h-8 text-xs" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSaveNewProduct}
+                        disabled={savingProduct || !newProductCalories}
+                        className="flex-1 text-xs bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 h-8"
+                      >
+                        {savingProduct ? 'Сохранение...' : 'Сохранить продукт'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setShowAddProductForm(false); setNewProductCalories(''); setNewProductProtein(''); setNewProductFat(''); setNewProductCarbs(''); }}
+                        className="text-xs h-8"
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -369,6 +544,11 @@ export const RecipeFromIngredients = ({ onSave, onCancel, initialData }: RecipeF
                 <div className="text-xs text-muted-foreground">углеводы</div>
               </div>
             </div>
+            {servingType === 'grams' && totalGrams > 0 && (
+              <div className="mt-2 pt-2 border-t border-border/20 text-xs text-muted-foreground text-center">
+                На 100г: {Math.round(totals.calories / totalGrams * 100)} ккал · Б {(totals.protein / totalGrams * 100).toFixed(1)} · Ж {(totals.fat / totalGrams * 100).toFixed(1)} · У {(totals.carbs / totalGrams * 100).toFixed(1)}
+              </div>
+            )}
           </Card>
         )}
       </div>
