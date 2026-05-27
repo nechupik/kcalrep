@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ function pluralize(n: number, one: string, few: string, many: string): string {
 const Products = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -81,6 +82,7 @@ const Products = () => {
     try {
       const userProducts = await loadProducts();
       clearTimeout(timeoutId);
+      setAllProducts(userProducts);
       // Apply category filter if selected
       const filterToUse = categoryFilter !== null ? categoryFilter : selectedCategory;
       const filteredProducts = filterToUse
@@ -103,32 +105,33 @@ const Products = () => {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-
-    setLoading(true);
-    try {
-      // Load all products and filter client-side
-      const allProducts = await loadProducts();
-      let filteredProducts = allProducts.filter(product => 
+  // Smart search: filter products in real-time based on search query and category
+  const filteredProducts = useMemo(() => {
+    let result = allProducts;
+    
+    // Apply category filter if selected
+    if (selectedCategory) {
+      if (selectedCategory === 'unsorted') {
+        result = result.filter(product => !product.category || product.category === '');
+      } else {
+        result = result.filter(product => product.category === selectedCategory);
+      }
+    }
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      result = result.filter(product => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      // Apply category filter if selected
-      if (selectedCategory) {
-        if (selectedCategory === 'unsorted') {
-          filteredProducts = filteredProducts.filter(product => !product.category || product.category === '');
-        } else {
-          filteredProducts = filteredProducts.filter(product => product.category === selectedCategory);
-        }
-      }
-      setProducts(filteredProducts);
-    } catch (error) {
-      console.error("Error searching:", error);
-      toast.error("Ошибка поиска");
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    return result;
+  }, [allProducts, searchQuery, selectedCategory]);
+
+  // Update displayed products when filtered products change
+  useEffect(() => {
+    setProducts(filteredProducts);
+  }, [filteredProducts]);
 
 
   const handleAddProduct = () => {
@@ -166,6 +169,7 @@ const Products = () => {
       setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", category: "" });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
+      setSearchQuery(''); // Clear search
     } catch (error) {
       console.error("Error saving product:", error);
       toast.error("Ошибка сохранения продукта");
@@ -237,6 +241,7 @@ const Products = () => {
       setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", category: "" });
       setShowAddForm(false);
       loadUserProducts(); // Refresh list
+      setSearchQuery(''); // Clear search
     } catch (error) {
       console.error("Error updating product:", error);
       toast.error("Ошибка обновления продукта");
@@ -347,9 +352,9 @@ const Products = () => {
         
         {/* Search bar */}
         <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-          {/* Search input */}
-          <div className="mb-4">
-            <div className="relative">
+          <div className="flex gap-2">
+            {/* Search input - takes 2/3 of space */}
+            <div className="relative flex-[2]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
               <Input
                 type="text"
@@ -357,20 +362,10 @@ const Products = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
-          </div>
 
-          {/* Search and Sort buttons */}
-          <div className="flex gap-2">
-            <Button
-              onClick={handleSearch}
-              disabled={loading}
-              className="flex-1 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-8 py-4 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
-            >
-              Поиск
-            </Button>
+            {/* Sort button - takes 1/3 of space */}
             <Button
               onClick={() => setShowSortModal(true)}
               variant="outline"

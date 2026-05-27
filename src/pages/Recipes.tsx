@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ function pluralize(n: number, one: string, few: string, many: string): string {
 const Recipes = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -60,6 +61,7 @@ const Recipes = () => {
     setLoading(true);
     try {
       const userRecipes = await loadRecipes();
+      setAllRecipes(userRecipes);
       setRecipes(userRecipes);
     } catch (error) {
       console.error("Error loading recipes:", error);
@@ -69,24 +71,18 @@ const Recipes = () => {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  // Smart search: filter recipes in real-time based on search query
+  const filteredRecipes = useMemo(() => {
+    if (!searchQuery.trim()) return allRecipes;
+    return allRecipes.filter(recipe => 
+      recipe.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [allRecipes, searchQuery]);
 
-    setLoading(true);
-    try {
-      // Load all recipes and filter client-side
-      const allRecipes = await loadRecipes();
-      const filteredRecipes = allRecipes.filter(recipe => 
-        recipe.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setRecipes(filteredRecipes);
-    } catch (error) {
-      console.error("Error searching:", error);
-      toast.error("Ошибка поиска");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Update displayed recipes when filtered recipes change
+  useEffect(() => {
+    setRecipes(filteredRecipes);
+  }, [filteredRecipes]);
 
   const handleAddRecipe = () => {
     if (!user) return;
@@ -132,6 +128,7 @@ const Recipes = () => {
       setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
       setShowAddForm(false);
       loadUserRecipes(); // Refresh list
+      setSearchQuery(''); // Clear search
     } catch (error) {
       console.error("Error saving recipe:", error);
       toast.error("Ошибка сохранения блюда");
@@ -283,6 +280,7 @@ const Recipes = () => {
       setFormData({ name: "", calories: "", protein: "", fat: "", carbs: "", description: "" });
       setShowAddForm(false);
       loadUserRecipes(); // Refresh list
+      setSearchQuery(''); // Clear search
     } catch (error) {
       console.error("Error updating recipe:", error);
       toast.error("Ошибка обновления блюда");
@@ -404,6 +402,7 @@ const Recipes = () => {
       setEditingRecipe(null);
       setEditingRecipeIngredients(null);
       loadUserRecipes(); // Refresh list
+      setSearchQuery(''); // Clear search
     } catch (error) {
       console.error("Error saving recipe:", error);
       toast.error("Ошибка сохранения блюда");
@@ -424,29 +423,17 @@ const Recipes = () => {
         
         {/* Search bar */}
         <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
-          <div className="flex gap-2 mb-4 items-center">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
-              <Input
-                id="search"
-                type="text"
-                placeholder="Поиск блюд..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-12 h-10"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-            <Button
-              onClick={handleSearch}
-              disabled={loading}
-              className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] px-6 py-0 h-10 text-foreground font-bold text-lg shadow-glow hover:opacity-90 transition-smooth"
-            >
-              <span className="hidden sm:inline">Поиск</span>
-              <span className="sm:hidden">Найти</span>
-            </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
+            <Input
+              id="search"
+              type="text"
+              placeholder="Поиск блюд..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
-
         </Card>
 
         {/* Recipes list */}

@@ -395,6 +395,43 @@ const Profile = () => {
                       </Card>
         )}
 
+        {/* Deficit slider — above Моя норма */}
+        {user && norm && !showCalculator && !manualMode && (
+          <Card className="p-5 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold">Дефицит калорий</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold text-foreground">{deficitPercent}%</span>
+                <Button
+                  size="sm"
+                  onClick={handleSaveSettings}
+                  disabled={savingSettings}
+                  className="h-7 px-4 text-xs rounded-lg bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] text-white border-0 hover:opacity-90"
+                >
+                  {savingSettings ? 'Применяю...' : 'Применить'}
+                </Button>
+              </div>
+            </div>
+            <input
+              type="range"
+              min={10}
+              max={15}
+              step={1}
+              value={deficitPercent}
+              onChange={(e) => setDeficitPercent(Number(e.target.value))}
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{
+                accentColor: '#7C3AED',
+                background: `linear-gradient(to right, #7C3AED 0%, #7C3AED ${((deficitPercent - 10) / 5) * 100}%, #2d2040 ${((deficitPercent - 10) / 5) * 100}%, #2d2040 100%)`,
+              }}
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1.5">
+              <span>10%</span>
+              <span>15%</span>
+            </div>
+          </Card>
+        )}
+
         {/* KBJU norm section */}
         {user && (
           <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
@@ -532,28 +569,6 @@ const Profile = () => {
                     <NormStat label="БЕЛКИ" value={`${norm.protein}`} unit="г" colorClass="text-macro-protein" />
                     <NormStat label="ЖИРЫ" value={`${norm.fat}`} unit="г" colorClass="text-macro-fat" />
                     <NormStat label="УГЛЕВОДЫ" value={`${norm.carbs}`} unit="г" colorClass="text-macro-carbs" />
-                  </div>
-
-                  {/* Deficit slider — visible for all users */}
-                  <div className="mb-4 pt-3 border-t border-border/30">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">Дефицит калорий</span>
-                      <span className="text-sm font-bold">{deficitPercent}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={10}
-                      max={15}
-                      step={1}
-                      value={deficitPercent}
-                      onChange={(e) => setDeficitPercent(Number(e.target.value))}
-                      className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-foreground"
-                      style={{ background: 'linear-gradient(to right, #0a0520 0%, #1a0a3d 100%)' }}
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-                      <span>10%</span>
-                      <span>15%</span>
-                    </div>
                   </div>
 
                   {/* Apple Watch activity input + recalculation — admin only */}

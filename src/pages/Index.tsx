@@ -408,7 +408,6 @@ const Index = () => {
         {user?.uid === ADMIN_UID && watchCardVisible && (
           <section className="container max-w-5xl mb-4">
             <Card className="p-4 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
-              <div className="text-xs font-medium mb-2 text-muted-foreground">⌚ Сколько ккал сожгла вчера по часам?</div>
               <div className="flex gap-2 items-center">
                 <Input
                   type="number"

@@ -25,7 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ADMIN_UID } from "@/lib/config";
 import { toDateStr } from "@/lib/utils";
 import { loadNorm } from "@/lib/storage";
-import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry } from "@/lib/firestore";
+import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry, loadActivityRange, type ActivityEntry } from "@/lib/firestore";
 import { analyzeNutrition, formatStreak, type NutritionAnalyticsInput, type NutritionAnalyticsResult } from "@/lib/nutritionAnalytics";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
@@ -75,6 +75,7 @@ const Stats = () => {
   const [analytics, setAnalytics] = useState<NutritionAnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [productPage, setProductPage] = useState(1);
+  const [activityWeekData, setActivityWeekData] = useState<ActivityEntry[]>([]);
   const PRODUCTS_PER_PAGE = 10;
   // Control modal animation
   useEffect(() => {
@@ -107,12 +108,24 @@ const Stats = () => {
         const startDateStr = toDateStr(startDate);
         const endDateStr = toDateStr(today);
 
-        const [diaryEntries, weights] = await Promise.all([
+        const today7Start = new Date(today);
+        today7Start.setDate(today.getDate() - 6);
+        const start7Str = toDateStr(today7Start);
+
+        const requests: Promise<any>[] = [
           loadDiaryRange(user.uid, startDateStr, endDateStr),
           loadWeight(user.uid, 30),
-        ]);
+        ];
+        if (user.uid === ADMIN_UID) {
+          requests.push(loadActivityRange(user.uid, start7Str, endDateStr));
+        }
+
+        const [diaryEntries, weights, activityEntries] = await Promise.all(requests);
         setEntries(diaryEntries);
         setWeightEntries(weights);
+        if (user.uid === ADMIN_UID && activityEntries) {
+          setActivityWeekData(activityEntries);
+        }
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
@@ -450,6 +463,41 @@ const Stats = () => {
       peakHour: peakEntry.hour >= 0 ? peakEntry.hour : null,
     };
   }, [entries]);
+
+  // Admin: per-day activity + TDEE for last 7 days
+  const activityStats = useMemo(() => {
+    if (!norm) return null;
+    const today = new Date();
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateStr = toDateStr(date);
+      const dayOfWeek = date.getDay();
+      const weekdayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const entry = activityWeekData.find(e => e.date === dateStr);
+      const actCal = entry?.caloriesBurned ?? 0;
+      const tdee = Math.round((norm.bmr ?? 0) + actCal);
+      const deficit = tdee - norm.calories;
+      days.push({
+        date: dateStr,
+        label: WEEKDAYS[weekdayIndex],
+        shortDate: `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`,
+        activity: actCal,
+        tdee,
+        deficit,
+        hasData: !!entry,
+      });
+    }
+    const daysWithData = days.filter(d => d.hasData);
+    const avgActivity = daysWithData.length > 0
+      ? Math.round(daysWithData.reduce((s, d) => s + d.activity, 0) / daysWithData.length)
+      : 0;
+    const avgTDEE = daysWithData.length > 0
+      ? Math.round(daysWithData.reduce((s, d) => s + d.tdee, 0) / daysWithData.length)
+      : Math.round(norm.bmr ?? 0);
+    return { days, avgActivity, avgTDEE, daysWithData: daysWithData.length };
+  }, [activityWeekData, norm]);
 
   // Product statistics for interesting stats section
   const productStats = useMemo(() => {
@@ -793,6 +841,105 @@ const Stats = () => {
               <Eye className="h-4 w-4" />
               <span>Шо там Женя?</span>
             </Button>
+          </Card>
+        )}
+
+        {/* Admin: Apple Watch Activity + TDEE */}
+        {user?.uid === ADMIN_UID && activityStats && (
+          <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="h-4 w-4 text-purple-400" />
+              <h2 className="font-semibold text-white">Apple Watch — активность и TDEE (7 дней)</h2>
+            </div>
+
+            {/* Bar chart */}
+            <div className="h-44 mb-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={activityStats.days} margin={{ top: 5, right: 5, left: -30, bottom: 0 }} barGap={4}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(168, 85, 247, 0.1)" />
+                  <XAxis dataKey="label" tick={{ fill: '#a855f7', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis stroke="#a855f7" fontSize={10} />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(168, 85, 247, 0.1)' }}
+                    contentStyle={{
+                      background: 'rgba(10, 5, 32, 0.97)',
+                      border: '1px solid rgba(168, 85, 247, 0.5)',
+                      borderRadius: '0.75rem',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                    labelStyle={{ color: '#fff', fontWeight: 600, marginBottom: 4 }}
+                    itemStyle={{ color: '#e9d5ff' }}
+                    formatter={(value: number, name: string) => [
+                      `${value} ккал`,
+                      name === 'activity' ? 'Активность' : 'TDEE',
+                    ]}
+                  />
+                  <Bar dataKey="activity" name="activity" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="tdee" name="tdee" fill="#a855f7" opacity={0.45} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Per-day table */}
+            <div className="space-y-1 mb-4">
+              <div className="grid grid-cols-4 gap-1 text-[10px] text-purple-400 uppercase tracking-wide px-2 mb-1">
+                <span>День</span>
+                <span className="text-right">Актив.</span>
+                <span className="text-right">TDEE</span>
+                <span className="text-right">Деф.</span>
+              </div>
+              {[...activityStats.days].reverse().map(day => (
+                <div
+                  key={day.date}
+                  className={`grid grid-cols-4 gap-1 rounded-lg px-2 py-1.5 text-xs ${
+                    day.hasData ? 'bg-purple-500/10' : 'bg-purple-950/20'
+                  }`}
+                >
+                  <span className="font-medium text-white">{day.label}</span>
+                  <span className={`text-right font-medium ${
+                    day.hasData ? 'text-white' : 'text-purple-700'
+                  }`}>
+                    {day.hasData ? `${day.activity}` : '—'}
+                  </span>
+                  <span className={`text-right font-medium ${
+                    day.hasData ? 'text-purple-200' : 'text-purple-700'
+                  }`}>
+                    {day.hasData ? `${day.tdee}` : '—'}
+                  </span>
+                  <span className={`text-right text-[11px] ${
+                    !day.hasData ? 'text-purple-700' :
+                    day.deficit >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {day.hasData ? `${day.deficit >= 0 ? '+' : ''}${day.deficit}` : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary */}
+            <div className="border-t border-purple-500/20 pt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-purple-500/10 p-3">
+                <div className="text-xs text-purple-300 mb-0.5">BMR</div>
+                <div className="font-bold text-white">{Math.round(norm?.bmr ?? 0)} ккал</div>
+              </div>
+              <div className="rounded-xl bg-purple-500/10 p-3">
+                <div className="text-xs text-purple-300 mb-0.5">Ср. активность ({activityStats.daysWithData} дн.)</div>
+                <div className="font-bold text-white">{activityStats.avgActivity} ккал</div>
+              </div>
+              <div className="rounded-xl bg-purple-500/10 p-3">
+                <div className="text-xs text-purple-300 mb-0.5">Ср. TDEE за неделю</div>
+                <div className="font-bold text-white">{activityStats.avgTDEE} ккал</div>
+              </div>
+              <div className="rounded-xl bg-purple-500/10 p-3">
+                <div className="text-xs text-purple-300 mb-0.5">TDEE нормы (текущий)</div>
+                <div className="font-bold text-white">{norm?.tdee ?? '—'} ккал</div>
+              </div>
+              <div className="col-span-2 rounded-xl bg-purple-900/20 p-3 border border-purple-500/20">
+                <div className="text-xs text-purple-300 mb-0.5">Целевые калории (норма)</div>
+                <div className="font-bold text-purple-200">{norm?.calories ?? '—'} ккал</div>
+              </div>
+            </div>
           </Card>
         )}
 
