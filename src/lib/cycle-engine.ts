@@ -261,6 +261,97 @@ export function getCurrentCycleState(cycles: CycleEntry[]) {
 // Macro adjustments
 // ==========================================
 
+export const CYCLE_CALORIE_BOOST = 100;
+export const CYCLE_PRE_START_BOOST_DAYS = 2;
+
+export interface CycleCalorieAdjustment {
+  active: boolean;
+  calories: number;
+  carbs: number;
+  source: "recorded" | "predicted" | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  cycleStart: string | null;
+  cycleEnd: string | null;
+}
+
+function emptyCycleCalorieAdjustment(): CycleCalorieAdjustment {
+  return {
+    active: false,
+    calories: 0,
+    carbs: 0,
+    source: null,
+    windowStart: null,
+    windowEnd: null,
+    cycleStart: null,
+    cycleEnd: null,
+  };
+}
+
+function buildCycleCalorieAdjustment(
+  source: "recorded" | "predicted",
+  cycleStart: string,
+  cycleEnd: string
+): CycleCalorieAdjustment {
+  return {
+    active: true,
+    calories: CYCLE_CALORIE_BOOST,
+    carbs: Math.round(CYCLE_CALORIE_BOOST / 4),
+    source,
+    windowStart: addDays(cycleStart, -CYCLE_PRE_START_BOOST_DAYS),
+    windowEnd: cycleEnd,
+    cycleStart,
+    cycleEnd,
+  };
+}
+
+export function getCycleCalorieAdjustmentForDate(
+  cycles: CycleEntry[],
+  date: string = todayStr(),
+  options: { includePrediction?: boolean } = {}
+): CycleCalorieAdjustment {
+  const sorted = calculateCycleDurations(cycles).sort((a, b) =>
+    b.startDate.localeCompare(a.startDate)
+  );
+
+  const recordedCycle = sorted.find((cycle) => {
+    const windowStart = addDays(cycle.startDate, -CYCLE_PRE_START_BOOST_DAYS);
+    return date >= windowStart && date <= cycle.endDate;
+  });
+
+  if (recordedCycle) {
+    return buildCycleCalorieAdjustment(
+      "recorded",
+      recordedCycle.startDate,
+      recordedCycle.endDate
+    );
+  }
+
+  if (options.includePrediction !== false) {
+    const prediction = predictNextCycle(sorted);
+    if (prediction) {
+      const predictedEnd = addDays(
+        prediction.nextPeriodStart,
+        prediction.predictedBleedingDays - 1
+      );
+      const predictedWindowStart = addDays(
+        prediction.nextPeriodStart,
+        -CYCLE_PRE_START_BOOST_DAYS
+      );
+
+      if (date >= predictedWindowStart && date <= predictedEnd) {
+        return buildCycleCalorieAdjustment(
+          "predicted",
+          prediction.nextPeriodStart,
+          predictedEnd
+        );
+      }
+    }
+  }
+
+  return emptyCycleCalorieAdjustment();
+}
+
 /**
  * Compute calorie/macro adjustments based on current cycle phase.
  * 

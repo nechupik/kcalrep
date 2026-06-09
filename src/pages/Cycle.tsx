@@ -20,7 +20,7 @@ import {
 import {
   getCurrentCycleState,
   predictNextCycle,
-  computeMacroAdjustment,
+  getCycleCalorieAdjustmentForDate,
   shouldShowAntiPanic,
   updateSymptomMap,
   recalculateMetabolicConfig,
@@ -167,15 +167,10 @@ const Cycle = () => {
     return predictNextCycle(sorted);
   }, [cyclesWithDurations]);
 
-  const macroAdjustment = useMemo(() => {
-    if (!cycleState) return null;
-    return computeMacroAdjustment(
-      cycleState.phase,
-      config?.predictionConfidence || "medium",
-      bodyComp[0] || null,
-      todaySurvey
-    );
-  }, [cycleState, config, bodyComp, todaySurvey]);
+  const cycleCalorieAdjustment = useMemo(
+    () => getCycleCalorieAdjustmentForDate(cyclesWithDurations, todayStr()),
+    [cyclesWithDurations]
+  );
 
   const antiPanicMsg = useMemo(() => {
     if (!cycleState) return null;
@@ -396,7 +391,7 @@ const Cycle = () => {
             )}
 
             {/* Macro Adjustment */}
-            {macroAdjustment && macroAdjustment.calorieAdjustment > 0 && (
+            {cycleCalorieAdjustment.active && (
               <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-lg">🍽️</span>
@@ -406,17 +401,21 @@ const Cycle = () => {
                   <div className="rounded-xl bg-muted/40 p-3 text-center">
                     <div className="text-xs text-muted-foreground mb-1">Калории</div>
                     <div className="font-bold text-green-400">
-                      +{macroAdjustment.calorieAdjustment} ккал
+                      +{cycleCalorieAdjustment.calories} ккал
                     </div>
                   </div>
                   <div className="rounded-xl bg-muted/40 p-3 text-center">
                     <div className="text-xs text-muted-foreground mb-1">Углеводы</div>
                     <div className="font-bold text-green-400">
-                      +{macroAdjustment.carbAdjustment}г
+                      +{cycleCalorieAdjustment.carbs}г
                     </div>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">{macroAdjustment.reason}</p>
+                <p className="text-sm text-muted-foreground">
+                  {cycleCalorieAdjustment.source === "predicted"
+                    ? "Прогнозируемое окно цикла: добавляем 100 ккал на 2 дня до начала и дни кровотечения."
+                    : "Окно цикла: добавляем 100 ккал на 2 дня до начала и дни кровотечения."}
+                </p>
               </Card>
             )}
 

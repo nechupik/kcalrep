@@ -22,6 +22,10 @@ export interface NutritionAnalyticsInput {
     fat: number;
     carbs: number;
     entries: number;
+    targetCalories?: number;
+    targetProtein?: number;
+    targetFat?: number;
+    targetCarbs?: number;
   }[];
   trackedDays: number;
   streakDays: number;
@@ -32,6 +36,10 @@ export interface NutritionAnalyticsInput {
     fat: number;
     carbs: number;
     entries: number;
+    targetCalories?: number;
+    targetProtein?: number;
+    targetFat?: number;
+    targetCarbs?: number;
   };
 }
 
@@ -129,7 +137,8 @@ function calculateProteinCompliance(
   let missCount = 0;
 
   daysWithData.forEach(day => {
-    const ratio = day.protein / targetProtein;
+    const dayTargetProtein = day.targetProtein ?? targetProtein;
+    const ratio = dayTargetProtein > 0 ? day.protein / dayTargetProtein : 0;
     if (ratio >= 0.9) {
       successDays++;
     } else {
@@ -605,7 +614,8 @@ function calculateStreaks(
   let calorieStreak = 0;
   for (const day of sortedDays) {
     if (day.entries === 0) break;
-    const ratio = day.calories / targetCalories;
+    const dayTargetCalories = day.targetCalories ?? targetCalories;
+    const ratio = dayTargetCalories > 0 ? day.calories / dayTargetCalories : 0;
     if (ratio >= 0.9 && ratio <= 1.1) {
       calorieStreak++;
     } else {
@@ -617,7 +627,8 @@ function calculateStreaks(
   let proteinStreak = 0;
   for (const day of sortedDays) {
     if (day.entries === 0) break;
-    const ratio = day.protein / targetProtein;
+    const dayTargetProtein = day.targetProtein ?? targetProtein;
+    const ratio = dayTargetProtein > 0 ? day.protein / dayTargetProtein : 0;
     if (ratio >= 0.9) {
       proteinStreak++;
     } else {
@@ -669,8 +680,10 @@ function generateDailyVerdict(
     return 'Сегодня ещё нет записей. Начните день с белкового завтрака!';
   }
 
-  const calorieRatio = todayLog.calories / targetCalories;
-  const proteinRatio = todayLog.protein / targetProtein;
+  const todayTargetCalories = todayLog.targetCalories ?? targetCalories;
+  const todayTargetProtein = todayLog.targetProtein ?? targetProtein;
+  const calorieRatio = todayTargetCalories > 0 ? todayLog.calories / todayTargetCalories : 0;
+  const proteinRatio = todayTargetProtein > 0 ? todayLog.protein / todayTargetProtein : 0;
   
   // Get today's deficit from the filtered array (last day with data)
   const filteredDeficit: number[] = [];

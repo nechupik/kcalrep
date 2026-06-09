@@ -11,8 +11,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -24,11 +24,14 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { ADMIN_UID } from "@/lib/config";
 import { toDateStr } from "@/lib/utils";
-import { loadNorm } from "@/lib/storage";
+import { applyCycleAdjustmentToNorm, loadNorm } from "@/lib/storage";
 import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry, loadActivityRange, type ActivityEntry } from "@/lib/firestore";
+import { loadCycles } from "@/lib/metabolic-firestore";
+import { getCycleCalorieAdjustmentForDate } from "@/lib/cycle-engine";
 import { analyzeNutrition, formatStreak, type NutritionAnalyticsInput, type NutritionAnalyticsResult } from "@/lib/nutritionAnalytics";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
+import type { CycleEntry } from "@/lib/metabolic-types";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -46,6 +49,10 @@ interface DayData {
   carbs: number;
   count: number;
   label: string;
+  targetCalories: number;
+  targetProtein: number;
+  targetFat: number;
+  targetCarbs: number;
 }
 
 interface WeightData {
@@ -54,10 +61,40 @@ interface WeightData {
   date: string;
 }
 
+function dateRange(startDate: Date, endDate: Date): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(startDate);
+  cursor.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+
+  while (cursor <= end) {
+    dates.push(toDateStr(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
+}
+
+function buildEffectiveNormsByDate(
+  baseNorm: MacroResult | null,
+  cycles: CycleEntry[],
+  dates: string[]
+): Record<string, MacroResult> {
+  if (!baseNorm) return {};
+
+  return dates.reduce<Record<string, MacroResult>>((acc, date) => {
+    const adjustment = getCycleCalorieAdjustmentForDate(cycles, date);
+    acc[date] = applyCycleAdjustmentToNorm(baseNorm, adjustment);
+    return acc;
+  }, {});
+}
+
 const Stats = () => {
   const { user } = useAuth();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [norm, setNorm] = useState<MacroResult | null>(null);
+  const [normsByDate, setNormsByDate] = useState<Record<string, MacroResult>>({});
   const [weightEntries, setWeightEntries] = useState<WeightData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isInterestingOpen, setIsInterestingOpen] = useState(false);
@@ -96,7 +133,6 @@ const Stats = () => {
       try {
         setLoading(true);
         
-        // Load norm
         const userNorm = await loadNorm();
         setNorm(userNorm);
 
@@ -111,19 +147,32 @@ const Stats = () => {
         const today7Start = new Date(today);
         today7Start.setDate(today.getDate() - 6);
         const start7Str = toDateStr(today7Start);
+        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const normStartDate = currentMonthStart < startDate ? currentMonthStart : startDate;
+        const normDates = dateRange(normStartDate, today);
 
-        const requests: Promise<any>[] = [
-          loadDiaryRange(user.uid, startDateStr, endDateStr),
-          loadWeight(user.uid, 30),
-        ];
-        if (user.uid === ADMIN_UID) {
-          requests.push(loadActivityRange(user.uid, start7Str, endDateStr));
-        }
+        const diaryPromise = loadDiaryRange(user.uid, startDateStr, endDateStr);
+        const weightPromise = loadWeight(user.uid, 30);
+        const cyclesPromise = userNorm
+          ? loadCycles(user.uid).catch((error) => {
+              console.error("Failed to load cycles for effective norms:", error);
+              return [] as CycleEntry[];
+            })
+          : Promise.resolve([] as CycleEntry[]);
+        const activityPromise = user.uid === ADMIN_UID
+          ? loadActivityRange(user.uid, start7Str, endDateStr)
+          : Promise.resolve([] as ActivityEntry[]);
 
-        const [diaryEntries, weights, activityEntries] = await Promise.all(requests);
+        const [diaryEntries, weights, cycles, activityEntries] = await Promise.all([
+          diaryPromise,
+          weightPromise,
+          cyclesPromise,
+          activityPromise,
+        ]);
+        setNormsByDate(buildEffectiveNormsByDate(userNorm, cycles, normDates));
         setEntries(diaryEntries);
         setWeightEntries(weights);
-        if (user.uid === ADMIN_UID && activityEntries) {
+        if (user.uid === ADMIN_UID) {
           setActivityWeekData(activityEntries);
         }
       } catch (error) {
@@ -154,6 +203,7 @@ const Stats = () => {
           d.setDate(d.getDate() - i);
           const dateStr = toDateStr(d);
           const dayEntries = entries.filter(e => e.date === dateStr);
+          const targetNorm = normsByDate[dateStr] ?? norm;
 
           foodLogsByDay.push({
             date: dateStr,
@@ -162,6 +212,10 @@ const Stats = () => {
             fat: dayEntries.reduce((sum, e) => sum + e.fat, 0),
             carbs: dayEntries.reduce((sum, e) => sum + e.carbs, 0),
             entries: dayEntries.length,
+            targetCalories: targetNorm.calories,
+            targetProtein: targetNorm.protein,
+            targetFat: targetNorm.fat,
+            targetCarbs: targetNorm.carbs,
           });
         }
 
@@ -215,6 +269,19 @@ const Stats = () => {
         const avgCarbs = activeDays.length > 0
           ? activeDays.reduce((sum, d) => sum + d.carbs, 0) / activeDays.length
           : 0;
+        const todayNorm = normsByDate[todayStr] ?? norm;
+        const avgTargetCalories = activeDays.length > 0
+          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetCalories ?? norm.calories), 0) / activeDays.length)
+          : todayNorm.calories;
+        const avgTargetProtein = activeDays.length > 0
+          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetProtein ?? norm.protein), 0) / activeDays.length)
+          : todayNorm.protein;
+        const avgTargetFat = activeDays.length > 0
+          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetFat ?? norm.fat), 0) / activeDays.length)
+          : todayNorm.fat;
+        const avgTargetCarbs = activeDays.length > 0
+          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetCarbs ?? norm.carbs), 0) / activeDays.length)
+          : todayNorm.carbs;
 
         const normData = await loadFullNormData(user.uid);
 
@@ -225,6 +292,10 @@ const Stats = () => {
           fat: todayEntries.reduce((sum, e) => sum + e.fat, 0),
           carbs: todayEntries.reduce((sum, e) => sum + e.carbs, 0),
           entries: todayEntries.length,
+          targetCalories: todayNorm.calories,
+          targetProtein: todayNorm.protein,
+          targetFat: todayNorm.fat,
+          targetCarbs: todayNorm.carbs,
         };
 
         const analyticsInput: NutritionAnalyticsInput = {
@@ -234,10 +305,10 @@ const Stats = () => {
           avgProtein,
           avgFat,
           avgCarbs,
-          dailyTargetCalories: norm.calories,
-          dailyTargetProtein: norm.protein,
-          dailyTargetFat: norm.fat,
-          dailyTargetCarbs: norm.carbs,
+          dailyTargetCalories: avgTargetCalories,
+          dailyTargetProtein: avgTargetProtein,
+          dailyTargetFat: avgTargetFat,
+          dailyTargetCarbs: avgTargetCarbs,
           dailyDeficit,
           weightHistory,
           foodLogsByDay,
@@ -259,7 +330,7 @@ const Stats = () => {
     if (norm && !loading) {
       calculateAnalytics();
     }
-  }, [norm, user, entries, weightEntries]);
+  }, [norm, user, entries, weightEntries, normsByDate, loading]);
 
   useEffect(() => {
     const loadMonthlyDetail = async () => {
@@ -288,6 +359,7 @@ const Stats = () => {
       const weekdayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Monday=0 index
       
       const dayEntries = entries.filter(entry => entry.date === dateStr);
+      const dayNorm = normsByDate[dateStr] ?? norm;
       const totals = dayEntries.reduce(
         (acc, entry) => ({
           calories: acc.calories + entry.calories,
@@ -303,11 +375,15 @@ const Stats = () => {
         ...totals,
         count: dayEntries.length,
         label: WEEKDAYS[weekdayIndex],
+        targetCalories: dayNorm?.calories ?? 0,
+        targetProtein: dayNorm?.protein ?? 0,
+        targetFat: dayNorm?.fat ?? 0,
+        targetCarbs: dayNorm?.carbs ?? 0,
       });
     }
     
     return data;
-  }, [entries]);
+  }, [entries, norm, normsByDate]);
 
   // Monthly overview data
   const monthlyData = useMemo(() => {
@@ -325,9 +401,10 @@ const Stats = () => {
       const date = new Date(year, month, day);
       const dateStr = toDateStr(new Date(year, month, day));
       const dayEntries = entries.filter(entry => entry.date === dateStr);
+      const dayNorm = normsByDate[dateStr] ?? norm;
 
       const calories = dayEntries.reduce((sum, entry) => sum + entry.calories, 0);
-      const percentage = norm.calories > 0 ? (calories / norm.calories) * 100 : 0;
+      const percentage = dayNorm.calories > 0 ? (calories / dayNorm.calories) * 100 : 0;
 
       let color = "bg-purple-950/40"; // No data - very dark purple
       if (dayEntries.length > 0) {
@@ -344,7 +421,7 @@ const Stats = () => {
     }
 
     return days;
-  }, [entries, norm]);
+  }, [entries, norm, normsByDate]);
 
   // Averages calculation
   const averages = useMemo(() => {
@@ -357,6 +434,7 @@ const Stats = () => {
         avgCarbs: 0,
         daysTracked: 0,
         withinNormPercent: 0,
+        avgTargetCalories: 0,
       };
     }
 
@@ -372,10 +450,13 @@ const Stats = () => {
 
     const daysWithinNorm = norm 
       ? activeDays.filter(day => {
-          const percentage = (day.calories / norm.calories) * 100;
+          const percentage = day.targetCalories > 0 ? (day.calories / day.targetCalories) * 100 : 0;
           return percentage >= 90 && percentage <= 110;
         }).length
       : 0;
+    const avgTargetCalories = Math.round(
+      activeDays.reduce((sum, day) => sum + day.targetCalories, 0) / activeDays.length
+    );
 
     return {
       avgCalories: Math.round(totals.calories / activeDays.length),
@@ -384,6 +465,7 @@ const Stats = () => {
       avgCarbs: Math.round(totals.carbs / activeDays.length),
       daysTracked: activeDays.length,
       withinNormPercent: Math.round((daysWithinNorm / activeDays.length) * 100),
+      avgTargetCalories,
     };
   }, [weeklyData, norm]);
 
@@ -619,7 +701,7 @@ const Stats = () => {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <ComposedChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="caloriesGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
@@ -654,23 +736,36 @@ const Stats = () => {
                     color: "#fff",
                   }}
                 />
-                {norm && (
+                {averages.avgTargetCalories > 0 && (
                   <ReferenceLine
-                    y={norm.calories}
+                    y={averages.avgTargetCalories}
                     stroke="#a855f7"
-                    strokeDasharray="4 4"
-                    label={{ value: "норма", fill: "#a855f7", fontSize: 11, position: "right" }}
+                    strokeDasharray="2 6"
+                    label={{ value: "ср. норма", fill: "#a855f7", fontSize: 11, position: "right" }}
                   />
                 )}
                 <Area
                   type="monotone"
                   dataKey="calories"
+                  name="Калории"
                   stroke="#a855f7"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#caloriesGradient)"
                 />
-              </AreaChart>
+                {norm && (
+                  <Line
+                    type="monotone"
+                    dataKey="targetCalories"
+                    name="Норма"
+                    stroke="#c084fc"
+                    strokeWidth={2}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    activeDot={false}
+                  />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </Card>
@@ -802,7 +897,7 @@ const Stats = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-purple-300">Калории</span>
                 <span className="font-semibold text-white">
-                  {averages.avgCalories} {norm && `/ ${norm.calories}`}
+                  {averages.avgCalories} {averages.avgTargetCalories > 0 && `/ ${averages.avgTargetCalories}`}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -1084,16 +1179,19 @@ const Stats = () => {
                           fat: acc.fat + e.fat,
                           carbs: acc.carbs + e.carbs,
                         }), { calories: 0, protein: 0, fat: 0, carbs: 0 });
+                        const selectedDayNorm = selectedDay
+                          ? normsByDate[selectedDay] ?? norm
+                          : norm;
 
                         return (
                           <>
                             {/* Summary grid */}
                             <div className="grid grid-cols-2 gap-3 mb-5">
                               {[
-                                { label: 'Калории', value: `${totals.calories} ккал`, norm: norm?.calories, icon: '🔥' },
-                                { label: 'Белки', value: `${Math.round(totals.protein)}г`, norm: norm?.protein, icon: '💪' },
-                                { label: 'Жиры', value: `${Math.round(totals.fat)}г`, norm: norm?.fat, icon: '🧈' },
-                                { label: 'Углеводы', value: `${Math.round(totals.carbs)}г`, norm: norm?.carbs, icon: '🌾' },
+                                { label: 'Калории', value: `${totals.calories} ккал`, norm: selectedDayNorm?.calories, icon: '🔥' },
+                                { label: 'Белки', value: `${Math.round(totals.protein)}г`, norm: selectedDayNorm?.protein, icon: '💪' },
+                                { label: 'Жиры', value: `${Math.round(totals.fat)}г`, norm: selectedDayNorm?.fat, icon: '🧈' },
+                                { label: 'Углеводы', value: `${Math.round(totals.carbs)}г`, norm: selectedDayNorm?.carbs, icon: '🌾' },
                               ].map(stat => (
                                 <div key={stat.label} className="rounded-xl bg-muted/40 p-3">
                                   <div className="text-lg mb-1">{stat.icon}</div>
@@ -1120,11 +1218,11 @@ const Stats = () => {
                             </div>
 
                             {/* Deficit */}
-                            {norm && (
+                            {selectedDayNorm && (
                               <div className="rounded-xl bg-muted/30 px-4 py-3 mb-5 grid grid-cols-3 gap-2 text-center">
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Сожжено</div>
-                                  <div className="font-bold text-sm">{norm.tdee} ккал</div>
+                                  <div className="font-bold text-sm">{selectedDayNorm.tdee} ккал</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Съедено</div>
@@ -1133,10 +1231,10 @@ const Stats = () => {
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
                                   <div className={`font-bold text-sm ${
-                                    norm.tdee - totals.calories > 0 ? 'text-green-400' : 'text-red-400'
+                                    selectedDayNorm.tdee - totals.calories > 0 ? 'text-green-400' : 'text-red-400'
                                   }`}>
                                     {(() => {
-                                      const d = norm.tdee - totals.calories;
+                                      const d = selectedDayNorm.tdee - totals.calories;
                                       return `${d > 0 ? '+' : ''}${d} ккал`;
                                     })()}
                                   </div>

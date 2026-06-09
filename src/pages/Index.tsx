@@ -16,7 +16,7 @@ import { ADMIN_UID } from "@/lib/config";
 import { toDateStr } from "@/lib/utils";
 import {
   loadDiary,
-  loadNorm,
+  loadEffectiveNorm,
   saveNorm,
   addDiaryEntry,
   removeDiaryEntry,
@@ -93,7 +93,7 @@ const Index = () => {
       if (!user) { setLoading(false); return; }
       try {
         const [normData, diaryData] = await Promise.all([
-          loadNorm(),
+          loadEffectiveNorm(selectedDate),
           loadDiary(selectedDate),
         ]);
         

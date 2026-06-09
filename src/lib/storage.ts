@@ -1,6 +1,8 @@
 import type { MacroResult } from "./nutrition";
 import { getCurrentUser } from "./auth";
 import { saveNorm as saveNormToFirestore, loadNorm as loadNormFromFirestore, saveDiaryEntry, loadDiary as loadDiaryFromFirestore, deleteDiaryEntry, updateDiaryEntry as updateDiaryEntryInFirestore } from "./firestore";
+import { loadCycles } from "./metabolic-firestore";
+import { getCycleCalorieAdjustmentForDate } from "./cycle-engine";
 
 const NORM_KEY = "kbju.norm";
 const DIARY_KEY = "kbju.diary";
@@ -52,6 +54,34 @@ export async function loadNorm(): Promise<MacroResult | null> {
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
+  }
+}
+
+export function applyCycleAdjustmentToNorm(
+  norm: MacroResult,
+  adjustment: { calories: number; carbs: number; active: boolean }
+): MacroResult {
+  if (!adjustment.active) return norm;
+  return {
+    ...norm,
+    calories: norm.calories + adjustment.calories,
+    carbs: norm.carbs + adjustment.carbs,
+  };
+}
+
+export async function loadEffectiveNorm(date?: string): Promise<MacroResult | null> {
+  const norm = await loadNorm();
+  const user = getCurrentUser();
+
+  if (!user || !norm) return norm;
+
+  try {
+    const cycles = await loadCycles(user.uid);
+    const adjustment = getCycleCalorieAdjustmentForDate(cycles, date);
+    return applyCycleAdjustmentToNorm(norm, adjustment);
+  } catch (error) {
+    console.error("Failed to apply cycle adjustment to norm:", error);
+    return norm;
   }
 }
 
