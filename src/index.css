@@ -1,0 +1,267 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 232 20% 10%;
+    --foreground: 240 20% 62%;
+    --card: 270 15% 17%;
+    --card-foreground: 240 20% 62%;
+    --popover: 270 15% 17%;
+    --popover-foreground: 240 20% 62%;
+    --primary: 263 72% 59%;
+    --primary-foreground: 240 20% 62%;
+    --secondary: 240 20% 17%;
+    --secondary-foreground: 240 20% 62%;
+    --muted: 240 15% 19%;
+    --muted-foreground: 240 15% 55%;
+    --accent: 263 60% 40%;
+    --accent-foreground: 240 20% 62%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 15% 23%;
+    --input: 240 20% 17%;
+    --ring: 263 72% 59%;
+    --radius: 0.75rem;
+
+    --macro-calories: #9d86b8;
+    --macro-protein: #6328c1;
+    --macro-fat: #6328c1;
+    --macro-carbs: #6328c1;
+  }
+
+  .dark {
+    --background: 232 20% 10%;
+    --foreground: 240 20% 62%;
+    --card: 270 15% 17%;
+    --card-foreground: 240 20% 62%;
+    --popover: 270 15% 17%;
+    --popover-foreground: 240 20% 62%;
+    --primary: 263 72% 59%;
+    --primary-foreground: 240 20% 62%;
+    --secondary: 240 20% 17%;
+    --secondary-foreground: 240 20% 62%;
+    --muted: 240 15% 19%;
+    --muted-foreground: 240 15% 55%;
+    --accent: 263 60% 40%;
+    --accent-foreground: 240 20% 62%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 15% 23%;
+    --input: 240 20% 17%;
+    --ring: 263 72% 59%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    background-color: #130c13;
+    color: #a38fa0;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply tracking-tight;
+  }
+}
+
+@layer utilities {
+  .bg-gradient-sunset { background: var(--gradient-sunset); }
+  .bg-gradient-sunset-soft { background: var(--gradient-sunset-soft); }
+  .bg-gradient-violet { background: var(--gradient-violet); }
+  .text-gradient-sunset {
+    filter: brightness(0.5);
+  }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .transition-smooth { transition: all 0.65s cubic-bezier(0.4, 0, 0.2, 1); }
+  .transition-dropdown { transition: all 0.65s cubic-bezier(0.4, 0, 0.2, 1); }
+  .toast-enter {
+    animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .toast-exit {
+    animation: slideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Modal slide-up animation */
+  @keyframes modal-slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes modal-slide-down {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(100%);
+    }
+  }
+
+  .modal-enter {
+    animation: modal-slide-up 650ms ease-in-out forwards;
+  }
+
+  .modal-exit {
+    animation: modal-slide-down 650ms ease-in-out forwards;
+  }
+
+  /* Overlay fade animation */
+  @keyframes overlay-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes overlay-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  .overlay-enter {
+    animation: overlay-fade-in 650ms ease-in-out forwards;
+  }
+
+  .overlay-exit {
+    animation: overlay-fade-out 650ms ease-in-out forwards;
+  }
+}
+
+/* PWA Safe Area for iPhone notch */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Prevent overscroll bounce */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Better tap targets for iPhone */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Hide number input spinners */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* Truncate placeholder text with ellipsis */
+input::placeholder {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Scrollbar colors */
+::-webkit-scrollbar-thumb { background: #836a8c; }
+::-webkit-scrollbar-track { background: #836a8c; }
+
+/* Toast swipe styles */
+[data-sonner-toast][data-swipe="move"] {
+  transform: translateX(var(--swipe-amount, 0));
+  transition: none;
+}
+
+[data-sonner-toast][data-swipe="cancel"] {
+  transform: translateX(0);
+  transition: transform 200ms ease-out;
+}
+
+[data-sonner-toast][data-swipe="end"] {
+  animation: swipe-out 350ms ease-out forwards;
+}
+
+@keyframes swipe-out {
+  from {
+    transform: translateX(var(--swipe-amount, 0));
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Toast exit animation - top to bottom */
+[data-sonner-toast][data-dismissed] {
+  animation: toast-exit 350ms ease-out forwards;
+}
+
+@keyframes toast-exit {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+}
+
+
+/* Alternative selectors for sonner */
+.sonner-toast[data-removed] {
+  animation: toast-exit 350ms ease-out forwards;
+}
+
+.sonner-toast.exiting {
+  animation: toast-exit 350ms ease-out forwards;
+}
+
+/* Global toast exit styles */
+[data-sonner-toast] {
+  transition: all 350ms ease-out;
+}
+
+[data-sonner-toast][data-state="destroyed"] {
+  transform: translateY(100px);
+  opacity: 0;
+  transition: transform 350ms ease-out, opacity 350ms ease-out;
+}
+
+@keyframes loading-bar {
+  0% { width: 0%; }
+  20% { width: 25%; }
+  50% { width: 60%; }
+  80% { width: 85%; }
+  100% { width: 95%; }
+}
+
+.animate-loading-bar {
+  animation: loading-bar 8s ease-out forwards;
+}
