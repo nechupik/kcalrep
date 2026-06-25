@@ -28,7 +28,8 @@ import { applyCycleAdjustmentToNorm, loadNorm } from "@/lib/storage";
 import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry, loadActivityRange, type ActivityEntry } from "@/lib/firestore";
 import { loadCycles } from "@/lib/metabolic-firestore";
 import { getCycleCalorieAdjustmentForDate } from "@/lib/cycle-engine";
-import { analyzeNutrition, formatStreak, type NutritionAnalyticsInput, type NutritionAnalyticsResult } from "@/lib/nutritionAnalytics";
+import { type NutritionAnalyticsInput } from "@/lib/nutritionAnalytics";
+import { analyzeWithGemini, type AIAnalyticsResult } from "@/lib/gemini";
 import type { DiaryEntry } from "@/lib/storage";
 import type { MacroResult } from "@/lib/nutrition";
 import type { CycleEntry } from "@/lib/metabolic-types";
@@ -109,8 +110,9 @@ const Stats = () => {
   const [showUserDataViewer, setShowUserDataViewer] = useState(false);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
-  const [analytics, setAnalytics] = useState<NutritionAnalyticsResult | null>(null);
+  const [analytics, setAnalytics] = useState<AIAnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [productPage, setProductPage] = useState(1);
   const [activityWeekData, setActivityWeekData] = useState<ActivityEntry[]>([]);
   const PRODUCTS_PER_PAGE = 10;
@@ -185,152 +187,134 @@ const Stats = () => {
     loadData();
   }, [user]);
 
-  // Load and calculate analytics when data changes
+  // Try to load cached AI analytics on mount
   useEffect(() => {
-    const calculateAnalytics = async () => {
-      if (!user || !norm) return;
-
-      setAnalyticsLoading(true);
-      try {
-        // Use already-loaded entries and weightEntries from state (30-day range)
-        const today = new Date();
-
-        // Build foodLogsByDay (exclude today — window is still open)
-        const todayStr = toDateStr(today);
-        const foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay'] = [];
-        for (let i = 29; i >= 1; i--) {
-          const d = new Date(today);
-          d.setDate(d.getDate() - i);
-          const dateStr = toDateStr(d);
-          const dayEntries = entries.filter(e => e.date === dateStr);
-          const targetNorm = normsByDate[dateStr] ?? norm;
-
-          foodLogsByDay.push({
-            date: dateStr,
-            calories: dayEntries.reduce((sum, e) => sum + e.calories, 0),
-            protein: dayEntries.reduce((sum, e) => sum + e.protein, 0),
-            fat: dayEntries.reduce((sum, e) => sum + e.fat, 0),
-            carbs: dayEntries.reduce((sum, e) => sum + e.carbs, 0),
-            entries: dayEntries.length,
-            targetCalories: targetNorm.calories,
-            targetProtein: targetNorm.protein,
-            targetFat: targetNorm.fat,
-            targetCarbs: targetNorm.carbs,
-          });
+    if (!user) return;
+    try {
+      const cached = localStorage.getItem(`ai-analytics-${user.uid}`);
+      if (cached) {
+        const { result, timestamp } = JSON.parse(cached);
+        const ageHours = (Date.now() - timestamp) / (1000 * 60 * 60);
+        if (ageHours < 6) {
+          setAnalytics(result);
         }
+      }
+    } catch {}
+  }, [user]);
 
-        // Calculate daily deficit
-        const dailyDeficit = foodLogsByDay.map(day => {
-          const burned = norm.tdee || 0;
-          return burned - day.calories;
-        });
+  const runAIAnalysis = async (forceRefresh = false) => {
+    if (!user || !norm) return;
+    if (analyticsLoading) return;
 
-        // Build timestampsMeals (exclude today)
-        const timestampsMeals: NutritionAnalyticsInput['timestampsMeals'] = [];
-        entries.filter(e => e.date !== todayStr).forEach(entry => {
-          const hour = new Date(entry.addedAt || Date.now()).getHours();
-          timestampsMeals.push({
-            hour,
-            calories: entry.calories,
-          });
-        });
-
-        // Calculate tracked days and streak
-        const trackedDays = foodLogsByDay.filter(d => d.entries > 0).length;
-        let streakDays = 0;
-        for (let i = foodLogsByDay.length - 1; i >= 0; i--) {
-          if (foodLogsByDay[i].entries > 0) {
-            streakDays++;
-          } else {
-            break;
+    if (!forceRefresh) {
+      try {
+        const cached = localStorage.getItem(`ai-analytics-${user.uid}`);
+        if (cached) {
+          const { result, timestamp } = JSON.parse(cached);
+          const ageHours = (Date.now() - timestamp) / (1000 * 60 * 60);
+          if (ageHours < 6) {
+            setAnalytics(result);
+            return;
           }
         }
-
-        // Get current weight
-        const currentWeight = weightEntries.length > 0 ? weightEntries[0].weight : 70;
-
-        // Build weight history
-        const weightHistory = weightEntries.map(w => ({
-          date: w.date,
-          weight: w.weight,
-        }));
-
-        // Calculate averages
-        const activeDays = foodLogsByDay.filter(d => d.entries > 0);
-        const avgCalories = activeDays.length > 0
-          ? activeDays.reduce((sum, d) => sum + d.calories, 0) / activeDays.length
-          : 0;
-        const avgProtein = activeDays.length > 0
-          ? activeDays.reduce((sum, d) => sum + d.protein, 0) / activeDays.length
-          : 0;
-        const avgFat = activeDays.length > 0
-          ? activeDays.reduce((sum, d) => sum + d.fat, 0) / activeDays.length
-          : 0;
-        const avgCarbs = activeDays.length > 0
-          ? activeDays.reduce((sum, d) => sum + d.carbs, 0) / activeDays.length
-          : 0;
-        const todayNorm = normsByDate[todayStr] ?? norm;
-        const avgTargetCalories = activeDays.length > 0
-          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetCalories ?? norm.calories), 0) / activeDays.length)
-          : todayNorm.calories;
-        const avgTargetProtein = activeDays.length > 0
-          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetProtein ?? norm.protein), 0) / activeDays.length)
-          : todayNorm.protein;
-        const avgTargetFat = activeDays.length > 0
-          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetFat ?? norm.fat), 0) / activeDays.length)
-          : todayNorm.fat;
-        const avgTargetCarbs = activeDays.length > 0
-          ? Math.round(activeDays.reduce((sum, d) => sum + (d.targetCarbs ?? norm.carbs), 0) / activeDays.length)
-          : todayNorm.carbs;
-
-        const normData = await loadFullNormData(user.uid);
-
-        const todayEntries = entries.filter(e => e.date === todayStr);
-        const todayLog = {
-          calories: todayEntries.reduce((sum, e) => sum + e.calories, 0),
-          protein: todayEntries.reduce((sum, e) => sum + e.protein, 0),
-          fat: todayEntries.reduce((sum, e) => sum + e.fat, 0),
-          carbs: todayEntries.reduce((sum, e) => sum + e.carbs, 0),
-          entries: todayEntries.length,
-          targetCalories: todayNorm.calories,
-          targetProtein: todayNorm.protein,
-          targetFat: todayNorm.fat,
-          targetCarbs: todayNorm.carbs,
-        };
-
-        const analyticsInput: NutritionAnalyticsInput = {
-          currentWeight,
-          targetWeight: normData?.goal === 'lose' ? currentWeight - 5 : undefined,
-          avgCalories,
-          avgProtein,
-          avgFat,
-          avgCarbs,
-          dailyTargetCalories: avgTargetCalories,
-          dailyTargetProtein: avgTargetProtein,
-          dailyTargetFat: avgTargetFat,
-          dailyTargetCarbs: avgTargetCarbs,
-          dailyDeficit,
-          weightHistory,
-          foodLogsByDay,
-          trackedDays,
-          streakDays,
-          timestampsMeals,
-          todayLog,
-        };
-
-        const result = analyzeNutrition(analyticsInput);
-        setAnalytics(result);
-      } catch (error) {
-        console.error('Failed to calculate analytics:', error);
-      } finally {
-        setAnalyticsLoading(false);
-      }
-    };
-
-    if (norm && !loading) {
-      calculateAnalytics();
+      } catch {}
     }
-  }, [norm, user, entries, weightEntries, normsByDate, loading]);
+
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    try {
+      const today = new Date();
+      const todayStr = toDateStr(today);
+      const foodLogsByDay: NutritionAnalyticsInput['foodLogsByDay'] = [];
+      for (let i = 29; i >= 1; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = toDateStr(d);
+        const dayEntries = entries.filter(e => e.date === dateStr);
+        const targetNorm = normsByDate[dateStr] ?? norm;
+        foodLogsByDay.push({
+          date: dateStr,
+          calories: dayEntries.reduce((sum, e) => sum + e.calories, 0),
+          protein: dayEntries.reduce((sum, e) => sum + e.protein, 0),
+          fat: dayEntries.reduce((sum, e) => sum + e.fat, 0),
+          carbs: dayEntries.reduce((sum, e) => sum + e.carbs, 0),
+          entries: dayEntries.length,
+          targetCalories: targetNorm.calories,
+          targetProtein: targetNorm.protein,
+          targetFat: targetNorm.fat,
+          targetCarbs: targetNorm.carbs,
+        });
+      }
+
+      const dailyDeficit = foodLogsByDay.map(day => {
+        const burned = norm.tdee || 0;
+        return burned - day.calories;
+      });
+
+      const timestampsMeals: NutritionAnalyticsInput['timestampsMeals'] = [];
+      entries.filter(e => e.date !== todayStr).forEach(entry => {
+        const hour = new Date(entry.addedAt || Date.now()).getHours();
+        timestampsMeals.push({ hour, calories: entry.calories });
+      });
+
+      const trackedDays = foodLogsByDay.filter(d => d.entries > 0).length;
+      let streakDays = 0;
+      for (let i = foodLogsByDay.length - 1; i >= 0; i--) {
+        if (foodLogsByDay[i].entries > 0) streakDays++;
+        else break;
+      }
+
+      const currentWeight = weightEntries.length > 0 ? weightEntries[0].weight : 70;
+      const weightHistory = weightEntries.map(w => ({ date: w.date, weight: w.weight }));
+
+      const activeDays = foodLogsByDay.filter(d => d.entries > 0);
+      const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
+      const avgCalories = avg(activeDays.map(d => d.calories));
+      const avgProtein = avg(activeDays.map(d => d.protein));
+      const avgFat = avg(activeDays.map(d => d.fat));
+      const avgCarbs = avg(activeDays.map(d => d.carbs));
+      const todayNorm = normsByDate[todayStr] ?? norm;
+      const avgTargetCalories = activeDays.length > 0
+        ? Math.round(avg(activeDays.map(d => d.targetCalories ?? norm.calories)))
+        : todayNorm.calories;
+      const avgTargetProtein = activeDays.length > 0
+        ? Math.round(avg(activeDays.map(d => d.targetProtein ?? norm.protein)))
+        : todayNorm.protein;
+      const avgTargetFat = activeDays.length > 0
+        ? Math.round(avg(activeDays.map(d => d.targetFat ?? norm.fat)))
+        : todayNorm.fat;
+      const avgTargetCarbs = activeDays.length > 0
+        ? Math.round(avg(activeDays.map(d => d.targetCarbs ?? norm.carbs)))
+        : todayNorm.carbs;
+
+      const normData = await loadFullNormData(user.uid);
+
+      const analyticsInput: NutritionAnalyticsInput = {
+        currentWeight,
+        targetWeight: normData?.goal === 'lose' ? currentWeight - 5 : undefined,
+        avgCalories, avgProtein, avgFat, avgCarbs,
+        dailyTargetCalories: avgTargetCalories,
+        dailyTargetProtein: avgTargetProtein,
+        dailyTargetFat: avgTargetFat,
+        dailyTargetCarbs: avgTargetCarbs,
+        dailyDeficit, weightHistory, foodLogsByDay,
+        trackedDays, streakDays, timestampsMeals,
+      };
+
+      const result = await analyzeWithGemini(analyticsInput);
+      setAnalytics(result);
+
+      localStorage.setItem(`ai-analytics-${user.uid}`, JSON.stringify({
+        result,
+        timestamp: Date.now(),
+      }));
+    } catch (error) {
+      console.error('Failed to get AI analytics:', error);
+      setAnalyticsError(error instanceof Error ? error.message : 'Не удалось получить анализ от AI');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const loadMonthlyDetail = async () => {
@@ -1267,36 +1251,55 @@ const Stats = () => {
 
           {/* AI Analytics Tab */}
           <TabsContent value="ai-analytics" className="space-y-4">
-            {analyticsLoading ? (
-              <Card className="p-8 text-center bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
-                <div className="animate-pulse">
-                  <Brain className="h-12 w-12 mx-auto mb-4 text-purple-400" />
-                  <p className="text-purple-300">Анализируем ваши данные...</p>
+            {/* Loading state with progress bar */}
+            {analyticsLoading && (
+              <Card className="p-8 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
+                <div className="text-center">
+                  <Brain className="h-12 w-12 mx-auto mb-4 text-purple-400 animate-pulse" />
+                  <p className="text-purple-300 font-medium mb-3">Gemini анализирует ваши данные...</p>
+                  <div className="w-full max-w-xs mx-auto bg-purple-500/20 rounded-full h-2 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-loading-bar" />
+                  </div>
+                  <p className="text-xs text-purple-400/60 mt-3">Обычно занимает 5-10 секунд</p>
                 </div>
               </Card>
-            ) : analytics ? (
+            )}
+
+            {/* Error state */}
+            {!analyticsLoading && analyticsError && (
+              <Card className="p-8 text-center bg-red-500/10 border-red-500/30">
+                <Brain className="h-12 w-12 mx-auto mb-4 text-red-400" />
+                <p className="text-red-400 font-medium mb-2">Ошибка AI анализа</p>
+                <p className="text-sm text-purple-300 mb-4">{analyticsError}</p>
+                <Button
+                  variant="outline"
+                  onClick={() => { setAnalyticsError(null); runAIAnalysis(true); }}
+                >
+                  Попробовать снова
+                </Button>
+              </Card>
+            )}
+
+            {/* Results */}
+            {!analyticsLoading && !analyticsError && analytics && (
               <>
                 {/* Overall Score */}
                 <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
                   <div className="flex items-center gap-2 mb-4">
                     <Brain className="h-5 w-5 text-purple-400" />
                     <h2 className="font-semibold text-white">AI Оценка питания</h2>
+                    <span className="ml-auto text-[10px] text-purple-500/60 bg-purple-500/10 px-2 py-0.5 rounded-full">Gemini 2.5 Flash</span>
                   </div>
                   <div className="text-center py-4">
                     <div className={`text-5xl font-bold mb-2 ${
-                      analytics.nutritionScore >= 90 ? 'text-green-500' :
-                      analytics.nutritionScore >= 75 ? 'text-lime-500' :
-                      analytics.nutritionScore >= 60 ? 'text-yellow-500' :
-                      analytics.nutritionScore >= 40 ? 'text-orange-500' : 'text-red-500'
+                      analytics.score >= 90 ? 'text-green-500' :
+                      analytics.score >= 75 ? 'text-lime-500' :
+                      analytics.score >= 60 ? 'text-yellow-500' :
+                      analytics.score >= 40 ? 'text-orange-500' : 'text-red-500'
                     }`}>
-                      {analytics.nutritionScore}/100
+                      {analytics.score}/100
                     </div>
-                    <p className="text-lg text-purple-300">
-                      {analytics.nutritionScore >= 90 ? 'Отлично' :
-                       analytics.nutritionScore >= 75 ? 'Хорошо' :
-                       analytics.nutritionScore >= 60 ? 'Нормально' :
-                       analytics.nutritionScore >= 40 ? 'Требует внимания' : 'Критично'}
-                    </p>
+                    <p className="text-lg text-purple-300">{analytics.scoreLabel}</p>
                   </div>
                 </Card>
 
@@ -1313,207 +1316,90 @@ const Stats = () => {
                   </div>
                 </Card>
 
-                {/* Protein Compliance */}
-                <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="bg-purple-500/20 rounded-full p-2">
-                      <span className="text-lg">💪</span>
-                    </div>
-                    <h3 className="font-semibold text-white">Выполнение белковой нормы</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-purple-300">Оценка</span>
-                      <span className="font-medium text-white">{analytics.proteinCompliance.score}%</span>
-                    </div>
-                    <div className="w-full bg-purple-500/20 rounded-full h-2">
-                      <div 
-                        className="bg-purple-500 h-2 rounded-full transition-all"
-                        style={{ width: `${analytics.proteinCompliance.score}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-purple-300">Успешных дней</span>
-                      <span className="font-medium text-white">{analytics.proteinCompliance.successDays}</span>
-                    </div>
-                    {analytics.proteinCompliance.avgMiss > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-purple-300">Средний недобор</span>
-                        <span className="font-medium text-white">{analytics.proteinCompliance.avgMiss}%</span>
-                      </div>
-                    )}
-                    <p className="text-sm text-purple-300 mt-2">{analytics.proteinCompliance.verdict}</p>
-                  </div>
-                </Card>
-
-                {/* Deficit Analysis */}
-                <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="bg-purple-500/20 rounded-full p-2">
-                      <span className="text-lg">⚖️</span>
-                    </div>
-                    <h3 className="font-semibold text-white">Анализ дефицита</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-purple-500/10 rounded-lg">
-                        <div className="text-sm text-purple-300">Ожидаемая потеря</div>
-                        <div className="text-lg font-semibold text-white">{analytics.deficitAnalysis.expectedLoss.toFixed(2)} кг</div>
-                      </div>
-                      <div className="text-center p-3 bg-purple-500/10 rounded-lg">
-                        <div className="text-sm text-purple-300">Фактическая потеря</div>
-                        <div className="text-lg font-semibold text-white">{analytics.deficitAnalysis.actualLoss.toFixed(2)} кг</div>
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-purple-300">Расхождение</span>
-                      <span className={`font-medium text-white ${
-                        analytics.deficitAnalysis.discrepancy > 50 ? 'text-red-500' :
-                        analytics.deficitAnalysis.discrepancy > 35 ? 'text-yellow-500' : 'text-green-500'
-                      }`}>
-                        {analytics.deficitAnalysis.discrepancy.toFixed(1)}%
-                      </span>
-                    </div>
-                    <p className="text-sm text-purple-300">{analytics.deficitAnalysis.interpretation}</p>
-                    {analytics.deficitAnalysis.possibleCause && (
-                      <p className="text-sm text-yellow-500">{analytics.deficitAnalysis.possibleCause}</p>
-                    )}
-                  </div>
-                </Card>
-
-                {/* Plateau Detection */}
-                {analytics.plateau.plateau && (
-                  <Card className="p-5 md:p-6 bg-red-500/10 border-red-500/30">
+                {/* Dynamic AI Sections */}
+                {analytics.sections.map((section, idx) => (
+                  <Card key={idx} className={`p-5 md:p-6 backdrop-blur-sm ${
+                    section.type === 'danger' ? 'bg-red-500/10 border-red-500/30' :
+                    section.type === 'warning' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                    section.type === 'success' ? 'bg-green-500/10 border-green-500/30' :
+                    'bg-[#0a0520]/90 border-border/50'
+                  }`}>
                     <div className="flex items-start gap-3">
-                      <div className="bg-red-500/20 rounded-full p-2 mt-0.5">
-                        <span className="text-lg">🛑</span>
+                      <div className={`rounded-full p-2 mt-0.5 shrink-0 ${
+                        section.type === 'danger' ? 'bg-red-500/20' :
+                        section.type === 'warning' ? 'bg-yellow-500/20' :
+                        section.type === 'success' ? 'bg-green-500/20' :
+                        'bg-purple-500/20'
+                      }`}>
+                        <span className="text-lg">{section.icon}</span>
                       </div>
                       <div>
-                        <h3 className="font-semibold text-red-400 mb-1">Обнаружено плато</h3>
-                        <p className="text-sm text-purple-300 mb-2">
-                          Вес не снижается уже {analytics.plateau.daysStuck} дней
-                        </p>
-                        {analytics.plateau.recommendation && (
-                          <p className="text-sm text-purple-300">{analytics.plateau.recommendation}</p>
-                        )}
+                        <h3 className={`font-semibold mb-1 ${
+                          section.type === 'danger' ? 'text-red-400' :
+                          section.type === 'warning' ? 'text-yellow-400' :
+                          section.type === 'success' ? 'text-green-400' :
+                          'text-white'
+                        }`}>{section.title}</h3>
+                        <p className="text-sm text-purple-300 leading-relaxed">{section.content}</p>
                       </div>
                     </div>
                   </Card>
-                )}
+                ))}
 
-                {/* Calorie Stability */}
-                <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="bg-blue-500/20 rounded-full p-2">
-                      <span className="text-lg">📊</span>
-                    </div>
-                    <h3 className="font-semibold text-white">Стабильность калорий</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-purple-300">Оценка стабильности</span>
-                      <span className="font-medium text-white">{analytics.stability.stabilityScore}/100</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full transition-all"
-                        style={{ width: `${analytics.stability.stabilityScore}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-purple-300">Разброс (σ)</span>
-                      <span className="font-medium text-white">{analytics.stability.variance} ккал</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{analytics.stability.explanation}</p>
-                  </div>
-                </Card>
-
-                {/* Patterns */}
-                {analytics.patterns.length > 0 && (
-                  <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
+                {/* AI Recommendations */}
+                {analytics.recommendations.length > 0 && (
+                  <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="bg-purple-500/20 rounded-full p-2">
-                        <span className="text-lg">🔍</span>
+                        <span className="text-lg">💡</span>
                       </div>
-                      <h3 className="font-semibold">Обнаруженные паттерны</h3>
+                      <h3 className="font-semibold text-white">Рекомендации</h3>
                     </div>
                     <div className="space-y-2">
-                      {analytics.patterns.map((pattern, idx) => (
-                        <div 
-                          key={idx}
-                          className={`p-3 rounded-lg text-sm ${
-                            pattern.severity === 'alert' ? 'bg-red-500/10 border border-red-500/20' :
-                            pattern.severity === 'warning' ? 'bg-yellow-500/10 border border-yellow-500/20' :
-                            'bg-muted/50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span>
-                              {pattern.type === 'weekend' ? '📅' :
-                               pattern.type === 'weekday' ? '📆' :
-                               pattern.type === 'evening' ? '🌙' : '📈'}
-                            </span>
-                            <span>{pattern.description}</span>
-                          </div>
+                      {analytics.recommendations.map((rec, idx) => (
+                        <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-purple-500/10">
+                          <span className="text-purple-400 font-bold text-sm mt-0.5">{idx + 1}</span>
+                          <p className="text-sm text-purple-200">{rec}</p>
                         </div>
                       ))}
                     </div>
                   </Card>
                 )}
 
-                {/* Recovery Risk */}
-                {(analytics.recovery.riskLevel === 'high' || analytics.recovery.riskLevel === 'medium') && (
-                  <Card className={`p-5 md:p-6 ${
-                    analytics.recovery.riskLevel === 'high' ? 'bg-red-500/10 border-red-500/30' :
-                    analytics.recovery.riskLevel === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
-                    'bg-orange-500/10 border-orange-500/30'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      <div className={`rounded-full p-2 mt-0.5 ${
-                        analytics.recovery.riskLevel === 'high' ? 'bg-red-500/20' :
-                        analytics.recovery.riskLevel === 'medium' ? 'bg-yellow-500/20' :
-                        'bg-orange-500/20'
-                      }`}>
-                        <span className="text-lg">⚠️</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold mb-1">
-                          Риск восстановления: {
-                            analytics.recovery.riskLevel === 'high' ? 'Высокий' :
-                            analytics.recovery.riskLevel === 'medium' ? 'Средний' : 'Низкий'
-                          }
-                        </h3>
-                        <p className="text-sm text-muted-foreground">{analytics.recovery.explanation}</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-                {/* Weight Interpretation */}
-                {analytics.weightInterpretation.type !== 'none' && (
-                  <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-green-500/20 rounded-full p-2 mt-0.5">
-                        <span className="text-lg">
-                          {analytics.weightInterpretation.type === 'water' ? '💧' : '📊'}
-                        </span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold mb-1">Интерпретация веса</h3>
-                        <p className="text-sm text-muted-foreground">{analytics.weightInterpretation.explanation}</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
+                {/* Refresh button */}
+                <Button
+                  variant="outline"
+                  className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+                  onClick={() => runAIAnalysis(true)}
+                  disabled={analyticsLoading}
+                >
+                  <Brain className="h-4 w-4 mr-2" />
+                  Обновить анализ
+                </Button>
               </>
-            ) : (
-              <Card className="p-8 text-center">
-                <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">Недостаточно данных для анализа</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Записывайте питание минимум 3 дня, чтобы увидеть аналитику
+            )}
+
+            {/* Initial state — no analysis yet, show button */}
+            {!analyticsLoading && !analyticsError && !analytics && (
+              <Card className="p-8 text-center bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
+                <Brain className="h-16 w-16 mx-auto mb-4 text-purple-400/60" />
+                <h3 className="text-lg font-semibold text-white mb-2">AI Аналитика питания</h3>
+                <p className="text-sm text-purple-300 mb-6 max-w-sm mx-auto">
+                  Нейросеть Gemini проанализирует ваши данные за 30 дней и даст персональные рекомендации
                 </p>
+                <Button
+                  onClick={() => runAIAnalysis()}
+                  disabled={!norm || loading}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 text-base"
+                >
+                  <Brain className="h-5 w-5 mr-2" />
+                  Анализировать
+                </Button>
+                {!norm && (
+                  <p className="text-xs text-purple-400/60 mt-3">
+                    Сначала рассчитайте норму КБЖУ в калькуляторе
+                  </p>
+                )}
               </Card>
             )}
           </TabsContent>
