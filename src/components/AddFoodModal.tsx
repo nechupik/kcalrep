@@ -209,7 +209,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-50 flex items-end sm:items-center justify-center" style={{ height: 'var(--modal-vh, 100dvh)' }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
     >
       {/* Overlay */}
       <div

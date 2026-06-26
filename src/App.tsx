@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RunningCat } from "@/components/RunningCat";
-import { useVisualViewport } from "@/hooks/useVisualViewport";
 
 const Index = lazy(() => import("./pages/Index.tsx"));
 const Auth = lazy(() => import("./pages/Auth.tsx"));
@@ -23,9 +22,7 @@ const Cycle = lazy(() => import("./pages/Cycle.tsx"));
 
 const queryClient = new QueryClient();
 
-const App = () => {
-  useVisualViewport();
-  return (
+const App = () => (
   <AuthProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -85,7 +82,6 @@ const App = () => {
       </TooltipProvider>
     </QueryClientProvider>
   </AuthProvider>
-  );
-};
+);
 
 export default App;
