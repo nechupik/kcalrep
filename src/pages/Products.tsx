@@ -521,7 +521,7 @@ const Products = () => {
 
         {/* Add/Edit Product Modal */}
         {showAddForm && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="fixed inset-x-0 top-0 z-50 flex items-end sm:items-center justify-center" style={{ height: 'var(--modal-vh, 100dvh)' }}>
             <div
               onClick={handleCancelEdit}
               className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}

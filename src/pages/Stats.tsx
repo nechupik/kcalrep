@@ -25,7 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ADMIN_UID } from "@/lib/config";
 import { toDateStr } from "@/lib/utils";
 import { applyCycleAdjustmentToNorm, loadNorm } from "@/lib/storage";
-import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry, loadActivityRange, type ActivityEntry } from "@/lib/firestore";
+import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry, loadActivityRange, loadNormHistory, type ActivityEntry, type NormHistoryEntry } from "@/lib/firestore";
 import { loadCycles } from "@/lib/metabolic-firestore";
 import { getCycleCalorieAdjustmentForDate } from "@/lib/cycle-engine";
 import { type NutritionAnalyticsInput } from "@/lib/nutritionAnalytics";
@@ -79,14 +79,28 @@ function dateRange(startDate: Date, endDate: Date): string[] {
 
 function buildEffectiveNormsByDate(
   baseNorm: MacroResult | null,
+  normHistory: NormHistoryEntry[],
   cycles: CycleEntry[],
   dates: string[]
 ): Record<string, MacroResult> {
   if (!baseNorm) return {};
 
   return dates.reduce<Record<string, MacroResult>>((acc, date) => {
+    const historyEntry = normHistory.filter(h => h.date <= date).at(-1);
+    const base: MacroResult = historyEntry ? {
+      calories: historyEntry.calories,
+      protein: historyEntry.protein,
+      fat: historyEntry.fat,
+      carbs: historyEntry.carbs,
+      bmr: historyEntry.bmr,
+      tdee: historyEntry.tdee,
+      activityFactor: historyEntry.activityFactor,
+      activityLabel: historyEntry.activityLabel as any,
+      goalMultiplier: historyEntry.goalMultiplier,
+    } : baseNorm;
+
     const adjustment = getCycleCalorieAdjustmentForDate(cycles, date);
-    acc[date] = applyCycleAdjustmentToNorm(baseNorm, adjustment);
+    acc[date] = applyCycleAdjustmentToNorm(base, adjustment);
     return acc;
   }, {});
 }
@@ -164,14 +178,16 @@ const Stats = () => {
         const activityPromise = user.uid === ADMIN_UID
           ? loadActivityRange(user.uid, start7Str, endDateStr)
           : Promise.resolve([] as ActivityEntry[]);
+        const normHistoryPromise = loadNormHistory(user.uid, endDateStr).catch(() => [] as NormHistoryEntry[]);
 
-        const [diaryEntries, weights, cycles, activityEntries] = await Promise.all([
+        const [diaryEntries, weights, cycles, activityEntries, normHistory] = await Promise.all([
           diaryPromise,
           weightPromise,
           cyclesPromise,
           activityPromise,
+          normHistoryPromise,
         ]);
-        setNormsByDate(buildEffectiveNormsByDate(userNorm, cycles, normDates));
+        setNormsByDate(buildEffectiveNormsByDate(userNorm, normHistory, cycles, normDates));
         setEntries(diaryEntries);
         setWeightEntries(weights);
         if (user.uid === ADMIN_UID) {
@@ -720,14 +736,6 @@ const Stats = () => {
                     color: "#fff",
                   }}
                 />
-                {averages.avgTargetCalories > 0 && (
-                  <ReferenceLine
-                    y={averages.avgTargetCalories}
-                    stroke="#a855f7"
-                    strokeDasharray="2 6"
-                    label={{ value: "ср. норма", fill: "#a855f7", fontSize: 11, position: "right" }}
-                  />
-                )}
                 <Area
                   type="monotone"
                   dataKey="calories"
@@ -1065,62 +1073,15 @@ const Stats = () => {
                 </div>
               )}
 
-              {/* Per product breakdown */}
-              {productStats.length === 0 ? (
-                <p className="text-sm text-purple-300 text-center py-4">Нет данных за этот месяц</p>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-purple-300">По продуктам</p>
-                  {productStats
-                    .slice((productPage - 1) * PRODUCTS_PER_PAGE, productPage * PRODUCTS_PER_PAGE)
-                    .map(p => (
-                    <div key={p.name} className="rounded-xl bg-purple-500/10 px-4 py-3">
-                      <div className="flex justify-between items-start mb-[5px]">
-                        <span className="font-medium text-sm text-white">{p.name}</span>
-                        <span className="text-xs text-purple-300">{p.count} раз</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-xs text-purple-300">
-                        <span>⚖️ {p.totalGrams.toLocaleString()}г</span>
-                        <span>🔥 {p.totalCalories.toLocaleString()} ккал</span>
-                        <span>💪 Б {Math.round(p.totalProtein)}г</span>
-                        <span>🌾 У {Math.round(p.totalCarbs)}г</span>
-                        <span>🧈 Ж {Math.round(p.totalFat)}г</span>
-                      </div>
-                    </div>
-                  ))}
-                  {/* Pagination controls */}
-                  {productStats.length > PRODUCTS_PER_PAGE && (
-                    <div className="flex items-center justify-center gap-4 pt-4">
-                      <button
-                        onClick={() => setProductPage(p => Math.max(1, p - 1))}
-                        disabled={productPage === 1}
-                        className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Назад
-                      </button>
-                      <span className="text-sm text-purple-300">
-                        {productPage} из {Math.ceil(productStats.length / PRODUCTS_PER_PAGE)}
-                      </span>
-                      <button
-                        onClick={() => setProductPage(p => Math.min(Math.ceil(productStats.length / PRODUCTS_PER_PAGE), p + 1))}
-                        disabled={productPage === Math.ceil(productStats.length / PRODUCTS_PER_PAGE)}
-                        className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Вперёд
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </Card>
 
         {/* Day Detail Modal */}
         {selectedDay && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-            <div 
-              onClick={() => setSelectedDay(null)} 
+          <div className="fixed inset-x-0 top-0 z-50 flex items-end sm:items-center justify-center" style={{ height: 'var(--modal-vh, 100dvh)' }}>
+            <div
+              onClick={() => setSelectedDay(null)}
               className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`} 
             />
             <div
@@ -1172,7 +1133,7 @@ const Stats = () => {
                             {/* Summary grid */}
                             <div className="grid grid-cols-2 gap-3 mb-5">
                               {[
-                                { label: 'Калории', value: `${totals.calories} ккал`, norm: selectedDayNorm?.calories, icon: '🔥' },
+                                { label: 'Калории', value: `${Math.round(totals.calories)} ккал`, norm: selectedDayNorm?.calories, icon: '🔥' },
                                 { label: 'Белки', value: `${Math.round(totals.protein)}г`, norm: selectedDayNorm?.protein, icon: '💪' },
                                 { label: 'Жиры', value: `${Math.round(totals.fat)}г`, norm: selectedDayNorm?.fat, icon: '🧈' },
                                 { label: 'Углеводы', value: `${Math.round(totals.carbs)}г`, norm: selectedDayNorm?.carbs, icon: '🌾' },
@@ -1210,7 +1171,7 @@ const Stats = () => {
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Съедено</div>
-                                  <div className="font-bold text-sm">{totals.calories} ккал</div>
+                                  <div className="font-bold text-sm">{Math.round(totals.calories)} ккал</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground mb-1">Дефицит</div>
@@ -1218,7 +1179,7 @@ const Stats = () => {
                                     selectedDayNorm.tdee - totals.calories > 0 ? 'text-green-400' : 'text-red-400'
                                   }`}>
                                     {(() => {
-                                      const d = selectedDayNorm.tdee - totals.calories;
+                                      const d = Math.round(selectedDayNorm.tdee - totals.calories);
                                       return `${d > 0 ? '+' : ''}${d} ккал`;
                                     })()}
                                   </div>

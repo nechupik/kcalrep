@@ -62,8 +62,8 @@ export const SortModal = ({ isOpen, onClose, onCategorySelect, selectedCategory 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-      style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
+      className="fixed inset-x-0 top-0 z-50 flex items-end sm:items-center justify-center"
+      style={{ pointerEvents: isOpen ? 'auto' : 'none', height: 'var(--modal-vh, 100dvh)' }}
     >
       {/* Overlay */}
       <div

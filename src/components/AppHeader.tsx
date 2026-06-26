@@ -88,7 +88,7 @@ export const AppHeader = () => {
         }`}
         style={{ transitionDuration: '600ms' }}
       >
-        <div className="pt-[50px] pl-[15px] pr-6 pb-6 flex flex-col h-full">
+        <div className="pt-4 pl-[15px] pr-6 pb-6 flex flex-col h-full">
           <nav className="space-y-2 flex-1">
             {links.map((l) => (
               <NavLink

@@ -394,29 +394,24 @@ const Body = () => {
         {/* Weight Input */}
         <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
           <div className="flex items-center gap-2 mb-4">
-            <Weight className="h-4 w-4 text-macro-protein" />
             <h2 className="font-semibold">Записать вес</h2>
           </div>
 
           <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                step="0.1"
-                placeholder="0"
-                value={weightInput}
-                onChange={(e) => setWeightInput(e.target.value.replace(",", "."))}
-                className="flex-1"
-              />
-            </div>
-
-            {/* Body composition fields — admin only */}
-            {user?.uid === ADMIN_UID && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {user?.uid === ADMIN_UID ? (
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    % жира
-                  </label>
+                  <label className="text-xs text-muted-foreground mb-1 block pl-[5px]">Вес (кг)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="0"
+                    value={weightInput}
+                    onChange={(e) => setWeightInput(e.target.value.replace(",", "."))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block pl-[5px]">% жира</label>
                   <Input
                     type="number"
                     step="0.1"
@@ -426,9 +421,7 @@ const Body = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    Безжировая масса (кг)
-                  </label>
+                  <label className="text-xs text-muted-foreground mb-1 block pl-[5px]">Безжировая масса (кг)</label>
                   <Input
                     type="number"
                     step="0.1"
@@ -438,9 +431,7 @@ const Body = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    BMR с весов
-                  </label>
+                  <label className="text-xs text-muted-foreground mb-1 block pl-[5px]">BMR с весов</label>
                   <Input
                     type="number"
                     step="1"
@@ -450,6 +441,14 @@ const Body = () => {
                   />
                 </div>
               </div>
+            ) : (
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="0"
+                value={weightInput}
+                onChange={(e) => setWeightInput(e.target.value.replace(",", "."))}
+              />
             )}
 
             <Button
@@ -517,7 +516,6 @@ const Body = () => {
         {weightChartData.length > 1 && (
           <Card className="p-5 md:p-6 bg-card/80 backdrop-blur-sm border-border/50">
             <div className="flex items-center gap-2 mb-4">
-              <Weight className="h-4 w-4 text-macro-protein" />
               <h2 className="font-semibold">График веса</h2>
             </div>
             <div className="h-48">

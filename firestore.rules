@@ -59,6 +59,11 @@ service cloud.firestore {
         allow read: if canPartnerReadAdminData(userId);
       }
 
+      match /normHistory/{historyId} {
+        allow read, write: if isOwnerOrAdmin(userId);
+        allow read: if canPartnerReadAdminData(userId);
+      }
+
       match /activity/{activityId} {
         allow read, write: if isOwnerOrAdmin(userId);
         allow read: if canPartnerReadAdminData(userId);

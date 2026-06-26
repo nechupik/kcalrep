@@ -92,6 +92,20 @@ export async function loadUserProfile(userId: string): Promise<UserProfile | nul
   return null;
 }
 
+export interface NormHistoryEntry {
+  date: string;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  bmr: number;
+  tdee: number;
+  activityFactor: number;
+  activityLabel: string;
+  goalMultiplier: number;
+  savedAt: Timestamp;
+}
+
 // Norm functions
 export async function saveNorm(userId: string, norm: MacroResult, params?: { gender: 'male' | 'female'; height: number; age: number; goal: string }) {
   const normDoc = doc(db, "users", userId, "norm", "main");
@@ -112,6 +126,30 @@ export async function saveNorm(userId: string, norm: MacroResult, params?: { gen
     updatedAt: Timestamp.now(),
   };
   await setDoc(normDoc, normData);
+
+  const today = new Date().toISOString().split('T')[0];
+  const historyDoc = doc(db, "users", userId, "normHistory", today);
+  const historyEntry: NormHistoryEntry = {
+    date: today,
+    calories: norm.calories,
+    protein: norm.protein,
+    fat: norm.fat,
+    carbs: norm.carbs,
+    bmr: norm.bmr,
+    tdee: norm.tdee,
+    activityFactor: norm.activityFactor,
+    activityLabel: norm.activityLabel,
+    goalMultiplier: norm.goalMultiplier,
+    savedAt: Timestamp.now(),
+  };
+  await setDoc(historyDoc, historyEntry);
+}
+
+export async function loadNormHistory(userId: string, endDate: string): Promise<NormHistoryEntry[]> {
+  const historyCol = collection(db, "users", userId, "normHistory");
+  const q = query(historyCol, where("date", "<=", endDate), orderBy("date", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => d.data() as NormHistoryEntry);
 }
 
 export async function loadNorm(userId: string): Promise<MacroResult | null> {
