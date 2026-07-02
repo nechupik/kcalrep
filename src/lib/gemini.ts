@@ -71,7 +71,8 @@ async function fetchWithRetry(prompt: string): Promise<Response> {
         generationConfig: {
           responseMimeType: "application/json",
           temperature: 0.7,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     });
@@ -100,10 +101,15 @@ export async function analyzeWithGemini(input: NutritionAnalyticsInput): Promise
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts?.[0]?.text;
 
   if (!text) {
     throw new Error("Empty response from Gemini");
+  }
+
+  if (candidate.finishReason === "MAX_TOKENS") {
+    throw new Error("Ответ Gemini был обрезан из-за лимита токенов");
   }
 
   const parsed: AIAnalyticsResult = JSON.parse(text);
