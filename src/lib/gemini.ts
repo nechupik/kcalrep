@@ -52,21 +52,47 @@ JSON ответ (без markdown):
 4-6 секций, 3-4 рекомендации. Русский. Кратко. Реальные цифры из данных.`;
 }
 
+const RETRYABLE_STATUSES = new Set([429, 503]);
+const MAX_RETRIES = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(prompt: string): Promise<Response> {
+  let lastResponse: Response | undefined;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+        },
+      }),
+    });
+
+    if (response.ok || !RETRYABLE_STATUSES.has(response.status)) {
+      return response;
+    }
+
+    lastResponse = response;
+    if (attempt < MAX_RETRIES) {
+      await sleep(1000 * 2 ** attempt);
+    }
+  }
+
+  return lastResponse!;
+}
+
 export async function analyzeWithGemini(input: NutritionAnalyticsInput): Promise<AIAnalyticsResult> {
   const prompt = buildPrompt(input);
 
-  const response = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.7,
-        maxOutputTokens: 1024,
-      },
-    }),
-  });
+  const response = await fetchWithRetry(prompt);
 
   if (!response.ok) {
     const err = await response.text();
