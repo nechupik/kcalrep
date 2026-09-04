@@ -493,11 +493,17 @@ const Stats = () => {
   const mealTimingData = useMemo(() => {
     if (entries.length === 0) return null;
 
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - 6);
+    const weekStartStr = toDateStr(weekStart);
+    const weekEntries = entries.filter(e => e.date >= weekStartStr);
+    if (weekEntries.length === 0) return null;
+
     const hourTotals: Record<number, number> = {};
     const hourDayCounts: Record<number, Set<string>> = {};
     const dailyFirstLast: Record<string, { first: number; last: number }> = {};
 
-    entries.forEach(e => {
+    weekEntries.forEach(e => {
       if (!e.addedAt) return;
       const dt = new Date(e.addedAt);
       const hour = dt.getHours();
@@ -804,7 +810,7 @@ const Stats = () => {
             </div>
             {mealTimingData.peakHour !== null && (
               <p className="text-xs text-purple-300 mt-2 text-center">
-                Пиковый час: <span className="font-medium text-white">{mealTimingData.peakHour}:00–{mealTimingData.peakHour + 1}:00</span> · среднее за 30 дней
+                Пиковый час: <span className="font-medium text-white">{mealTimingData.peakHour}:00–{mealTimingData.peakHour + 1}:00</span> · среднее за 7 дней
               </p>
             )}
           </Card>
