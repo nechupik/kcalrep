@@ -11,11 +11,22 @@ import type { DiaryEntry } from '@/lib/storage';
 interface AddFoodModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (entry: Omit<DiaryEntry, 'id' | 'addedAt'>) => Promise<void>;
+  onAdd: (entry: Omit<DiaryEntry, 'id'>) => Promise<void>;
   selectedDate: string;
 }
 
 type Tab = 'search' | 'manual';
+
+function nowTimeStr(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function computeAddedAt(dateStr: string, timeStr: string): number {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return new Date(year, month - 1, day, hours || 0, minutes || 0).getTime();
+}
 
 export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodModalProps) => {
   const { user } = useAuth();
@@ -29,6 +40,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [grams, setGrams] = useState('');
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [entryTime, setEntryTime] = useState(nowTimeStr);
   const overlayRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(false);
 
@@ -44,6 +56,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   useEffect(() => {
     if (isOpen) {
       setAnimationState('enter');
+      setEntryTime(nowTimeStr());
       wasOpenRef.current = true;
     } else if (wasOpenRef.current) {
       // Only run exit animation if modal was previously open
@@ -100,7 +113,8 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     if (!selected || isAdding) return;
     const isPortionType = isPortion(selected);
 
-    let entry: Omit<DiaryEntry, 'id' | 'addedAt'>;
+    let entry: Omit<DiaryEntry, 'id'>;
+    const addedAt = computeAddedAt(selectedDate, entryTime);
 
     if (isPortionType) {
       // Use totalGrams for portion-type recipes (sum of ingredient weights)
@@ -114,6 +128,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         fat: selected.fat,
         carbs: selected.carbs,
         date: selectedDate,
+        addedAt,
       };
     } else {
       const g = Number(grams);
@@ -128,6 +143,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         fat: +(selected.fat * factor).toFixed(1),
         carbs: +(selected.carbs * factor).toFixed(1),
         date: selectedDate,
+        addedAt,
       };
     }
 
@@ -161,7 +177,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         }, user.uid);
       }
 
-      const entry: Omit<DiaryEntry, 'id' | 'addedAt'> = {
+      const entry: Omit<DiaryEntry, 'id'> = {
         foodId: saveToBase ? manualName : 'manual-' + Date.now(),
         name: manualName,
         grams: 100,
@@ -170,6 +186,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         fat: Number(manualFat) || 0,
         carbs: Number(manualCarbs) || 0,
         date: selectedDate,
+        addedAt: computeAddedAt(selectedDate, entryTime),
       };
 
       await onAdd(entry);
@@ -193,6 +210,7 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     setActiveTab('search');
     setShowManual(false);
     setIsAdding(false);
+    setEntryTime(nowTimeStr());
   };
 
 
@@ -225,6 +243,16 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold">Добавить еду</h2>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="entry-time" className="text-xs text-muted-foreground shrink-0">Время</Label>
+            <Input
+              id="entry-time"
+              type="time"
+              value={entryTime}
+              onChange={e => setEntryTime(e.target.value)}
+              className="w-28"
+            />
+          </div>
         </div>
 
         {/* Keep all existing tab content exactly as before */}

@@ -107,7 +107,7 @@ const Index = () => {
     loadData();
   }, [user, selectedDate]);
 
-  const handleAddEntry = async (entry: Omit<DiaryEntry, 'id' | 'addedAt'>) => {
+  const handleAddEntry = async (entry: Omit<DiaryEntry, 'id'>) => {
     try {
       const entryWithDate = { ...entry, date: selectedDate };
       await addDiaryEntry(entryWithDate);
@@ -295,6 +295,11 @@ const Index = () => {
     }
     
     for (const entry of yesterdayEntries) {
+      // Preserve the original time-of-day, shifted onto the target date
+      const originalTime = new Date(entry.addedAt);
+      const repeatedAddedAt = new Date(selectedDate + 'T00:00:00');
+      repeatedAddedAt.setHours(originalTime.getHours(), originalTime.getMinutes(), originalTime.getSeconds(), 0);
+
       await addDiaryEntry({
         foodId: entry.foodId,
         name: entry.name,
@@ -304,6 +309,7 @@ const Index = () => {
         fat: entry.fat,
         carbs: entry.carbs,
         date: selectedDate,
+        addedAt: repeatedAddedAt.getTime(),
       });
     }
     
