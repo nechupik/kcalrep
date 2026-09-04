@@ -283,6 +283,31 @@ export async function deleteWeightEntry(userId: string, entryId: string): Promis
   await deleteDoc(ref);
 }
 
+export async function loadWeightRange(userId: string, startDate: string, endDate: string): Promise<Array<WeightEntry & { id: string }>> {
+  const weightCollection = collection(db, "users", userId, "weight");
+  const q = query(
+    weightCollection,
+    where("date", ">=", startDate),
+    where("date", "<=", endDate),
+    orderBy("date", "asc")
+  );
+
+  const querySnapshot = await getDocs(q);
+  const entries: Array<WeightEntry & { id: string }> = [];
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data() as WeightEntry;
+    entries.push({
+      id: doc.id,
+      weight: data.weight,
+      date: data.date,
+      createdAt: data.createdAt,
+    });
+  });
+
+  return entries;
+}
+
 export async function wasWeightEnteredThisWeek(userId: string): Promise<boolean> {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday...

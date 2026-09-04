@@ -53,7 +53,7 @@ export const AppHeader = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/40 px-[14px] py-[10px] flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/40 px-[14px] pt-[calc(10px+env(safe-area-inset-top))] pb-[10px] flex items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div className="rounded-xl bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] p-2 shadow-glow">
             <img src="/logo-512x512.png" alt="LoviEat" className="h-5 w-5" />
@@ -88,7 +88,7 @@ export const AppHeader = () => {
         }`}
         style={{ transitionDuration: '600ms' }}
       >
-        <div className="pt-4 pl-[15px] pr-6 pb-6 flex flex-col h-full">
+        <div className="pt-[calc(1rem+env(safe-area-inset-top))] pl-[15px] pr-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex flex-col h-full">
           <nav className="space-y-2 flex-1">
             {links.map((l) => (
               <NavLink

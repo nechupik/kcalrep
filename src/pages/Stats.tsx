@@ -3,10 +3,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { EatenFoodsList } from "@/components/EatenFoodsList";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { MonthPicker } from "@/components/ui/month-picker";
 import { UserDataViewer } from "@/components/UserDataViewer";
-import { BarChart3, TrendingUp, Activity, X, Eye, Brain, Clock } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, X, Eye, Brain, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -110,14 +108,16 @@ const Stats = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [norm, setNorm] = useState<MacroResult | null>(null);
   const [normsByDate, setNormsByDate] = useState<Record<string, MacroResult>>({});
+  const [normHistoryState, setNormHistoryState] = useState<NormHistoryEntry[]>([]);
+  const [cyclesState, setCyclesState] = useState<CycleEntry[]>([]);
   const [weightEntries, setWeightEntries] = useState<WeightData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isInterestingOpen, setIsInterestingOpen] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
+  const [viewedMonth, setViewedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [monthlyDetailEntries, setMonthlyDetailEntries] = useState<DiaryEntry[]>([]);
+  const [calendarEntries, setCalendarEntries] = useState<DiaryEntry[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dayEntries, setDayEntries] = useState<DiaryEntry[]>([]);
   const [loadingDay, setLoadingDay] = useState(false);
@@ -127,9 +127,7 @@ const Stats = () => {
   const [analytics, setAnalytics] = useState<AIAnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
-  const [productPage, setProductPage] = useState(1);
   const [activityWeekData, setActivityWeekData] = useState<ActivityEntry[]>([]);
-  const PRODUCTS_PER_PAGE = 10;
   // Control modal animation
   useEffect(() => {
     if (selectedDay) {
@@ -188,6 +186,8 @@ const Stats = () => {
           normHistoryPromise,
         ]);
         setNormsByDate(buildEffectiveNormsByDate(userNorm, normHistory, cycles, normDates));
+        setNormHistoryState(normHistory);
+        setCyclesState(cycles);
         setEntries(diaryEntries);
         setWeightEntries(weights);
         if (user.uid === ADMIN_UID) {
@@ -332,19 +332,32 @@ const Stats = () => {
     }
   };
 
+  // Load diary + effective norms for whichever month the monthly calendar is showing
   useEffect(() => {
-    const loadMonthlyDetail = async () => {
-      if (!user || !isInterestingOpen) return;
-      const [year, month] = selectedMonth.split('-').map(Number);
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const lastDay = new Date(year, month, 0).getDate();
-      const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
-      const entries = await loadDiaryRange(user.uid, startDate, endDate);
-      setMonthlyDetailEntries(entries);
-      setProductPage(1); // Reset to page 1 when month changes
+    const loadCalendarMonth = async () => {
+      if (!user || !norm) return;
+      setCalendarLoading(true);
+      try {
+        const [year, month] = viewedMonth.split('-').map(Number);
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        const monthEntries = await loadDiaryRange(user.uid, startDate, endDate);
+        setCalendarEntries(monthEntries);
+
+        const monthDates = dateRange(new Date(year, month - 1, 1), new Date(year, month - 1, lastDay));
+        setNormsByDate(prev => ({
+          ...prev,
+          ...buildEffectiveNormsByDate(norm, normHistoryState, cyclesState, monthDates),
+        }));
+      } catch (error) {
+        console.error('Failed to load calendar month data:', error);
+      } finally {
+        setCalendarLoading(false);
+      }
     };
-    loadMonthlyDetail();
-  }, [user, isInterestingOpen, selectedMonth]);
+    loadCalendarMonth();
+  }, [user, viewedMonth, norm, normHistoryState, cyclesState]);
 
   // Aggregate entries by day for the last 7 days
   const weeklyData = useMemo(() => {
@@ -389,18 +402,14 @@ const Stats = () => {
   const monthlyData = useMemo(() => {
     if (!norm) return [];
 
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+    const [year, month] = viewedMonth.split('-').map(Number);
+    const lastDay = new Date(year, month, 0);
 
     const days: Array<{ date: number; calories: number; color: string }> = [];
 
     for (let day = 1; day <= lastDay.getDate(); day++) {
-      const date = new Date(year, month, day);
-      const dateStr = toDateStr(new Date(year, month, day));
-      const dayEntries = entries.filter(entry => entry.date === dateStr);
+      const dateStr = toDateStr(new Date(year, month - 1, day));
+      const dayEntries = calendarEntries.filter(entry => entry.date === dateStr);
       const dayNorm = normsByDate[dateStr] ?? norm;
 
       const calories = dayEntries.reduce((sum, entry) => sum + entry.calories, 0);
@@ -421,7 +430,7 @@ const Stats = () => {
     }
 
     return days;
-  }, [entries, norm, normsByDate]);
+  }, [calendarEntries, norm, normsByDate, viewedMonth]);
 
   // Averages calculation
   const averages = useMemo(() => {
@@ -581,63 +590,12 @@ const Stats = () => {
     return { days, avgActivity, avgTDEE, daysWithData: daysWithData.length };
   }, [activityWeekData, norm]);
 
-  // Product statistics for interesting stats section
-  const productStats = useMemo(() => {
-    const map = new Map<string, {
-      name: string;
-      totalGrams: number;
-      totalCalories: number;
-      totalProtein: number;
-      totalCarbs: number;
-      totalFat: number;
-      count: number;
-    }>();
-
-    monthlyDetailEntries.forEach(entry => {
-      const existing = map.get(entry.name);
-      if (existing) {
-        existing.totalGrams += entry.grams;
-        existing.totalCalories += entry.calories;
-        existing.totalProtein += entry.protein;
-        existing.totalCarbs += entry.carbs;
-        existing.totalFat += entry.fat;
-        existing.count += 1;
-      } else {
-        map.set(entry.name, {
-          name: entry.name,
-          totalGrams: entry.grams,
-          totalCalories: entry.calories,
-          totalProtein: entry.protein,
-          totalCarbs: entry.carbs,
-          totalFat: entry.fat,
-          count: 1,
-        });
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => b.totalGrams - a.totalGrams);
-  }, [monthlyDetailEntries]);
-
-  // Monthly totals summary
-  const monthlyTotals = useMemo(() => {
-    return productStats.reduce((acc, p) => ({
-      grams: acc.grams + p.totalGrams,
-      calories: acc.calories + p.totalCalories,
-      protein: acc.protein + p.totalProtein,
-      carbs: acc.carbs + p.totalCarbs,
-      fat: acc.fat + p.totalFat,
-    }), { grams: 0, calories: 0, protein: 0, carbs: 0, fat: 0 });
-  }, [productStats]);
-
   const handleDayClick = async (dayNumber: number) => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
-    
+    const dateStr = `${viewedMonth}-${String(dayNumber).padStart(2, '0')}`;
+
     setSelectedDay(dateStr);
     setLoadingDay(true);
-    
+
     try {
       const entries = await loadDiaryRange(user!.uid, dateStr, dateStr);
       setDayEntries(entries);
@@ -651,17 +609,35 @@ const Stats = () => {
   const handleRemoveEntry = async (id: string) => {
     try {
       await deleteDiaryEntry(user.uid, id);
-      setMonthlyDetailEntries(prev => prev.filter(e => e.id !== id));
+      setDayEntries(prev => prev.filter(e => e.id !== id));
+      setCalendarEntries(prev => prev.filter(e => e.id !== id));
+      setEntries(prev => prev.filter(e => e.id !== id));
       toast.success('Запись удалена');
     } catch (error) {
       toast.error('Ошибка удаления записи');
     }
   };
 
-  const currentMonth = MONTHS[new Date().getMonth()];
-  const currentYear = new Date().getFullYear();
-  const firstDayOfMonth = new Date(currentYear, new Date().getMonth(), 1).getDay();
+  const [viewedYear, viewedMonthNum] = viewedMonth.split('-').map(Number);
+  const viewedMonthLabel = MONTHS[viewedMonthNum - 1];
+  const firstDayOfMonth = new Date(viewedYear, viewedMonthNum - 1, 1).getDay();
   const calendarOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+  const todayMonthStr = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  })();
+  const isCurrentMonthViewed = viewedMonth === todayMonthStr;
+
+  const goToPrevMonth = () => {
+    const prevDate = new Date(viewedYear, viewedMonthNum - 2, 1);
+    setViewedMonth(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const goToNextMonth = () => {
+    if (isCurrentMonthViewed) return;
+    const nextDate = new Date(viewedYear, viewedMonthNum, 1);
+    setViewedMonth(`${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`);
+  };
 
   if (loading) {
     return (
@@ -833,10 +809,26 @@ const Stats = () => {
         <div className="grid md:grid-cols-2 gap-6 mb-4">
           {/* SECTION 2 - Monthly Overview */}
           <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
-            <div className="mb-4 text-left">
-              <h2 className="font-semibold text-white">{currentMonth} {currentYear}</h2>
+            <div className="mb-4 flex items-center justify-between">
+              <button
+                onClick={goToPrevMonth}
+                disabled={calendarLoading}
+                className="rounded-lg p-1.5 text-purple-300 hover:bg-purple-500/10 hover:text-white transition-smooth disabled:opacity-40"
+                aria-label="Предыдущий месяц"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <h2 className="font-semibold text-white">{viewedMonthLabel} {viewedYear}</h2>
+              <button
+                onClick={goToNextMonth}
+                disabled={calendarLoading || isCurrentMonthViewed}
+                className="rounded-lg p-1.5 text-purple-300 hover:bg-purple-500/10 hover:text-white transition-smooth disabled:opacity-40 disabled:hover:bg-transparent"
+                aria-label="Следующий месяц"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-xs">
+            <div className={`grid grid-cols-7 gap-1 text-xs transition-opacity ${calendarLoading ? 'opacity-50' : 'opacity-100'}`}>
               {WEEKDAYS.map(day => (
                 <div key={day} className="text-center font-medium text-purple-300 p-1">
                   {day}
@@ -1030,53 +1022,6 @@ const Stats = () => {
           </Card>
         )}
 
-        {/* SECTION 5 - Interesting Statistics */}
-        <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50">
-          <button
-            onClick={() => setIsInterestingOpen(!isInterestingOpen)}
-            className="w-full flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🔍</span>
-              <h2 className="font-semibold text-white">Интересная статистика</h2>
-            </div>
-            <span className="text-purple-300 text-sm">{isInterestingOpen ? '▲' : '▼'}</span>
-          </button>
-
-          {isInterestingOpen && (
-            <div className="mt-4 space-y-4">
-              {/* Month selector */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-purple-300">Месяц:</label>
-                <MonthPicker
-                  value={selectedMonth}
-                  onChange={setSelectedMonth}
-                />
-              </div>
-
-              {/* Monthly totals summary */}
-              {productStats.length > 0 && (
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Всего съедено', value: `${monthlyTotals.grams.toLocaleString()}г`, icon: '⚖️' },
-                    { label: 'Калорий', value: `${monthlyTotals.calories.toLocaleString()} ккал`, icon: '🔥' },
-                    { label: 'Белков', value: `${Math.round(monthlyTotals.protein)}г`, icon: '💪' },
-                    { label: 'Жиров', value: `${Math.round(monthlyTotals.fat)}г`, icon: '🧈' },
-                    { label: 'Углеводов', value: `${Math.round(monthlyTotals.carbs)}г`, icon: '🌾' },
-                  ].map(stat => (
-                    <div key={stat.label} className="rounded-xl bg-purple-500/10 p-3">
-                      <div className="text-lg">{stat.icon}</div>
-                      <div className="font-bold text-white">{stat.value}</div>
-                      <div className="text-xs text-purple-300">{stat.label}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-            </div>
-          )}
-        </Card>
-
         {/* Day Detail Modal */}
         {selectedDay && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -1085,7 +1030,7 @@ const Stats = () => {
               className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`} 
             />
             <div
-              className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
+              className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}
               style={{ transform: animationState === null ? 'translateY(100%)' : undefined }}
             >
               

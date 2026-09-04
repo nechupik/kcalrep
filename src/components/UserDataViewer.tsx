@@ -232,7 +232,7 @@ export const UserDataViewer = ({ isOpen, onClose, targetUserId, targetUserName }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-2xl bg-background border border-border/50 rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-background border border-border/50 rounded-2xl shadow-2xl p-6 max-h-[85dvh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between mb-5">

@@ -9,6 +9,7 @@ import { CalculatorForm } from "@/components/CalculatorForm";
 import { SimpleCalculatorForm } from "@/components/SimpleCalculatorForm";
 import { ResultsCard } from "@/components/ResultsCard";
 import { EditProfileDataModal } from "@/components/EditProfileDataModal";
+import { ExportDataModal } from "@/components/ExportDataModal";
 import {
   User,
   LogIn,
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   Shield,
   Edit3,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,6 +57,7 @@ const Profile = () => {
   const [manualFat, setManualFat] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [storedProfileData, setStoredProfileData] = useState<any>(null);
   const [deficitPercent, setDeficitPercent] = useState(10);
   const [adminRecalculating, setAdminRecalculating] = useState(false);
@@ -688,6 +691,23 @@ const Profile = () => {
           </Card>
         )}
 
+        {/* Data export — admin only */}
+        {user && user.uid === ADMIN_UID && (
+          <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
+            <h2 className="text-lg font-bold mb-1">Выгрузка данных</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Скачайте отчёт по питанию, весу и активности за выбранный период в формате Markdown.
+            </p>
+            <Button
+              onClick={() => setShowExportModal(true)}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Выгрузить данные
+            </Button>
+          </Card>
+        )}
 
         {/* Login form */}
         {!user && (
@@ -801,6 +821,14 @@ const Profile = () => {
           isOpen={showEditProfileModal}
           onClose={() => setShowEditProfileModal(false)}
           onSave={handleProfileDataSave}
+          userId={user.uid}
+        />
+      )}
+
+      {user && user.uid === ADMIN_UID && (
+        <ExportDataModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
           userId={user.uid}
         />
       )}
