@@ -494,7 +494,7 @@ const Stats = () => {
     if (entries.length === 0) return null;
 
     const hourTotals: Record<number, number> = {};
-    const activeDays = new Set<string>();
+    const hourDayCounts: Record<number, Set<string>> = {};
     const dailyFirstLast: Record<string, { first: number; last: number }> = {};
 
     entries.forEach(e => {
@@ -504,7 +504,8 @@ const Stats = () => {
       const mins = hour * 60 + dt.getMinutes();
 
       hourTotals[hour] = (hourTotals[hour] || 0) + e.calories;
-      activeDays.add(e.date);
+      if (!hourDayCounts[hour]) hourDayCounts[hour] = new Set();
+      hourDayCounts[hour].add(e.date);
 
       if (!dailyFirstLast[e.date]) {
         dailyFirstLast[e.date] = { first: mins, last: mins };
@@ -514,13 +515,16 @@ const Stats = () => {
       }
     });
 
-    const daysCount = activeDays.size || 1;
     const fmt = (mins: number) =>
       `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 
+    // Average per meal actually eaten in this hour (days with no meal then don't dilute it) —
+    // dividing by every tracked day instead understated real meal size whenever eating times
+    // shifted an hour day to day.
     const chartData = Array.from({ length: 19 }, (_, i) => {
       const h = i + 5;
-      return { hour: `${h}:00`, calories: Math.round((hourTotals[h] || 0) / daysCount) };
+      const daysWithMeal = hourDayCounts[h]?.size || 0;
+      return { hour: `${h}:00`, calories: daysWithMeal > 0 ? Math.round(hourTotals[h] / daysWithMeal) : 0 };
     });
 
     // Exclude today from avg calculations — today is incomplete (user may not have logged evening meals yet)
@@ -800,7 +804,7 @@ const Stats = () => {
             </div>
             {mealTimingData.peakHour !== null && (
               <p className="text-xs text-purple-300 mt-2 text-center">
-                Пиковый час: <span className="font-medium text-white">{mealTimingData.peakHour}:00–{mealTimingData.peakHour + 1}:00</span> · среднее за 7 дней
+                Пиковый час: <span className="font-medium text-white">{mealTimingData.peakHour}:00–{mealTimingData.peakHour + 1}:00</span> · среднее за 30 дней
               </p>
             )}
           </Card>

@@ -110,7 +110,7 @@ export async function loadDiary(date?: string): Promise<DiaryEntry[]> {
 }
 
 // Helper function to add a single diary entry
-export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id'>) {
+export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'addedAt'>) {
   const user = getCurrentUser();
   if (user) {
     try {
@@ -123,6 +123,7 @@ export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id'>) {
       const newEntry: DiaryEntry = {
         ...entry,
         id: Date.now().toString(),
+        addedAt: Date.now(),
       };
       entries.push(newEntry);
       localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
@@ -134,6 +135,7 @@ export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id'>) {
     const newEntry: DiaryEntry = {
       ...entry,
       id: Date.now().toString(),
+      addedAt: Date.now(),
     };
     entries.push(newEntry);
     localStorage.setItem(DIARY_KEY, JSON.stringify(entries));

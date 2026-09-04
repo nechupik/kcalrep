@@ -183,11 +183,11 @@ export async function loadFullNormData(userId: string): Promise<NormData | null>
 }
 
 // Diary functions
-export async function saveDiaryEntry(userId: string, entry: Omit<DiaryEntry, 'id'>) {
+export async function saveDiaryEntry(userId: string, entry: Omit<DiaryEntry, 'id' | 'addedAt'>) {
   const diaryCollection = collection(db, "users", userId, "diary");
   const newEntry = {
     ...entry,
-    addedAt: Timestamp.fromMillis(entry.addedAt),
+    addedAt: Timestamp.now(),
   };
   const docRef = await addDoc(diaryCollection, newEntry);
   return docRef.id;
