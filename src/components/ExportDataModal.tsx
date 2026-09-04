@@ -1,7 +1,7 @@
 import { useState } from "react";
+import type { DateRange } from "react-day-picker";
+import { ru } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar, CalendarDays, CalendarRange, Download } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarIcon, CalendarDays, CalendarRange, Download } from "lucide-react";
 import { toast } from "sonner";
 import { generateMarkdownReport } from "@/lib/exportReport";
 
@@ -21,19 +23,32 @@ interface ExportDataModalProps {
 
 type ExportMode = "month" | "week" | "custom";
 
-function todayStr(): string {
-  return new Date().toISOString().split("T")[0];
+function today(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-function daysAgoStr(days: number): string {
-  const d = new Date();
+function daysAgo(days: number): Date {
+  const d = today();
   d.setDate(d.getDate() - days);
-  return d.toISOString().split("T")[0];
+  return d;
 }
 
-function currentMonthStartStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+function currentMonthStart(): Date {
+  const d = today();
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function toDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateRu(date: Date): string {
+  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function downloadMarkdown(filename: string, content: string) {
@@ -49,18 +64,17 @@ function downloadMarkdown(filename: string, content: string) {
 }
 
 export const ExportDataModal = ({ isOpen, onClose, userId }: ExportDataModalProps) => {
-  const [startDate, setStartDate] = useState(currentMonthStartStr());
-  const [endDate, setEndDate] = useState(todayStr());
+  const [range, setRange] = useState<DateRange | undefined>({
+    from: currentMonthStart(),
+    to: today(),
+  });
   const [showCustomRange, setShowCustomRange] = useState(false);
+  const [rangePickerOpen, setRangePickerOpen] = useState(false);
   const [generatingMode, setGeneratingMode] = useState<ExportMode | null>(null);
 
   const isGenerating = generatingMode !== null;
 
   const runExport = async (mode: ExportMode, start: string, end: string) => {
-    if (!start || !end) {
-      toast.error("Выберите период");
-      return;
-    }
     if (start > end) {
       toast.error("Дата начала позже даты окончания");
       return;
@@ -80,9 +94,17 @@ export const ExportDataModal = ({ isOpen, onClose, userId }: ExportDataModalProp
     }
   };
 
+  const handleCustomRangeExport = () => {
+    if (!range?.from || !range?.to) {
+      toast.error("Выберите период");
+      return;
+    }
+    runExport("custom", toDateStr(range.from), toDateStr(range.to));
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-card/95 backdrop-blur-sm border-border/50 max-w-[calc(100%-40px)] rounded-2xl p-6">
+      <DialogContent className="bg-card/95 backdrop-blur-sm border-border/50 max-w-[calc(100%-40px)] sm:max-w-md rounded-2xl p-6">
         <DialogHeader>
           <DialogTitle>Выгрузка данных</DialogTitle>
         </DialogHeader>
@@ -92,17 +114,17 @@ export const ExportDataModal = ({ isOpen, onClose, userId }: ExportDataModalProp
             <Button
               type="button"
               variant="outline"
-              onClick={() => runExport("month", currentMonthStartStr(), todayStr())}
+              onClick={() => runExport("month", toDateStr(currentMonthStart()), toDateStr(today()))}
               disabled={isGenerating}
               className="w-full justify-start gap-2"
             >
-              <Calendar className="h-4 w-4" />
+              <CalendarIcon className="h-4 w-4" />
               {generatingMode === "month" ? "Формирование..." : "За текущий месяц"}
             </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => runExport("week", daysAgoStr(6), todayStr())}
+              onClick={() => runExport("week", toDateStr(daysAgo(6)), toDateStr(today()))}
               disabled={isGenerating}
               className="w-full justify-start gap-2"
             >
@@ -123,30 +145,35 @@ export const ExportDataModal = ({ isOpen, onClose, userId }: ExportDataModalProp
 
           {showCustomRange && (
             <div className="space-y-3 rounded-xl border border-border/50 p-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="export-start">С</Label>
-                  <Input
-                    id="export-start"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+              <Popover open={rangePickerOpen} onOpenChange={setRangePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isGenerating}
+                    className="w-full justify-start gap-2 font-normal"
+                  >
+                    <CalendarIcon className="h-4 w-4 shrink-0" />
+                    {range?.from && range?.to
+                      ? `${formatDateRu(range.from)} – ${formatDateRu(range.to)}`
+                      : "Выберите период"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    locale={ru}
+                    selected={range}
+                    onSelect={setRange}
+                    defaultMonth={range?.from}
+                    numberOfMonths={1}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="export-end">По</Label>
-                  <Input
-                    id="export-end"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-              </div>
+                </PopoverContent>
+              </Popover>
               <Button
                 type="button"
-                onClick={() => runExport("custom", startDate, endDate)}
-                disabled={isGenerating}
+                onClick={handleCustomRangeExport}
+                disabled={isGenerating || !range?.from || !range?.to}
                 className="w-full bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground hover:opacity-90 border-0 flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
