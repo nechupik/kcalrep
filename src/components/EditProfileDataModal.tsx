@@ -63,6 +63,32 @@ export const EditProfileDataModal = ({ isOpen, onClose, onSave, userId }: EditPr
         return;
       }
 
+      if (currentNormData.mode === 'manual') {
+        // Manual norm is pinned — update bio-data only, keep the entered calories/macros untouched.
+        const preservedNorm: MacroResult = {
+          calories: currentNormData.calories,
+          protein: currentNormData.protein,
+          fat: currentNormData.fat,
+          carbs: currentNormData.carbs,
+          bmr: currentNormData.bmr,
+          tdee: currentNormData.tdee,
+          activityFactor: currentNormData.activityFactor,
+          activityLabel: currentNormData.activityLabel as MacroResult['activityLabel'],
+          goalMultiplier: currentNormData.goalMultiplier,
+        };
+        await saveNormToFirestore(userId, preservedNorm, {
+          gender,
+          height: parsedHeight,
+          age: parsedAge,
+          goal: currentNormData.goal,
+          mode: 'manual',
+        });
+        onSave(preservedNorm);
+        onClose();
+        toast.success("Данные обновлены. Норма КБЖУ (ручной режим) не изменилась.");
+        return;
+      }
+
       // Load current weight from weight entries
       const weightEntries = await loadWeight(userId, 1);
       const currentWeight = weightEntries.length > 0 ? weightEntries[0].weight : 70;

@@ -180,6 +180,10 @@ const Index = () => {
             loadUserSettings(user.uid),
           ]);
 
+          if (fullNormData?.mode === 'manual') {
+            return;
+          }
+
           const weight = weightEntries.length > 0 ? weightEntries[0].weight : 80;
           const deficitPercent = userSettings?.deficitPercent ?? 20;
 

@@ -21,6 +21,10 @@ import type {
   MetabolicConfig,
 } from "./metabolic-types";
 
+function stripUndefined(obj: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
+
 // ==========================================
 // Cycles  — users/{uid}/cycles/{cycleId}
 // ==========================================
@@ -153,7 +157,7 @@ export async function saveBodyComposition(
 ): Promise<string> {
   const col = collection(db, "users", userId, "body_composition");
   const docRef = await addDoc(col, {
-    ...entry,
+    ...stripUndefined(entry as Record<string, any>),
     createdAt: Timestamp.now(),
   });
   return docRef.id;
@@ -165,7 +169,7 @@ export async function updateBodyComposition(
   updates: Partial<Omit<BodyCompositionEntry, "id">>
 ): Promise<void> {
   const ref = doc(db, "users", userId, "body_composition", entryId);
-  await updateDoc(ref, { ...updates, updatedAt: Timestamp.now() });
+  await updateDoc(ref, { ...stripUndefined(updates as Record<string, any>), updatedAt: Timestamp.now() });
 }
 
 export async function deleteBodyComposition(

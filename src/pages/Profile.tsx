@@ -90,6 +90,7 @@ const Profile = () => {
         // Load stored profile data (gender, age, height)
         const profileData = await loadFullNormData(user.uid);
         setStoredProfileData(profileData);
+        setManualMode(profileData?.mode === 'manual');
       }
     };
 
@@ -480,6 +481,11 @@ const Profile = () => {
                 Ввести вручную
               </button>
             </div>
+            <p className="text-xs text-muted-foreground -mt-2 mb-4">
+              {manualMode
+                ? "Норма зафиксирована вручную: вес и активность с Apple Watch не будут её пересчитывать."
+                : "Норма пересчитывается автоматически при сохранении веса и активности."}
+            </p>
 
             {manualMode && (
               <div className="space-y-4">
@@ -543,9 +549,11 @@ const Profile = () => {
                       height: storedProfileData?.height || 170,
                       age: storedProfileData?.age || 25,
                       goal: storedProfileData?.goal || 'maintain',
+                      mode: 'manual',
                     });
+                    setStoredProfileData((prev) => prev ? { ...prev, mode: 'manual' } : prev);
                     setNorm(manualNorm);
-                    toast.success('Норма КБЖУ сохранена');
+                    toast.success('Норма КБЖУ сохранена. Она не будет пересчитываться автоматически.');
                   }}
                   className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-white hover:opacity-90"
                 >

@@ -49,6 +49,8 @@ export interface NormData {
   age: number;
   goal: string;
   goalMultiplier: number;
+  // 'manual' = user-entered fixed values; weight/activity logging must not auto-recalculate it.
+  mode?: 'manual' | 'auto';
   updatedAt: Timestamp;
 }
 
@@ -107,7 +109,7 @@ export interface NormHistoryEntry {
 }
 
 // Norm functions
-export async function saveNorm(userId: string, norm: MacroResult, params?: { gender: 'male' | 'female'; height: number; age: number; goal: string }) {
+export async function saveNorm(userId: string, norm: MacroResult, params?: { gender: 'male' | 'female'; height: number; age: number; goal: string; mode?: 'manual' | 'auto' }) {
   const normDoc = doc(db, "users", userId, "norm", "main");
   const normData: NormData = {
     calories: norm.calories,
@@ -123,6 +125,7 @@ export async function saveNorm(userId: string, norm: MacroResult, params?: { gen
     age: params?.age || 25,
     goal: params?.goal || 'maintain',
     goalMultiplier: norm.goalMultiplier,
+    mode: params?.mode ?? 'auto',
     updatedAt: Timestamp.now(),
   };
   await setDoc(normDoc, normData);

@@ -20,7 +20,7 @@ export interface DiaryEntry {
   addedAt: number;
 }
 
-export async function saveNorm(norm: MacroResult, params?: { gender: 'male' | 'female'; height: number; age: number; goal: string }) {
+export async function saveNorm(norm: MacroResult, params?: { gender: 'male' | 'female'; height: number; age: number; goal: string; mode?: 'manual' | 'auto' }) {
   const user = getCurrentUser();
   if (user) {
     try {

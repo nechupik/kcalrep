@@ -19,6 +19,7 @@ import { loadWeight, saveWeight, deleteWeightEntry, loadFullNormData, saveNorm a
 import {
   saveBodyComposition,
   loadBodyComposition,
+  deleteBodyComposition,
 } from "@/lib/metabolic-firestore";
 import type { BodyCompositionEntry } from "@/lib/metabolic-types";
 import { recalculateNormWithNewWeight, recalculateNormWithBodyComposition, calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
@@ -45,7 +46,7 @@ function WeightHistoryRow({
   allEntries: WeightData[];
   bodyComp?: BodyCompositionEntry;
   deletingId: string | null;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, date: string) => void;
 }) {
   const [offsetX, setOffsetX] = useState(0);
   const [swiped, setSwiped] = useState(false);
@@ -86,7 +87,7 @@ function WeightHistoryRow({
   const handleDeleteClick = () => {
     setOffsetX(0);
     setSwiped(false);
-    onDelete(entry.id);
+    onDelete(entry.id, entry.date);
   };
 
   return (
@@ -160,7 +161,7 @@ function WeightHistoryRow({
           </div>
           {/* Desktop hover delete */}
           <button
-            onClick={() => onDelete(entry.id)}
+            onClick={() => onDelete(entry.id, entry.date)}
             disabled={deletingId === entry.id}
             className="hidden sm:block p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all disabled:opacity-50"
           >
@@ -180,6 +181,7 @@ const Body = () => {
   const [weightEntries, setWeightEntries] = useState<WeightData[]>([]);
   const [weightInput, setWeightInput] = useState("");
   const [lastWeightPlaceholder, setLastWeightPlaceholder] = useState("75");
+  const [entryDate, setEntryDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   // Body composition
   const [bodyCompEntries, setBodyCompEntries] = useState<BodyCompositionEntry[]>([]);
@@ -221,14 +223,18 @@ const Body = () => {
 
     setSaving(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
-      await saveWeight(user.uid, weight, today);
+      const todayStr = new Date().toISOString().split("T")[0];
+      const dateToSave = entryDate || todayStr;
+      // Backfilled dates older than the latest known entry shouldn't override today's norm with stale data.
+      const isLatestEntry = weightEntries.length === 0 || dateToSave >= weightEntries[0].date;
+
+      await saveWeight(user.uid, weight, dateToSave);
 
       // Save body composition if any fields are filled
       const hasBodyComp = bodyFatInput || lbmInput || bmrScaleInput;
       if (hasBodyComp) {
         await saveBodyComposition(user.uid, {
-          date: today,
+          date: dateToSave,
           weight,
           bodyFatPercent: bodyFatInput ? parseFloat(bodyFatInput) : undefined,
           lbmKg: lbmInput ? parseFloat(lbmInput) : undefined,
@@ -244,66 +250,70 @@ const Body = () => {
       setWeightEntries(weights);
       setBodyCompEntries(bodyComp);
 
-      // Auto-recalculate norm
-      const currentNormData = await loadFullNormData(user.uid);
-      if (currentNormData && currentNormData.gender) {
-        let newNormResult;
-
-        if (user.uid === ADMIN_UID) {
-          // Admin: use Apple Watch 7-day avg for TDEE
-          const today = new Date();
-          const endDate = today.toISOString().split('T')[0];
-          const startDay = new Date(today);
-          startDay.setDate(today.getDate() - 6);
-          const startDateStr = startDay.toISOString().split('T')[0];
-
-          const [activityEntries, settings] = await Promise.all([
-            loadActivityRange(user.uid, startDateStr, endDate),
-            loadUserSettings(user.uid),
-          ]);
-          const avg = activityEntries.length > 0
-            ? Math.round(activityEntries.reduce((sum, e) => sum + e.caloriesBurned, 0) / activityEntries.length)
-            : 0;
-          const deficitPercent = settings?.deficitPercent ?? 10;
-
-          // Prioritize bmrFromScale: input field → latest saved entry → Mifflin
-          const bmrScaleVal = bmrScaleInput ? parseFloat(bmrScaleInput) : null;
-          const bmrFromSaved = bodyComp.length > 0 && bodyComp[0].bmrFromScale && bodyComp[0].bmrFromScale > 0
-            ? bodyComp[0].bmrFromScale
-            : null;
-          const bmr = (bmrScaleVal && bmrScaleVal > 0)
-            ? bmrScaleVal
-            : bmrFromSaved ?? (currentNormData.gender === 'male'
-              ? 10 * weight + 6.25 * currentNormData.height - 5 * currentNormData.age + 5
-              : 10 * weight + 6.25 * currentNormData.height - 5 * currentNormData.age - 161);
-
-          newNormResult = calculateMacrosWithWatchTDEE(
-            bmr, avg, deficitPercent, weight,
-            currentNormData.gender, currentNormData.height,
-            bodyFatInput ? parseFloat(bodyFatInput) : undefined,
-            lbmInput ? parseFloat(lbmInput) : undefined
-          );
-        } else {
-          const bodyCompForCalc = {
-            bodyFatPercent: bodyFatInput ? parseFloat(bodyFatInput) : undefined,
-            lbmKg: lbmInput ? parseFloat(lbmInput) : undefined,
-            bmrFromScale: bmrScaleInput ? parseFloat(bmrScaleInput) : undefined,
-          };
-          const hasBodyComp = Object.values(bodyCompForCalc).some((v) => v != null);
-          newNormResult = hasBodyComp
-            ? recalculateNormWithBodyComposition(currentNormData, weight, bodyCompForCalc)
-            : recalculateNormWithNewWeight(currentNormData, weight);
-        }
-
-        await saveNormToFirestore(user.uid, newNormResult, {
-          gender: currentNormData.gender,
-          height: currentNormData.height,
-          age: currentNormData.age,
-          goal: currentNormData.goal,
-        });
-        toast.success(`Вес сохранён. Норма КБЖУ: ${newNormResult.calories} ккал`);
+      if (!isLatestEntry) {
+        toast.success(`Запись за ${new Date(dateToSave).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} добавлена`);
       } else {
-        toast.success("Вес сохранён");
+        // Auto-recalculate norm — skip if the user has pinned a manually-entered norm
+        const currentNormData = await loadFullNormData(user.uid);
+        if (currentNormData && currentNormData.gender && currentNormData.mode !== 'manual') {
+          let newNormResult;
+
+          if (user.uid === ADMIN_UID) {
+            // Admin: use Apple Watch 7-day avg for TDEE
+            const today = new Date();
+            const endDate = today.toISOString().split('T')[0];
+            const startDay = new Date(today);
+            startDay.setDate(today.getDate() - 6);
+            const startDateStr = startDay.toISOString().split('T')[0];
+
+            const [activityEntries, settings] = await Promise.all([
+              loadActivityRange(user.uid, startDateStr, endDate),
+              loadUserSettings(user.uid),
+            ]);
+            const avg = activityEntries.length > 0
+              ? Math.round(activityEntries.reduce((sum, e) => sum + e.caloriesBurned, 0) / activityEntries.length)
+              : 0;
+            const deficitPercent = settings?.deficitPercent ?? 10;
+
+            // Prioritize bmrFromScale: input field → latest saved entry → Mifflin
+            const bmrScaleVal = bmrScaleInput ? parseFloat(bmrScaleInput) : null;
+            const bmrFromSaved = bodyComp.length > 0 && bodyComp[0].bmrFromScale && bodyComp[0].bmrFromScale > 0
+              ? bodyComp[0].bmrFromScale
+              : null;
+            const bmr = (bmrScaleVal && bmrScaleVal > 0)
+              ? bmrScaleVal
+              : bmrFromSaved ?? (currentNormData.gender === 'male'
+                ? 10 * weight + 6.25 * currentNormData.height - 5 * currentNormData.age + 5
+                : 10 * weight + 6.25 * currentNormData.height - 5 * currentNormData.age - 161);
+
+            newNormResult = calculateMacrosWithWatchTDEE(
+              bmr, avg, deficitPercent, weight,
+              currentNormData.gender, currentNormData.height,
+              bodyFatInput ? parseFloat(bodyFatInput) : undefined,
+              lbmInput ? parseFloat(lbmInput) : undefined
+            );
+          } else {
+            const bodyCompForCalc = {
+              bodyFatPercent: bodyFatInput ? parseFloat(bodyFatInput) : undefined,
+              lbmKg: lbmInput ? parseFloat(lbmInput) : undefined,
+              bmrFromScale: bmrScaleInput ? parseFloat(bmrScaleInput) : undefined,
+            };
+            const hasBodyComp = Object.values(bodyCompForCalc).some((v) => v != null);
+            newNormResult = hasBodyComp
+              ? recalculateNormWithBodyComposition(currentNormData, weight, bodyCompForCalc)
+              : recalculateNormWithNewWeight(currentNormData, weight);
+          }
+
+          await saveNormToFirestore(user.uid, newNormResult, {
+            gender: currentNormData.gender,
+            height: currentNormData.height,
+            age: currentNormData.age,
+            goal: currentNormData.goal,
+          });
+          toast.success(`Вес сохранён. Норма КБЖУ: ${newNormResult.calories} ккал`);
+        } else {
+          toast.success("Вес сохранён");
+        }
       }
 
       // Reset inputs
@@ -311,6 +321,7 @@ const Body = () => {
       setBodyFatInput("");
       setLbmInput("");
       setBmrScaleInput("");
+      setEntryDate(todayStr);
     } catch (error) {
       console.error("Failed to save:", error);
       toast.error("Ошибка сохранения");
@@ -319,13 +330,21 @@ const Body = () => {
     }
   };
 
-  const handleDeleteWeight = async (entryId: string) => {
+  const handleDeleteWeight = async (entryId: string, date: string) => {
     if (!user) return;
     setDeletingId(entryId);
     try {
       await deleteWeightEntry(user.uid, entryId);
-      const weights = await loadWeight(user.uid, 200);
+      const matchingBodyComp = bodyCompEntries.find((b) => b.date === date);
+      if (matchingBodyComp) {
+        await deleteBodyComposition(user.uid, matchingBodyComp.id);
+      }
+      const [weights, bodyComp] = await Promise.all([
+        loadWeight(user.uid, 200),
+        loadBodyComposition(user.uid, 200),
+      ]);
       setWeightEntries(weights);
+      setBodyCompEntries(bodyComp);
       toast.success("Запись удалена");
     } catch (error) {
       console.error("Failed to delete:", error);
@@ -398,6 +417,16 @@ const Body = () => {
           </div>
 
           <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block pl-[5px]">Дата</label>
+              <Input
+                type="date"
+                max={new Date().toISOString().split("T")[0]}
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
+              />
+            </div>
+
             {user?.uid === ADMIN_UID ? (
               <div className="grid grid-cols-2 gap-2">
                 <div>
