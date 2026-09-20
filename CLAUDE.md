@@ -25,6 +25,15 @@ This repo uses `bun.lock`/`bun.lockb` as well as `package-lock.json`; `npm` scri
 
 There is no backend/functions directory — `firebase.json` only wires up Firestore rules/indexes (no Cloud Functions, no Netlify Functions). Deployment is static hosting via Netlify (`netlify.toml`, `npm run build` → `dist`).
 
+### MCP server (local, read-only, not part of the web app)
+
+[mcp-server/](mcp-server/) is a separate npm package (own `package.json`, `node_modules`, tests) — a local stdio MCP server that lets Claude read the admin's data — deliberately only what the site's «Выгрузка данных» export contains (diary, weight, body composition, activity, norms and their history), and nothing else (no cycle data, no product/recipe catalogue, no other users). It is never deployed or bundled; Vite/Netlify ignore it. Setup and tool list: [mcp-server/README.md](mcp-server/README.md). Commands, run from `mcp-server/`: `npm run build`, `npm test`.
+
+- It reads with the Google Cloud Firestore client + a service account (Cloud Datastore Viewer role), so it **bypasses `firestore.rules`** — what it may touch is decided by `mcp-server/src/firestore-source.ts` alone, and tests enforce that file: no write calls, only `users/{uid}` paths, no cycle/catalogue/usage-stats collections. Keep it that way: don't add write methods to its `DataSource`, and don't widen what it reads without the user asking.
+- `mcp-server/src/report.ts` is a port of `src/lib/exportReport.ts`, so Claude gets the same document the site downloads. If you change the site's export (sections, columns, wording, rounding), change the port with it.
+- `mcp-server/src/models.ts` mirrors the Firestore document shapes from `src/lib/firestore.ts`. If the app adds or renames fields the export uses, update the matching mapper there. Manual norms store placeholder BMR/TDEE (`bmr = tdee = calories`); the models flag this as `energyEstimated: false`.
+- Service-account keys must never be committed; `.gitignore` blocks the usual filenames, but keep the key outside the repo.
+
 ## Environment variables
 
 Vite env vars (`VITE_*`) are required in `.env` (see `.env.example` for the Firebase set):

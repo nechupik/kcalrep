@@ -19,6 +19,12 @@ dist-ssr
 .env.test.local
 .env.production.local
 
+# Google service-account keys (used by mcp-server) — never commit these
+*-firebase-adminsdk-*.json
+service-account*.json
+serviceAccount*.json
+mcp-server/credentials/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

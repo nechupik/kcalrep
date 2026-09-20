@@ -1,0 +1,27 @@
+{
+  "name": "kcalrep-mcp-server",
+  "version": "1.0.0",
+  "description": "Read-only MCP server that exposes kcalrep (Firestore) data to Claude",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "install-desktop": "node scripts/install-claude-desktop.mjs",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^9.2.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
