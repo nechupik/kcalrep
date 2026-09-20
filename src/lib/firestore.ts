@@ -15,6 +15,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { getDocResilient, getDocsResilient } from "./firestore-read";
 import type { MacroResult } from "./nutrition";
 import type { DiaryEntry } from "./storage";
 
@@ -86,7 +87,7 @@ export async function saveUserProfile(userId: string, profile: Omit<UserProfile,
 
 export async function loadUserProfile(userId: string): Promise<UserProfile | null> {
   const userDoc = doc(db, "users", userId, "profile", "main");
-  const docSnap = await getDoc(userDoc);
+  const docSnap = await getDocResilient(userDoc);
   
   if (docSnap.exists()) {
     return docSnap.data() as UserProfile;
@@ -148,16 +149,22 @@ export async function saveNorm(userId: string, norm: MacroResult, params?: { gen
   await setDoc(historyDoc, historyEntry);
 }
 
+// Flips only the mode flag: the stored numbers and today's history snapshot stay as they are.
+export async function setNormMode(userId: string, mode: 'manual' | 'auto') {
+  const normDoc = doc(db, "users", userId, "norm", "main");
+  await setDoc(normDoc, { mode }, { merge: true });
+}
+
 export async function loadNormHistory(userId: string, endDate: string): Promise<NormHistoryEntry[]> {
   const historyCol = collection(db, "users", userId, "normHistory");
   const q = query(historyCol, where("date", "<=", endDate), orderBy("date", "asc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(d => d.data() as NormHistoryEntry);
 }
 
 export async function loadNorm(userId: string): Promise<MacroResult | null> {
   const normDoc = doc(db, "users", userId, "norm", "main");
-  const docSnap = await getDoc(normDoc);
+  const docSnap = await getDocResilient(normDoc);
   
   if (docSnap.exists()) {
     const data = docSnap.data() as NormData;
@@ -178,7 +185,7 @@ export async function loadNorm(userId: string): Promise<MacroResult | null> {
 
 export async function loadFullNormData(userId: string): Promise<NormData | null> {
   const normDoc = doc(db, 'users', userId, 'norm', 'main');
-  const docSnap = await getDoc(normDoc);
+  const docSnap = await getDocResilient(normDoc);
   if (docSnap.exists()) {
     return docSnap.data() as NormData;
   }
@@ -186,12 +193,21 @@ export async function loadFullNormData(userId: string): Promise<NormData | null>
 }
 
 // Diary functions
-export async function saveDiaryEntry(userId: string, entry: Omit<DiaryEntry, 'id' | 'addedAt'>) {
+// Lets the UI show a new diary entry right away under its final id, before the write is acknowledged.
+export function newDiaryEntryId(userId: string): string {
+  return doc(collection(db, "users", userId, "diary")).id;
+}
+
+export async function saveDiaryEntry(userId: string, entry: Omit<DiaryEntry, 'id' | 'addedAt'>, id?: string) {
   const diaryCollection = collection(db, "users", userId, "diary");
   const newEntry = {
     ...entry,
     addedAt: Timestamp.now(),
   };
+  if (id) {
+    await setDoc(doc(diaryCollection, id), newEntry);
+    return id;
+  }
   const docRef = await addDoc(diaryCollection, newEntry);
   return docRef.id;
 }
@@ -204,7 +220,7 @@ export async function loadDiary(userId: string, date: string): Promise<DiaryEntr
     orderBy("addedAt", "desc")
   );
   
-  const querySnapshot = await getDocs(q);
+  const querySnapshot = await getDocsResilient(q);
   const entries: DiaryEntry[] = [];
   
   querySnapshot.forEach((doc) => {
@@ -265,7 +281,7 @@ export async function loadWeight(userId: string, limitCount?: number): Promise<A
   if (limitCount) constraints.push(limit(limitCount));
   const q = query(weightCollection, ...constraints);
   
-  const querySnapshot = await getDocs(q);
+  const querySnapshot = await getDocsResilient(q);
   const entries: Array<WeightEntry & { id: string }> = [];
   
   querySnapshot.forEach((doc) => {
@@ -295,7 +311,7 @@ export async function loadWeightRange(userId: string, startDate: string, endDate
     orderBy("date", "asc")
   );
 
-  const querySnapshot = await getDocs(q);
+  const querySnapshot = await getDocsResilient(q);
   const entries: Array<WeightEntry & { id: string }> = [];
 
   querySnapshot.forEach((doc) => {
@@ -325,7 +341,7 @@ export async function wasWeightEnteredThisWeek(userId: string): Promise<boolean>
     where('date', '>=', mondayStr),
     where('date', '<=', todayStr)
   );
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.size > 0;
 }
 
@@ -340,7 +356,7 @@ export async function loadDiaryRange(userId: string, startDate: string, endDate:
     orderBy("addedAt", "asc")
   );
   
-  const querySnapshot = await getDocs(q);
+  const querySnapshot = await getDocsResilient(q);
   const entries: DiaryEntry[] = [];
   
   querySnapshot.forEach((doc) => {
@@ -408,13 +424,13 @@ export async function updateUsageStat(
 export async function loadUsageStats(userId: string): Promise<UsageStat[]> {
   const statsCollection = collection(db, 'users', userId, 'usage_stats');
   const q = query(statsCollection, orderBy('usageCount', 'desc'));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => doc.data() as UsageStat);
 }
 
 export async function getLastAmount(userId: string, productId: string): Promise<number | null> {
   const statDoc = doc(db, 'users', userId, 'usage_stats', productId);
-  const snap = await getDoc(statDoc);
+  const snap = await getDocResilient(statDoc);
   if (snap.exists()) {
     return (snap.data() as UsageStat).lastAmount;
   }
@@ -425,7 +441,7 @@ export async function getLastAmount(userId: string, productId: string): Promise<
 export async function loadSharedProducts(): Promise<any[]> {
   const sharedCol = collection(db, "shared_products");
   const q = query(sharedCol, orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
@@ -435,7 +451,7 @@ export async function loadSharedProducts(): Promise<any[]> {
 export async function loadSharedRecipes(): Promise<any[]> {
   const sharedCol = collection(db, "shared_recipes");
   const q = query(sharedCol, orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
@@ -479,7 +495,7 @@ export async function saveActivity(userId: string, entry: Omit<ActivityEntry, 'u
 
 export async function loadActivity(userId: string, date: string): Promise<ActivityEntry | null> {
   const activityDoc = doc(db, 'users', userId, 'activity', date);
-  const snap = await getDoc(activityDoc);
+  const snap = await getDocResilient(activityDoc);
   if (snap.exists()) return snap.data() as ActivityEntry;
   return null;
 }
@@ -487,14 +503,14 @@ export async function loadActivity(userId: string, date: string): Promise<Activi
 export async function loadActivityRange(userId: string, startDate: string, endDate: string): Promise<ActivityEntry[]> {
   const activityCol = collection(db, 'users', userId, 'activity');
   const q = query(activityCol, where('date', '>=', startDate), where('date', '<=', endDate));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => doc.data() as ActivityEntry);
 }
 
 export async function loadLatestActivityEntries(userId: string, limitCount: number): Promise<ActivityEntry[]> {
   const activityCol = collection(db, 'users', userId, 'activity');
   const q = query(activityCol, orderBy('date', 'desc'), limit(limitCount));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => doc.data() as ActivityEntry);
 }
 
@@ -508,7 +524,7 @@ export async function saveUserSettings(userId: string, settings: Omit<UserSettin
 
 export async function loadUserSettings(userId: string): Promise<UserSettings | null> {
   const settingsDoc = doc(db, 'users', userId, 'settings', 'main');
-  const snap = await getDoc(settingsDoc);
+  const snap = await getDocResilient(settingsDoc);
   if (snap.exists()) return snap.data() as UserSettings;
   return null;
 }
@@ -611,7 +627,7 @@ export async function deleteAllNormData(): Promise<{ deleted: number; error?: st
 
     for (const userDoc of usersSnap.docs) {
       const normDoc = doc(db, 'users', userDoc.id, 'norm', 'main');
-      const normSnap = await getDoc(normDoc);
+      const normSnap = await getDocResilient(normDoc);
       
       if (normSnap.exists()) {
         await deleteDoc(normDoc);

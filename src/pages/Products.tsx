@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { loadProducts, saveProduct, updateProduct, deleteProduct, type Product } from "@/lib/products";
 import { loadCategories, type Category } from "@/lib/categories";
 import { SortModal } from "@/components/SortModal";
+import { useModalAnimation } from "@/hooks/use-modal-animation";
 import { Package, Search, Plus, Edit, Trash2, ArrowUpDown } from "lucide-react";
 
 function pluralize(n: number, one: string, few: string, many: string): string {
@@ -25,7 +26,7 @@ const Products = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
@@ -43,13 +44,7 @@ const Products = () => {
   const [showSortModal, setShowSortModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
-
-
-  // Guard: if no user, don't render
-  if (!user) {
-    return null;
-  }
+  const { animationState, canDismiss } = useModalAnimation(showAddForm);
 
   // Load user's products on component mount
   useEffect(() => {
@@ -72,16 +67,9 @@ const Products = () => {
     setLoading(true);
     setLoadingError(null);
 
-    // Set up timeout fallback
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setLoadingError("Не удалось загрузить продукты. Проверьте подключение.");
-      toast.error("Не удалось загрузить продукты. Проверьте подключение.");
-    }, 8000);
-
     try {
+      // Gives up on its own (with a cache fallback first) instead of leaving the spinner up forever.
       const userProducts = await loadProducts();
-      clearTimeout(timeoutId);
       setAllProducts(userProducts);
       // Apply category filter if selected
       const filterToUse = categoryFilter !== null ? categoryFilter : selectedCategory;
@@ -96,10 +84,8 @@ const Products = () => {
       setProducts(filteredProducts);
       setLoadingError(null);
     } catch (error) {
-      clearTimeout(timeoutId);
       console.error("Error loading products:", error);
-      toast.error("Ошибка загрузки продуктов");
-      setLoadingError("Ошибка загрузки продуктов");
+      setLoadingError("Не удалось загрузить продукты. Проверьте подключение.");
     } finally {
       setLoading(false);
     }
@@ -139,18 +125,6 @@ const Products = () => {
     
     setShowAddForm(true);
   };
-
-  // Control modal animation
-  useEffect(() => {
-    if (showAddForm) {
-      setAnimationState('enter');
-    } else {
-      setAnimationState('exit');
-      setTimeout(() => {
-        setAnimationState(null);
-      }, 650);
-    }
-  }, [showAddForm]);
 
   const handleSaveProduct = async () => {
     if (!user || !formData.name.trim()) return;
@@ -353,8 +327,8 @@ const Products = () => {
         {/* Search bar */}
         <Card className="p-4 md:p-6 bg-card/80 backdrop-blur-sm border-border/50 shadow-soft mb-6">
           <div className="flex gap-2">
-            {/* Search input - takes 2/3 of space */}
-            <div className="relative flex-[2]">
+            {/* Search input - takes all the space the sort icon leaves */}
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
               <Input
                 type="text"
@@ -365,14 +339,14 @@ const Products = () => {
               />
             </div>
 
-            {/* Sort button - takes 1/3 of space */}
             <Button
               onClick={() => setShowSortModal(true)}
               variant="outline"
-              className="flex-1 rounded-2xl border-border/50 hover:bg-muted/50"
+              size="icon"
+              aria-label="Сортировка"
+              className="h-10 w-10 shrink-0 rounded-2xl border-border/50 hover:bg-muted/50"
             >
-              <ArrowUpDown className="h-4 w-4 mr-2" />
-              Сортировка
+              <ArrowUpDown className="h-4 w-4" />
             </Button>
           </div>
         </Card>
@@ -523,8 +497,8 @@ const Products = () => {
         {showAddForm && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
             <div
-              onClick={handleCancelEdit}
-              className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
+              onClick={canDismiss ? handleCancelEdit : undefined}
+              className={`absolute inset-0 bg-black/60 sm:backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
             />
             <div
               className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}

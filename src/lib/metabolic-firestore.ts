@@ -1,8 +1,6 @@
 import {
   doc,
   setDoc,
-  getDoc,
-  getDocs,
   addDoc,
   deleteDoc,
   updateDoc,
@@ -14,6 +12,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { getDocResilient, getDocsResilient } from "./firestore-read";
 import type {
   CycleEntry,
   DailySurvey,
@@ -60,7 +59,7 @@ export async function deleteCycleEntry(
 export async function loadCycles(userId: string): Promise<CycleEntry[]> {
   const col = collection(db, "users", userId, "cycles");
   const q = query(col, orderBy("startDate", "desc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<CycleEntry, "id">),
@@ -79,7 +78,7 @@ export async function loadCyclesInRange(
     where("startDate", "<=", endDate),
     orderBy("startDate", "asc")
   );
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<CycleEntry, "id">),
@@ -106,7 +105,7 @@ export async function loadDailySurvey(
   date: string
 ): Promise<DailySurvey | null> {
   const ref = doc(db, "users", userId, "daily_survey", date);
-  const snap = await getDoc(ref);
+  const snap = await getDocResilient(ref);
   if (snap.exists()) {
     const data = snap.data();
     return {
@@ -133,7 +132,7 @@ export async function loadDailySurveysInRange(
     where("date", "<=", endDate),
     orderBy("date", "asc")
   );
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map((d) => {
     const data = d.data();
     return {
@@ -187,7 +186,7 @@ export async function loadBodyComposition(
   const q = limitCount
     ? query(col, orderBy("date", "desc"), limit(limitCount))
     : query(col, orderBy("date", "desc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<BodyCompositionEntry, "id">),
@@ -206,7 +205,7 @@ export async function loadBodyCompositionInRange(
     where("date", "<=", endDate),
     orderBy("date", "asc")
   );
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<BodyCompositionEntry, "id">),
@@ -232,7 +231,7 @@ export async function loadMetabolicConfig(
   userId: string
 ): Promise<MetabolicConfig | null> {
   const ref = doc(db, "users", userId, "metabolic_config", "main");
-  const snap = await getDoc(ref);
+  const snap = await getDocResilient(ref);
   if (snap.exists()) {
     return snap.data() as MetabolicConfig;
   }

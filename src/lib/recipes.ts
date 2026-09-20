@@ -1,5 +1,6 @@
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, increment } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, increment } from "firebase/firestore";
 import { db } from "./firebase";
+import { getDocsResilient } from "./firestore-read";
 
 export interface RecipeIngredient {
   productId: string;
@@ -34,7 +35,7 @@ export interface Recipe {
 export async function loadRecipes(): Promise<Recipe[]> {
   const col = collection(db, "shared_recipes");
   const q = query(col, orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), usageCount: doc.data().usageCount || 0 } as Recipe));
 }
 

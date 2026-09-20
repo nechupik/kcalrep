@@ -1,5 +1,6 @@
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "./firebase";
+import { getDocsResilient } from "./firestore-read";
 
 export interface Category {
   id: string;
@@ -11,7 +12,7 @@ export interface Category {
 export async function loadCategories(): Promise<Category[]> {
   const col = collection(db, "categories");
   const q = query(col, orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
 }
 

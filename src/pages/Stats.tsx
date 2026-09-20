@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { ADMIN_UID } from "@/lib/config";
 import { toDateStr } from "@/lib/utils";
+import { useModalAnimation } from "@/hooks/use-modal-animation";
 import { applyCycleAdjustmentToNorm, loadNorm } from "@/lib/storage";
 import { loadDiaryRange, loadWeight, loadFullNormData, deleteDiaryEntry, loadActivityRange, loadNormHistory, type ActivityEntry, type NormHistoryEntry } from "@/lib/firestore";
 import { loadCycles } from "@/lib/metabolic-firestore";
@@ -123,32 +124,25 @@ const Stats = () => {
   const [loadingDay, setLoadingDay] = useState(false);
   const [showUserDataViewer, setShowUserDataViewer] = useState(false);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
-  const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
+  const { animationState, canDismiss } = useModalAnimation(!!selectedDay);
+  const [normMode, setNormMode] = useState<'manual' | 'auto'>('auto');
   const [analytics, setAnalytics] = useState<AIAnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [activityWeekData, setActivityWeekData] = useState<ActivityEntry[]>([]);
-  // Control modal animation
-  useEffect(() => {
-    if (selectedDay) {
-      setAnimationState('enter');
-    } else {
-      setAnimationState('exit');
-      setTimeout(() => {
-        setAnimationState(null);
-      }, 650);
-    }
-  }, [selectedDay]);
-
   useEffect(() => {
     const loadData = async () => {
       if (!user) return;
 
       try {
         setLoading(true);
-        
+
         const userNorm = await loadNorm();
         setNorm(userNorm);
+        // A manual norm has placeholder BMR/TDEE, so the Apple Watch TDEE card can't say anything meaningful for it.
+        loadFullNormData(user.uid)
+          .then(normData => setNormMode(normData?.mode === 'manual' ? 'manual' : 'auto'))
+          .catch(() => undefined);
 
         // Load diary entries for last 30 days (covers both weekly chart and analytics)
         const today = new Date();
@@ -934,7 +928,7 @@ const Stats = () => {
         )}
 
         {/* Admin: Apple Watch Activity + TDEE */}
-        {user?.uid === ADMIN_UID && activityStats && (
+        {user?.uid === ADMIN_UID && activityStats && normMode !== 'manual' && (
           <Card className="p-5 md:p-6 bg-[#0a0520]/90 backdrop-blur-sm border-border/50 mb-4">
             <div className="flex items-center gap-2 mb-4">
               <Activity className="h-4 w-4 text-purple-400" />
@@ -1036,8 +1030,8 @@ const Stats = () => {
         {selectedDay && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
             <div
-              onClick={() => setSelectedDay(null)}
-              className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`} 
+              onClick={canDismiss ? () => setSelectedDay(null) : undefined}
+              className={`absolute inset-0 bg-black/60 sm:backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
             />
             <div
               className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}

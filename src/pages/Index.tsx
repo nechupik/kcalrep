@@ -23,7 +23,7 @@ import {
   updateDiaryEntry,
   type DiaryEntry,
 } from "@/lib/storage";
-import { loadWeight, loadFullNormData, loadUserSettings, saveActivity, loadActivity, loadActivityRange } from "@/lib/firestore";
+import { loadWeight, loadFullNormData, loadUserSettings, saveActivity, loadActivity, loadActivityRange, newDiaryEntryId } from "@/lib/firestore";
 import { loadBodyComposition } from "@/lib/metabolic-firestore";
 import type { MacroResult } from "@/lib/nutrition";
 import { calculateMacrosWithWatchTDEE } from "@/lib/nutrition";
@@ -43,6 +43,7 @@ const Index = () => {
   const [savingActivity, setSavingActivity] = useState(false);
   const [recalculatingNorm, setRecalculatingNorm] = useState(false);
   const [watchCardVisible, setWatchCardVisible] = useState(false);
+  const [normMode, setNormMode] = useState<'manual' | 'auto'>('auto');
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -60,6 +61,10 @@ const Index = () => {
       loadActivity(user.uid, yesterdayStr).then(entry => {
         setWatchCardVisible(!entry);
       });
+      // A manually-entered norm is never recalculated from Apple Watch data, so the input would be pointless.
+      loadFullNormData(user.uid).then(normData => {
+        setNormMode(normData?.mode === 'manual' ? 'manual' : 'auto');
+      }).catch(() => undefined);
     }
   }, [user]);
 
@@ -107,16 +112,19 @@ const Index = () => {
     loadData();
   }, [user, selectedDate]);
 
-  const handleAddEntry = async (entry: Omit<DiaryEntry, 'id' | 'addedAt'>) => {
-    try {
-      const entryWithDate = { ...entry, date: selectedDate };
-      await addDiaryEntry(entryWithDate);
-      const diaryData = await loadDiary(selectedDate);
-      setEntries(Array.isArray(diaryData) ? diaryData : []);
-      toast.success(`Добавлено: ${entry.name}`);
-    } catch (error) {
-      toast.error('Ошибка добавления записи');
-    }
+  // Shows the entry right away and saves it in the background: waiting for Firestore to acknowledge the write (and
+  // then re-reading the diary) made "Добавить" hang for a minute whenever the connection stalled.
+  const handleAddEntry = (entry: Omit<DiaryEntry, 'id' | 'addedAt'>) => {
+    const entryWithDate = { ...entry, date: selectedDate };
+    const id = user ? newDiaryEntryId(user.uid) : Date.now().toString();
+    setEntries(prev => [{ ...entryWithDate, id, addedAt: Date.now() }, ...prev]);
+    toast.success(`Добавлено: ${entry.name}`);
+
+    addDiaryEntry(entryWithDate, id).catch((error) => {
+      console.error('Failed to save diary entry:', error);
+      setEntries(prev => prev.filter(e => e.id !== id));
+      toast.error('Не удалось сохранить запись');
+    });
   };
 
   const handleRemoveEntry = async (id: string) => {
@@ -409,7 +417,7 @@ const Index = () => {
         </section>
 
         {/* Apple Watch activity input — admin only, shown when yesterday has no entry */}
-        {user?.uid === ADMIN_UID && watchCardVisible && (
+        {user?.uid === ADMIN_UID && watchCardVisible && normMode !== 'manual' && (
           <section className="container max-w-5xl mb-4">
             <Card className="p-4 shadow-soft border-border/50 backdrop-blur-sm bg-card/80">
               <div className="flex gap-2 items-center">

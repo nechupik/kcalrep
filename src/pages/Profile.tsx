@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadNorm, saveNorm } from "@/lib/storage";
 import { ADMIN_UID } from "@/lib/config";
-import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight, loadActivityRange, saveActivity, loadActivity } from "@/lib/firestore";
+import { loadUserSettings, saveUserSettings, loadFullNormData, loadWeight, loadActivityRange, saveActivity, loadActivity, setNormMode } from "@/lib/firestore";
 import { loadBodyComposition } from "@/lib/metabolic-firestore";
 import type { CalcInput, MacroResult } from "@/lib/nutrition";
 import { updateProfile } from "firebase/auth";
@@ -125,6 +125,23 @@ const Profile = () => {
   const handleSave = () => {
     // Profile data is now managed by Firebase Auth
     toast.success("Профиль сохранён");
+  };
+
+  // The Calculator / Manual tabs are a real switch: it takes effect (and is stored) as soon as it's flipped, so
+  // weight and Apple Watch saves elsewhere know whether they may recalculate the norm.
+  const switchNormMode = async (nextManual: boolean) => {
+    if (nextManual === manualMode) return;
+    setManualMode(nextManual);
+    if (!user || !norm) return; // no saved norm yet: only the visible form changes
+    const mode = nextManual ? 'manual' : 'auto';
+    try {
+      await setNormMode(user.uid, mode);
+      setStoredProfileData((prev) => prev ? { ...prev, mode } : prev);
+    } catch (error) {
+      console.error('Failed to switch norm mode:', error);
+      setManualMode(!nextManual);
+      toast.error('Не удалось переключить режим');
+    }
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -461,7 +478,7 @@ const Profile = () => {
 
             <div className="flex gap-2 mb-4">
               <button
-                onClick={() => setManualMode(false)}
+                onClick={() => switchNormMode(false)}
                 className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border justify-center whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:opacity-90 transition-all duration-2000 ease-in-out ${
                   !manualMode
                     ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-transparent shadow-glow'
@@ -471,7 +488,7 @@ const Profile = () => {
                 Калькулятор
               </button>
               <button
-                onClick={() => setManualMode(true)}
+                onClick={() => switchNormMode(true)}
                 className={`flex-1 rounded-xl py-2 text-sm font-medium transition-smooth border justify-center whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:opacity-90 transition-all duration-2000 ease-in-out ${
                   manualMode
                     ? 'bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] text-foreground border-transparent shadow-glow'

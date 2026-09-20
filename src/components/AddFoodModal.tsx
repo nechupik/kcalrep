@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Package, BookOpen, PenLine, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { useModalAnimation } from '@/hooks/use-modal-animation';
 import { loadProducts, saveProduct, incrementProductUsage, type Product } from '@/lib/products';
 import { loadRecipes, incrementRecipeUsage, type Recipe } from '@/lib/recipes';
 import type { DiaryEntry } from '@/lib/storage';
@@ -11,7 +13,8 @@ import type { DiaryEntry } from '@/lib/storage';
 interface AddFoodModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (entry: Omit<DiaryEntry, 'id' | 'addedAt'>) => Promise<void>;
+  // Should return right away: the entry is shown optimistically and saved in the background.
+  onAdd: (entry: Omit<DiaryEntry, 'id' | 'addedAt'>) => void;
   selectedDate: string;
 }
 
@@ -21,16 +24,17 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('search');
   const [showManual, setShowManual] = useState(false);
-  const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
+  const { animationState, canDismiss } = useModalAnimation(isOpen);
   const [products, setProducts] = useState<Product[]>([]);
   const [dishes, setDishes] = useState<Recipe[]>([]);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Product | Recipe | null>(null);
   const [grams, setGrams] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isAdding, setIsAdding] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const wasOpenRef = useRef(false);
+  const hasLoadedRef = useRef(false);
 
   // Manual entry state
   const [manualName, setManualName] = useState('');
@@ -40,33 +44,31 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
   const [manualCarbs, setManualCarbs] = useState('');
   const [saveToBase, setSaveToBase] = useState(false);
 
-  // Control animation
+  // Load the catalogue in the background as soon as the page is up so the first open is instant, and refresh it on
+  // every open. Only show the spinner when there is nothing to show yet; a failure always ends the spinner.
   useEffect(() => {
-    if (isOpen) {
-      setAnimationState('enter');
-      wasOpenRef.current = true;
-    } else if (wasOpenRef.current) {
-      // Only run exit animation if modal was previously open
-      setAnimationState('exit');
-      const timer = setTimeout(() => {
-        setAnimationState(null);
-        wasOpenRef.current = false;
-      }, 800); // Longer delay to ensure CSS animation completes
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen || !user) return;
+    if (!user) return;
+    if (!isOpen && hasLoadedRef.current) return;
+    let cancelled = false;
     const load = async () => {
-      setLoading(true);
-      const [p, d] = await Promise.all([loadProducts(), loadRecipes()]);
-      setProducts(p);
-      setDishes(d);
-      setLoading(false);
+      if (!hasLoadedRef.current) setLoading(true);
+      setLoadError(false);
+      try {
+        const [p, d] = await Promise.all([loadProducts(), loadRecipes()]);
+        if (cancelled) return;
+        setProducts(p);
+        setDishes(d);
+        hasLoadedRef.current = true;
+      } catch (error) {
+        console.error('Failed to load products/recipes:', error);
+        if (!cancelled && !hasLoadedRef.current) setLoadError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
     load();
-  }, [isOpen, user]);
+    return () => { cancelled = true; };
+  }, [isOpen, user, reloadKey]);
 
   const combinedItems = useMemo(() => {
     const items = [...products, ...dishes];
@@ -96,8 +98,8 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     return 'servingType' in item && item.servingType === 'portion';
   };
 
-  const handleAdd = async () => {
-    if (!selected || isAdding) return;
+  const handleAdd = () => {
+    if (!selected) return;
     const isPortionType = isPortion(selected);
 
     let entry: Omit<DiaryEntry, 'id' | 'addedAt'>;
@@ -131,53 +133,45 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
       };
     }
 
-    setIsAdding(true);
-    try {
-      if ('servingType' in selected) {
-        await incrementRecipeUsage(selected.id);
-      } else {
-        await incrementProductUsage(selected.id);
-      }
-      await onAdd(entry);
-      handleClose();
-      resetForm();
-    } finally {
-      setIsAdding(false);
-    }
+    // Nothing here waits for the network: the usage counter is a nice-to-have, and the diary entry is shown
+    // immediately and saved in the background (see Index.handleAddEntry).
+    const bumpUsage = 'servingType' in selected ? incrementRecipeUsage(selected.id) : incrementProductUsage(selected.id);
+    bumpUsage.catch((error) => console.error('Failed to update usage count:', error));
+    onAdd(entry);
+    handleClose();
+    resetForm();
   };
 
-  const handleManualAdd = async () => {
-    if (!manualName || !manualCalories || isAdding) return;
+  const handleManualAdd = () => {
+    if (!manualName || !manualCalories) return;
 
-    setIsAdding(true);
-    try {
-      if (saveToBase && user) {
-        await saveProduct({
-          name: manualName,
-          calories: Number(manualCalories) || 0,
-          protein: Number(manualProtein) || 0,
-          fat: Number(manualFat) || 0,
-          carbs: Number(manualCarbs) || 0,
-        }, user.uid);
-      }
-
-      const entry: Omit<DiaryEntry, 'id' | 'addedAt'> = {
-        foodId: saveToBase ? manualName : 'manual-' + Date.now(),
+    if (saveToBase && user) {
+      saveProduct({
         name: manualName,
-        grams: 100,
         calories: Number(manualCalories) || 0,
         protein: Number(manualProtein) || 0,
         fat: Number(manualFat) || 0,
         carbs: Number(manualCarbs) || 0,
-        date: selectedDate,
-      };
-
-      await onAdd(entry);
-      handleClose();
-      resetForm();
-    } finally {
-      setIsAdding(false);
+      }, user.uid).catch((error) => {
+        console.error('Failed to save product to the catalogue:', error);
+        toast.error('Не удалось сохранить продукт в базу');
+      });
     }
+
+    const entry: Omit<DiaryEntry, 'id' | 'addedAt'> = {
+      foodId: saveToBase ? manualName : 'manual-' + Date.now(),
+      name: manualName,
+      grams: 100,
+      calories: Number(manualCalories) || 0,
+      protein: Number(manualProtein) || 0,
+      fat: Number(manualFat) || 0,
+      carbs: Number(manualCarbs) || 0,
+      date: selectedDate,
+    };
+
+    onAdd(entry);
+    handleClose();
+    resetForm();
   };
 
   const resetForm = () => {
@@ -192,7 +186,6 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
     setSaveToBase(false);
     setActiveTab('search');
     setShowManual(false);
-    setIsAdding(false);
   };
 
 
@@ -214,8 +207,8 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
       {/* Overlay */}
       <div
         ref={overlayRef}
-        onClick={handleClose}
-        className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : ''}`}
+        onClick={canDismiss ? handleClose : undefined}
+        className={`absolute inset-0 bg-black/60 sm:backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : ''}`}
       />
 
       {/* Modal panel */}
@@ -244,7 +237,15 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
               {!selected && (
                 <div className="space-y-1 max-h-56 overflow-y-auto rounded-xl border border-border/50 bg-muted/20 p-2">
                   {loading && <p className="text-sm text-muted-foreground text-center py-4">Загрузка...</p>}
-                  {!loading && filtered.length === 0 && (
+                  {!loading && loadError && (
+                    <div className="text-center py-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">Не удалось загрузить список</p>
+                      <Button variant="outline" size="sm" onClick={() => setReloadKey((key) => key + 1)}>
+                        Повторить
+                      </Button>
+                    </div>
+                  )}
+                  {!loading && !loadError && filtered.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">Ничего не найдено</p>
                   )}
                   {filtered.map(item => (
@@ -310,10 +311,9 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
                   <div className="flex gap-2">
                     <Button
                       onClick={handleAdd}
-                      disabled={isAdding}
                       className="flex-1 bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90 disabled:opacity-60"
                     >
-                      {isAdding ? 'Добавление...' : 'Добавить'}
+                      Добавить
                     </Button>
                     <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}>
                       Отмена
@@ -389,10 +389,10 @@ export const AddFoodModal = ({ isOpen, onClose, onAdd, selectedDate }: AddFoodMo
 
               <Button
                 onClick={handleManualAdd}
-                disabled={!manualName || !manualCalories || isAdding}
+                disabled={!manualName || !manualCalories}
                 className="w-full bg-gradient-to-r from-[#4C1D95] to-[#7C3AED] border-0 text-primary-foreground hover:opacity-90 disabled:opacity-60"
               >
-                {isAdding ? 'Добавление...' : 'Добавить запись'}
+                Добавить запись
               </Button>
             </div>
           )}

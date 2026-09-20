@@ -110,11 +110,11 @@ export async function loadDiary(date?: string): Promise<DiaryEntry[]> {
 }
 
 // Helper function to add a single diary entry
-export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'addedAt'>) {
+export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'addedAt'>, id?: string) {
   const user = getCurrentUser();
   if (user) {
     try {
-      const entryId = await saveDiaryEntry(user.uid, entry);
+      const entryId = await saveDiaryEntry(user.uid, entry, id);
       return entryId;
     } catch (error) {
       console.error("Failed to add diary entry to Firestore:", error);
@@ -122,7 +122,7 @@ export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'addedAt'>) {
       const entries = await loadDiary();
       const newEntry: DiaryEntry = {
         ...entry,
-        id: Date.now().toString(),
+        id: id ?? Date.now().toString(),
         addedAt: Date.now(),
       };
       entries.push(newEntry);
@@ -134,7 +134,7 @@ export async function addDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'addedAt'>) {
     const entries = await loadDiary();
     const newEntry: DiaryEntry = {
       ...entry,
-      id: Date.now().toString(),
+      id: id ?? Date.now().toString(),
       addedAt: Date.now(),
     };
     entries.push(newEntry);

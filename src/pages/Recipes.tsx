@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { loadRecipes, saveRecipe, deleteRecipe, updateRecipe, type Recipe, type RecipeIngredient as RecipeIngredientType } from "@/lib/recipes";
 import { loadProducts } from "@/lib/products";
 import { RecipeFromIngredients } from "@/components/RecipeFromIngredients";
+import { useModalAnimation } from "@/hooks/use-modal-animation";
 import { BookOpen, Search, Plus, Edit, Trash2, Calculator } from "lucide-react";
 
 function pluralize(n: number, one: string, few: string, many: string): string {
@@ -26,7 +27,8 @@ const Recipes = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [servingType, setServingType] = useState<'grams' | 'portion'>('grams');
@@ -43,12 +45,7 @@ const Recipes = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [editingRecipeIngredients, setEditingRecipeIngredients] = useState<RecipeIngredientType[] | null>(null);
-  const [animationState, setAnimationState] = useState<'enter' | 'exit' | null>(null);
-
-  // Guard: if no user, don't render
-  if (!user) {
-    return null;
-  }
+  const { animationState, canDismiss } = useModalAnimation(showAddForm);
 
   // Load user's recipes on component mount
   useEffect(() => {
@@ -59,13 +56,15 @@ const Recipes = () => {
 
   const loadUserRecipes = async () => {
     setLoading(true);
+    setLoadingError(false);
     try {
+      // Gives up on its own (with a cache fallback first) instead of leaving the spinner up forever.
       const userRecipes = await loadRecipes();
       setAllRecipes(userRecipes);
       setRecipes(userRecipes);
     } catch (error) {
       console.error("Error loading recipes:", error);
-      toast.error("Ошибка загрузки рецептов");
+      setLoadingError(true);
     } finally {
       setLoading(false);
     }
@@ -90,18 +89,6 @@ const Recipes = () => {
     setShowAddForm(true);
     setAddMode('manual');
   };
-
-  // Control modal animation
-  useEffect(() => {
-    if (showAddForm) {
-      setAnimationState('enter');
-    } else {
-      setAnimationState('exit');
-      setTimeout(() => {
-        setAnimationState(null);
-      }, 650);
-    }
-  }, [showAddForm]);
 
   const handleAddRecipeFromIngredients = () => {
     if (!user) return;
@@ -450,6 +437,20 @@ const Recipes = () => {
               <div className="flex items-center justify-center py-8">
                 <div className="text-muted-foreground">Загрузка...</div>
               </div>
+            ) : loadingError ? (
+              <div className="text-center py-8">
+                <BookOpen className="h-12 w-12 text-destructive mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-destructive">Ошибка загрузки</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Не удалось загрузить блюда. Проверьте подключение.
+                </p>
+                <Button
+                  onClick={() => loadUserRecipes()}
+                  className="bg-gradient-to-r from-[#0a0520] to-[#1a0a3d] border-0 text-foreground hover:opacity-90 shadow-glow"
+                >
+                  Попробовать снова
+                </Button>
+              </div>
             ) : recipes.length === 0 ? (
               <div className="text-center py-8">
                 <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -577,8 +578,8 @@ const Recipes = () => {
         {showAddForm && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
             <div
-              onClick={handleCancelEdit}
-              className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
+              onClick={canDismiss ? handleCancelEdit : undefined}
+              className={`absolute inset-0 bg-black/60 sm:backdrop-blur-sm ${animationState === 'enter' ? 'overlay-enter' : animationState === 'exit' ? 'overlay-exit' : ''}`}
             />
             <div
               className={`relative w-full sm:max-w-2xl bg-background border border-border/50 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto ${animationState === 'enter' ? 'modal-enter' : animationState === 'exit' ? 'modal-exit' : ''}`}

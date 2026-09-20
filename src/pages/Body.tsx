@@ -417,18 +417,20 @@ const Body = () => {
           </div>
 
           <div className="space-y-3">
-            <div>
+            <div className="min-w-0">
               <label className="text-xs text-muted-foreground mb-1 block pl-[5px]">Дата</label>
+              {/* iOS Safari sizes native date inputs by their content and centres the value; force it into the card. */}
               <Input
                 type="date"
                 max={new Date().toISOString().split("T")[0]}
                 value={entryDate}
                 onChange={(e) => setEntryDate(e.target.value)}
+                className="min-w-0 max-w-full appearance-none text-left [&::-webkit-date-and-time-value]:text-left"
               />
             </div>
 
             {user?.uid === ADMIN_UID ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 items-end gap-2 [&>div]:min-w-0">
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block pl-[5px]">Вес (кг)</label>
                   <Input

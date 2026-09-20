@@ -1,5 +1,6 @@
-﻿import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, increment } from "firebase/firestore";
+﻿import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, increment } from "firebase/firestore";
 import { db } from "./firebase";
+import { getDocsResilient } from "./firestore-read";
 
 export interface Product {
   id: string;
@@ -17,7 +18,7 @@ export interface Product {
 export async function loadProducts(): Promise<Product[]> {
   const col = collection(db, "shared_products");
   const q = query(col, orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), usageCount: doc.data().usageCount || 0 } as Product));
 }
 

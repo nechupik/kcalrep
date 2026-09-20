@@ -1,6 +1,11 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,6 +18,23 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+function createFirestore() {
+  try {
+    return initializeFirestore(app, {
+      // On iOS Safari (and behind some ISPs/proxies) Firestore's streaming transport stalls silently, so reads and
+      // writes hang for minutes. Long-polling uses short request/response cycles and doesn't get stuck that way.
+      experimentalForceLongPolling: true,
+      // Keeps the catalogue and diary on the device: screens can fall back to it while the network is stalling.
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      ignoreUndefinedProperties: true,
+    });
+  } catch {
+    // Already initialised (dev hot reload).
+    return getFirestore(app);
+  }
+}
+
+export const db = createFirestore();
 
 export default app;
