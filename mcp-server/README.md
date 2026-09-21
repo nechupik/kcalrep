@@ -21,6 +21,7 @@ Only what the site's export contains, for **one account** (yours by default):
 | BMR, activity level, goal multiplier, protein/fat/carb targets of each day | 4. Норма и настройки по дням |
 | Weigh-ins, body fat %, lean mass, scale BMR | 5. Изменение веса и состава тела |
 | Activity kcal (Apple Watch / steps) | 6. Активность и TDEE |
+| Kcal and steps typed in by hand (Профиль → «Активность и шаги»; never used for the norm) | 7. Активность и шаги (ручной ввод) |
 
 **Never read**: cycle tracking and daily surveys, the shared product/recipe catalogue, food-usage statistics, your partner's data, sign-in details (e-mail, passwords), your `.env`, or any file on the computer. The display name is the only profile field beyond the export, and the e-mail address is never returned.
 
@@ -112,8 +113,8 @@ Claude Code's `claude mcp add` (above) is not affected by this: it writes `~/.cl
 
 | Tool | What it returns |
 |---|---|
-| `kcalrep_get_report` | **Use this first.** The site's export report, verbatim in structure: the six sections above, for a period (default last 7 days, max 31). `include_meals: false` skips the long meal list; it is also dropped automatically, with a note, if the report would exceed the output limit. |
-| `kcalrep_get_daily_summary` | Compact per-day table with period averages, for **longer** periods (max 92 days); JSON available. Flags days with no entries, and today as partial. |
+| `kcalrep_get_report` | **Use this first.** The site's export report, verbatim in structure: the seven sections above, for a period (default last 7 days, max 31). `include_meals: false` skips the long meal list; it is also dropped automatically, with a note, if the report would exceed the output limit. |
+| `kcalrep_get_daily_summary` | Compact per-day table with period averages, for **longer** periods (max 92 days); JSON available. Flags days with no entries, and today as partial. Includes the hand-entered kcal and steps per day. |
 | `kcalrep_get_diary` | Individual diary entries with paging (default: today). |
 | `kcalrep_get_weight_history` | Weigh-ins and body composition with changes (default 90 days). |
 | `kcalrep_get_profile` | Current targets, goal, manual/auto mode, settings. |

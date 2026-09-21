@@ -10,6 +10,10 @@ const input = (over: Partial<ReportInput> = {}): ReportInput => ({
   diary,
   weight: weights,
   activity: [{ date: "2026-09-17", type: "calories", value: 400, caloriesBurned: 400 }],
+  activityLog: [
+    { date: "2026-09-17", calories: 450, steps: 8200 },
+    { date: "2026-09-18", calories: null, steps: 6100 },
+  ],
   bodyComposition: [{ date: "2026-09-17", weight: 82.0, bodyFatPercent: 21.5, lbmKg: 64.4, bmrFromScale: 1750 }],
   normHistory,
   currentNorm,
@@ -20,7 +24,7 @@ const input = (over: Partial<ReportInput> = {}): ReportInput => ({
 const lines = (over: Partial<ReportInput> = {}) => buildMarkdownReport(input(over)).split("\n");
 
 describe("buildMarkdownReport — mirrors the site's «Выгрузка данных»", () => {
-  it("has the site's title, period, generation date and all six sections, in order", () => {
+  it("has the site's title, period, generation date and all seven sections, in order", () => {
     const text = buildMarkdownReport(input());
     expect(text.startsWith("# Отчёт по питанию и активности\n")).toBe(true);
     expect(text).toContain("**Период:** 16.09.2026 — 19.09.2026");
@@ -34,6 +38,7 @@ describe("buildMarkdownReport — mirrors the site's «Выгрузка данн
       "## 4. Норма и настройки по дням",
       "## 5. Изменение веса и состава тела",
       "## 6. Активность и TDEE",
+      "## 7. Активность и шаги (ручной ввод)",
     ]);
   });
 
@@ -117,7 +122,33 @@ describe("buildMarkdownReport — mirrors the site's «Выгрузка данн
   });
 
   it("6. omits the average line when no day has activity", () => {
-    expect(buildMarkdownReport(input({ activity: [] }))).not.toContain("Средняя активность");
+    // Section 7 has its own average line ("… за период (ручной ввод):"), so match section 6's exact wording.
+    expect(buildMarkdownReport(input({ activity: [] }))).not.toContain("**Средняя активность за период:**");
+  });
+
+  it("7. hand-entered kcal and steps per day, with a dash for a value never entered, plus averages", () => {
+    const l = lines();
+    expect(l).toContain("| Дата | Активность, ккал | Шаги |");
+    expect(l).toContain("| 16.09.2026 | — | — |");
+    expect(l).toContain("| 17.09.2026 | 450 | 8200 |");
+    expect(l).toContain("| 18.09.2026 | — | 6100 |");
+    expect(l).toContain("**Средняя активность за период (ручной ввод):** 450 ккал/день (1 дн. с данными)");
+    expect(l).toContain("**Средние шаги за период:** 7150 шагов/день (2 дн. с данными)");
+  });
+
+  it("7. keeps hand-entered activity apart from section 6 (Apple Watch), which is what feeds TDEE", () => {
+    const text = buildMarkdownReport(input({ activity: [] }));
+    const section6 = text.slice(text.indexOf("## 6."), text.indexOf("## 7."));
+    expect(section6).not.toContain("450");
+    expect(section6).not.toContain("8200");
+    expect(text).toContain("В расчёт нормы и TDEE не входит");
+  });
+
+  it("7. still prints the table, without averages, when nothing was entered", () => {
+    const text = buildMarkdownReport(input({ activityLog: [] }));
+    expect(text).toContain("| 17.09.2026 | — | — |");
+    expect(text).not.toContain("(ручной ввод):**");
+    expect(text).not.toContain("Средние шаги");
   });
 
   it("falls back to the current norm for days before the first snapshot", () => {

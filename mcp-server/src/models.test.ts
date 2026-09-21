@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toDiaryEntry, toMillis, toNorm, toNormSnapshot, toUserProfile } from "./models.js";
+import { toActivityLog, toDiaryEntry, toMillis, toNorm, toNormSnapshot, toUserProfile } from "./models.js";
 
 describe("toMillis", () => {
   it("reads Firestore Timestamps, plain numbers, and rejects everything else", () => {
@@ -37,6 +37,12 @@ describe("energy placeholders (manual norms)", () => {
 describe("defensive mapping", () => {
   it("fills missing diary fields instead of throwing", () => {
     expect(toDiaryEntry("x", {})).toMatchObject({ id: "x", date: "", addedAt: null, name: "(unnamed)", calories: 0 });
+  });
+
+  it("keeps a hand-entered value that was never given as null, not 0 (the site stores only what was typed)", () => {
+    expect(toActivityLog({ date: "2026-09-17", steps: 8200, updatedAt: {} })).toEqual({ date: "2026-09-17", calories: null, steps: 8200 });
+    expect(toActivityLog({ date: "2026-09-17", calories: 0, steps: 0 })).toEqual({ date: "2026-09-17", calories: 0, steps: 0 });
+    expect(toActivityLog({})).toEqual({ date: "", calories: null, steps: null });
   });
 
   it("never carries the e-mail address through", () => {

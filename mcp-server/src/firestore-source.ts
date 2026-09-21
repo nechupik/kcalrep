@@ -2,6 +2,7 @@ import { Firestore, type DocumentData } from "@google-cloud/firestore";
 import type { DataSource } from "./data-source.js";
 import {
   toActivity,
+  toActivityLog,
   toBodyComposition,
   toDiaryEntry,
   toNorm,
@@ -83,6 +84,11 @@ export class FirestoreSource implements DataSource {
   async getActivity(start: string, end: string) {
     const rows = await this.byDateRange("activity", "date", start, end);
     return rows.map((r) => toActivity(r.data)).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  async getActivityLog(start: string, end: string) {
+    const rows = await this.byDateRange("activityLog", "date", start, end);
+    return rows.map((r) => toActivityLog(r.data)).sort((a, b) => a.date.localeCompare(b.date));
   }
 
   async getNormHistory(start: string, end: string) {

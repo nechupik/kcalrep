@@ -196,6 +196,21 @@ export function toActivity(d: Raw): ActivityEntry {
   return { date: str(d.date), type: str(d.type), value: num(d.value), caloriesBurned: num(d.caloriesBurned) };
 }
 
+/**
+ * Activity typed in by hand under Профиль → «Активность и шаги» (the site's `activityLog` collection).
+ * Separate from `activity` (Apple Watch): the app never uses it to work out the norm or TDEE.
+ * A day may have kcal, steps, or both; a value that was never entered is null.
+ */
+export interface ActivityLogEntry {
+  date: string;
+  calories: number | null;
+  steps: number | null;
+}
+
+export function toActivityLog(d: Raw): ActivityLogEntry {
+  return { date: str(d.date), calories: numOrNull(d.calories), steps: numOrNull(d.steps) };
+}
+
 export interface UserProfile {
   name: string | null;
 }

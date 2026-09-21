@@ -3,10 +3,12 @@ import {
   loadDiaryRange,
   loadWeightRange,
   loadActivityRange,
+  loadActivityLogRange,
   loadNormHistory,
   loadFullNormData,
   loadUserSettings,
   type ActivityEntry,
+  type ActivityLogEntry,
   type NormHistoryEntry,
   type NormData,
 } from "./firestore";
@@ -92,10 +94,16 @@ export async function generateMarkdownReport(
   startDate: string,
   endDate: string
 ): Promise<ExportReportResult> {
-  const [diaryEntries, weightEntries, activityEntries, normHistory, currentNormData, bodyComp, userSettings] = await Promise.all([
+  const [diaryEntries, weightEntries, activityEntries, activityLogEntries, normHistory, currentNormData, bodyComp, userSettings] = await Promise.all([
     loadDiaryRange(userId, startDate, endDate),
     loadWeightRange(userId, startDate, endDate),
     loadActivityRange(userId, startDate, endDate),
+    // Optional section: if it can't be read (e.g. its Firestore rules aren't deployed yet) the rest of the
+    // report is still produced, and section 7 says so, instead of the whole export failing.
+    loadActivityLogRange(userId, startDate, endDate).catch((error) => {
+      console.error("Failed to load the manual activity log for the export:", error);
+      return null;
+    }),
     loadNormHistory(userId, endDate),
     loadFullNormData(userId),
     loadBodyCompositionInRange(userId, startDate, endDate),
@@ -116,6 +124,9 @@ export async function generateMarkdownReport(
 
   const activityByDate = new Map<string, ActivityEntry>();
   for (const a of activityEntries) activityByDate.set(a.date, a);
+
+  const activityLogByDate = new Map<string, ActivityLogEntry>();
+  for (const a of activityLogEntries ?? []) activityLogByDate.set(a.date, a);
 
   const sortedHistory = [...normHistory].sort((a, b) => a.date.localeCompare(b.date));
   function normForDay(day: string): NormHistoryEntry | NormData | null {
@@ -295,6 +306,38 @@ export async function generateMarkdownReport(
     lines.push(`**Средняя активность за период:** ${avgActivity} ккал/день (${activityValues.length} дн. с данными)`);
   }
   lines.push(``);
+
+  // 7. Активность и шаги, внесённые вручную (в расчёт нормы и TDEE не входят)
+  lines.push(`## 7. Активность и шаги (ручной ввод)`);
+  lines.push(``);
+  if (activityLogEntries === null) {
+    lines.push(`_Не удалось загрузить данные ручного ввода, раздел пропущен._`);
+    lines.push(``);
+  } else {
+    lines.push(`_Вносится вручную в профиле, отдельно от Apple Watch из раздела 6. В расчёт нормы и TDEE не входит._`);
+    lines.push(``);
+    lines.push(`| Дата | Активность, ккал | Шаги |`);
+    lines.push(`|---|---|---|`);
+    for (const day of days) {
+      const a = activityLogByDate.get(day);
+      lines.push(
+        `| ${formatDateRu(day)} | ${a?.calories != null ? Math.round(a.calories) : "—"} | ${a?.steps != null ? Math.round(a.steps) : "—"} |`
+      );
+    }
+    const loggedKcal = activityLogEntries.map((a) => a.calories).filter((v): v is number => v != null && v > 0);
+    const loggedSteps = activityLogEntries.map((a) => a.steps).filter((v): v is number => v != null && v > 0);
+    if (loggedKcal.length > 0) {
+      const avgKcal = Math.round(loggedKcal.reduce((s, v) => s + v, 0) / loggedKcal.length);
+      lines.push(``);
+      lines.push(`**Средняя активность за период (ручной ввод):** ${avgKcal} ккал/день (${loggedKcal.length} дн. с данными)`);
+    }
+    if (loggedSteps.length > 0) {
+      const avgSteps = Math.round(loggedSteps.reduce((s, v) => s + v, 0) / loggedSteps.length);
+      lines.push(``);
+      lines.push(`**Средние шаги за период:** ${avgSteps} шагов/день (${loggedSteps.length} дн. с данными)`);
+    }
+    lines.push(``);
+  }
 
   const content = lines.join("\n");
   const filename = `otchet_${startDate}_${endDate}.md`;

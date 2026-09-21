@@ -72,6 +72,14 @@ describe("kcalrep_get_report", () => {
     expect(text).toContain("**Итого за период:** -0.4 кг (с 82 до 81.6 кг)");
   });
 
+  it("includes the hand-entered activity and steps as section 7", async () => {
+    const c = await connect();
+    const { text } = await call(c, "kcalrep_get_report", { start_date: "2026-09-16", end_date: "2026-09-19" });
+    expect(text).toContain("## 7. Активность и шаги (ручной ввод)");
+    expect(text).toContain("| 17.09.2026 | 450 | 8200 |");
+    expect(text).toContain("| 18.09.2026 | — | 6100 |");
+  });
+
   it("can leave out the meal list and says how to get it", async () => {
     const c = await connect();
     const { text } = await call(c, "kcalrep_get_report", { start_date: "2026-09-16", end_date: "2026-09-19", include_meals: false });
@@ -132,6 +140,8 @@ describe("kcalrep_get_daily_summary", () => {
     expect(text).toContain("2026-09-19 (today, partial)");
     expect(text).toContain("Average: 1750 kcal");
     expect(text).toContain("82 → 81.6 kg (-0.4 kg)");
+    expect(text).toContain("Logged kcal | Steps");
+    expect(text).toContain("450 | 8200");
   });
 
   it("returns exact structured data as json", async () => {
@@ -141,6 +151,8 @@ describe("kcalrep_get_daily_summary", () => {
     expect(data.period).toMatchObject({ days: 2, avgCalories: 1750, avgDeficitVsTarget: 200 });
     expect(data.days).toHaveLength(2);
     expect(data.days[0]).toMatchObject({ date: "2026-09-17", deficitVsTarget: 200, deficitVsTdee: 600 });
+    expect(data.days[0].manualActivity).toEqual({ calories: 450, steps: 8200 });
+    expect(data.days[1].manualActivity).toEqual({ calories: null, steps: 6100 });
   });
 
   it("does not invent a TDEE for manually typed targets", async () => {
@@ -352,6 +364,7 @@ describe("what the server can reach", () => {
     const methods = [...sourceOf("data-source.ts").matchAll(/^\s{2}(\w+)\(/gm)].map((m) => m[1]).sort();
     expect(methods).toEqual([
       "getActivity",
+      "getActivityLog",
       "getBodyComposition",
       "getDiary",
       "getNorm",

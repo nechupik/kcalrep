@@ -1,5 +1,6 @@
 import type {
   ActivityEntry,
+  ActivityLogEntry,
   BodyCompositionEntry,
   DiaryEntry,
   Norm,
@@ -25,6 +26,8 @@ export interface DataSource {
   getWeight(start: string, end: string): Promise<WeightEntry[]>;
   getBodyComposition(start: string, end: string): Promise<BodyCompositionEntry[]>;
   getActivity(start: string, end: string): Promise<ActivityEntry[]>;
+  /** Hand-entered kcal/steps per day (site: «Активность и шаги»); unrelated to the norm. Oldest first. */
+  getActivityLog(start: string, end: string): Promise<ActivityLogEntry[]>;
   /**
    * Norm snapshots in force during [start, end]: those dated inside the range plus the latest one dated
    * before `start` (which is what applied on day one). Oldest first. Used only to work out which targets

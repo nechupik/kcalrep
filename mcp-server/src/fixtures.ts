@@ -98,6 +98,15 @@ export function fakeDb(overrides: Partial<DataSource> = {}): DataSource {
       inRange([{ date: "2026-09-17", weight: 82.0, bodyFatPercent: 21.5, lbmKg: 64.4, bmrFromScale: 1750 }], s, e),
     getActivity: async (s, e) =>
       inRange([{ date: "2026-09-17", type: "calories", value: 400, caloriesBurned: 400 }], s, e),
+    getActivityLog: async (s, e) =>
+      inRange(
+        [
+          { date: "2026-09-17", calories: 450, steps: 8200 },
+          { date: "2026-09-18", calories: null, steps: 6100 },
+        ],
+        s,
+        e,
+      ),
     getNormHistory: async (s, e) => {
       const before = normHistory.filter((n) => n.date < s).slice(-1);
       return [...before, ...inRange(normHistory, s, e)];

@@ -22,13 +22,14 @@ export function registerReportTool(server: McpServer, ctx: ToolContext): void {
     {
       name: "kcalrep_get_report",
       title: "Get nutrition and activity report",
-      description: `The same Markdown report the kcalrep website downloads under Профиль → «Выгрузка данных», for a date range. In Russian, six sections plus the current profile settings:
+      description: `The same Markdown report the kcalrep website downloads under Профиль → «Выгрузка данных», for a date range. In Russian, seven sections plus the current profile settings:
   1. meal periods per day (first meal, last meal, eating window, number of meals)
   2. every meal of every day (time, product, grams, kcal, protein, fat, carbs)
   3. daily totals and the deficit versus the target and versus TDEE
   4. the norm and settings that applied each day (BMR, activity level, goal multiplier, protein/fat/carb targets)
   5. weight change and body composition (body fat %, lean mass)
   6. activity (Apple Watch kcal / steps) and TDEE per day
+  7. activity kcal and steps the user typed in by hand per day — separate from section 6 and never used for the norm or TDEE
 Read-only. USE THIS FIRST for any question about eating, deficit, weight or activity over a period — it is what the user would otherwise export and paste by hand.
 
 Args:
@@ -43,10 +44,11 @@ Reading it: a positive deficit means the user ate LESS than the target/TDEE, neg
       const today = dateInZone(ctx.now(), ctx.timeZone);
       const { start, end } = resolveRange(args, { defaultDays: 7, maxDays: MAX_REPORT_DAYS, today });
 
-      const [diary, weight, activity, bodyComposition, normHistory, currentNorm, settings] = await Promise.all([
+      const [diary, weight, activity, activityLog, bodyComposition, normHistory, currentNorm, settings] = await Promise.all([
         ctx.db.getDiary(start, end),
         ctx.db.getWeight(start, end),
         ctx.db.getActivity(start, end),
+        ctx.db.getActivityLog(start, end),
         ctx.db.getBodyComposition(start, end),
         ctx.db.getNormHistory(start, end),
         ctx.db.getNorm(),
@@ -62,6 +64,7 @@ Reading it: a positive deficit means the user ate LESS than the target/TDEE, neg
           diary,
           weight,
           activity,
+          activityLog,
           bodyComposition,
           normHistory,
           currentNorm,

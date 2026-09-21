@@ -69,6 +69,16 @@ export interface ActivityEntry {
   updatedAt: Timestamp;
 }
 
+// Hand-entered activity for one day (Профиль → «Активность и шаги»). Kept in its own `activityLog` collection,
+// apart from `activity`: nothing that calculates the norm/TDEE reads it, so it never changes КБЖУ.
+// A day holds calories, steps, or both — whichever was entered.
+export interface ActivityLogEntry {
+  date: string; // YYYY-MM-DD
+  calories?: number; // kcal burned
+  steps?: number;
+  updatedAt: Timestamp;
+}
+
 export interface UserSettings {
   activityTrackingEnabled: boolean;
   deficitPercent?: number;
@@ -512,6 +522,32 @@ export async function loadLatestActivityEntries(userId: string, limitCount: numb
   const q = query(activityCol, orderBy('date', 'desc'), limit(limitCount));
   const snapshot = await getDocsResilient(q);
   return snapshot.docs.map(doc => doc.data() as ActivityEntry);
+}
+
+// Manual activity log: does not feed the norm, see ActivityLogEntry.
+// Merges into the day's document, so a value left out here keeps whatever was stored before.
+export async function saveActivityLog(
+  userId: string,
+  entry: { date: string; calories?: number; steps?: number }
+): Promise<void> {
+  const data: Record<string, unknown> = { date: entry.date, updatedAt: Timestamp.now() };
+  if (entry.calories !== undefined) data.calories = entry.calories;
+  if (entry.steps !== undefined) data.steps = entry.steps;
+  await setDoc(doc(db, 'users', userId, 'activityLog', entry.date), data, { merge: true });
+}
+
+export async function loadActivityLogRange(userId: string, startDate: string, endDate: string): Promise<ActivityLogEntry[]> {
+  const q = query(
+    collection(db, 'users', userId, 'activityLog'),
+    where('date', '>=', startDate),
+    where('date', '<=', endDate)
+  );
+  const snapshot = await getDocsResilient(q);
+  return snapshot.docs.map(d => d.data() as ActivityLogEntry).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function deleteActivityLog(userId: string, date: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', userId, 'activityLog', date));
 }
 
 export async function saveUserSettings(userId: string, settings: Omit<UserSettings, 'updatedAt'>): Promise<void> {

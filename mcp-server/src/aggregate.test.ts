@@ -27,6 +27,10 @@ describe("buildDailySummary", () => {
       normHistory,
       currentNorm,
       activity: [{ date: "2026-09-17", type: "calories", value: 400, caloriesBurned: 400 }],
+      activityLog: [
+        { date: "2026-09-17", calories: 450, steps: 8200 },
+        { date: "2026-09-18", calories: null, steps: 6100 },
+      ],
       weight: [
         { date: "2026-09-17", weight: 82.0, createdAt: 1 },
         { date: "2026-09-19", weight: 81.6, createdAt: 2 },
@@ -49,6 +53,23 @@ describe("buildDailySummary", () => {
     expect(d17.deficitVsTdee).toBe(600);
     expect(d17.activity).toEqual({ type: "calories", value: 400, caloriesBurned: 400 });
     expect(d17.weight).toBe(82.0);
+  });
+
+  it("attaches hand-entered kcal/steps per day, separately from the Apple Watch activity", () => {
+    const { days } = run();
+    expect(days[1].manualActivity).toEqual({ calories: 450, steps: 8200 });
+    expect(days[1].activity).toEqual({ type: "calories", value: 400, caloriesBurned: 400 });
+    // A value that was never entered stays null rather than becoming 0.
+    expect(days[2].manualActivity).toEqual({ calories: null, steps: 6100 });
+    expect(days[0].manualActivity).toBeNull();
+  });
+
+  it("leaves targets and deficits untouched by hand-entered activity", () => {
+    const withLog = run().days;
+    const without = run({ activityLog: [] }).days;
+    expect(withLog.map((d) => [d.targets, d.deficitVsTarget, d.deficitVsTdee])).toEqual(
+      without.map((d) => [d.targets, d.deficitVsTarget, d.deficitVsTdee]),
+    );
   });
 
   it("reports a surplus as a negative deficit", () => {

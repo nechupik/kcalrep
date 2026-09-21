@@ -2,6 +2,7 @@ import { pickNorm } from "./aggregate.js";
 import { eachDate, timeInZone } from "./dates.js";
 import type {
   ActivityEntry,
+  ActivityLogEntry,
   BodyCompositionEntry,
   DiaryEntry,
   Norm,
@@ -33,6 +34,8 @@ export interface ReportInput {
   diary: DiaryEntry[];
   weight: WeightEntry[];
   activity: ActivityEntry[];
+  /** Hand-entered kcal/steps (section 7); independent of `activity`. */
+  activityLog: ActivityLogEntry[];
   bodyComposition: BodyCompositionEntry[];
   /** Snapshots in force during the range, oldest first (including the one in force on `start`). */
   normHistory: NormSnapshot[];
@@ -115,6 +118,9 @@ export function buildMarkdownReport(input: ReportInput): string {
 
   const activityByDate = new Map<string, ActivityEntry>();
   for (const a of input.activity) activityByDate.set(a.date, a);
+
+  const activityLogByDate = new Map<string, ActivityLogEntry>();
+  for (const a of input.activityLog) activityLogByDate.set(a.date, a);
 
   const normForDay = (day: string) => pickNorm(day, input.normHistory, currentNorm)?.norm ?? null;
 
@@ -301,6 +307,33 @@ export function buildMarkdownReport(input: ReportInput): string {
     const avgActivity = Math.round(activityValues.reduce((s, v) => s + v, 0) / activityValues.length);
     lines.push(``);
     lines.push(`**Средняя активность за период:** ${avgActivity} ккал/день (${activityValues.length} дн. с данными)`);
+  }
+  lines.push(``);
+
+  // 7. Активность и шаги, внесённые вручную (в расчёт нормы и TDEE не входят)
+  lines.push(`## 7. Активность и шаги (ручной ввод)`);
+  lines.push(``);
+  lines.push(`_Вносится вручную в профиле, отдельно от Apple Watch из раздела 6. В расчёт нормы и TDEE не входит._`);
+  lines.push(``);
+  lines.push(`| Дата | Активность, ккал | Шаги |`);
+  lines.push(`|---|---|---|`);
+  for (const day of days) {
+    const a = activityLogByDate.get(day);
+    lines.push(
+      `| ${formatDateRu(day)} | ${a?.calories != null ? Math.round(a.calories) : "—"} | ${a?.steps != null ? Math.round(a.steps) : "—"} |`,
+    );
+  }
+  const loggedKcal = input.activityLog.map((a) => a.calories).filter((v): v is number => v !== null && v > 0);
+  const loggedSteps = input.activityLog.map((a) => a.steps).filter((v): v is number => v !== null && v > 0);
+  if (loggedKcal.length > 0) {
+    const avgKcal = Math.round(loggedKcal.reduce((s, v) => s + v, 0) / loggedKcal.length);
+    lines.push(``);
+    lines.push(`**Средняя активность за период (ручной ввод):** ${avgKcal} ккал/день (${loggedKcal.length} дн. с данными)`);
+  }
+  if (loggedSteps.length > 0) {
+    const avgSteps = Math.round(loggedSteps.reduce((s, v) => s + v, 0) / loggedSteps.length);
+    lines.push(``);
+    lines.push(`**Средние шаги за период:** ${avgSteps} шагов/день (${loggedSteps.length} дн. с данными)`);
   }
   lines.push(``);
 

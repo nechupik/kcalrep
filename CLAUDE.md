@@ -50,6 +50,14 @@ Most read/write logic follows a consistent layering, thinnest to thickest:
 2. **[src/lib/storage.ts](src/lib/storage.ts)** — the app-facing API (`saveNorm`, `loadNorm`, `loadDiary`, `addDiaryEntry`, ...). If a user is signed in, it calls firestore.ts; on any Firestore error, or when signed out, it transparently falls back to `localStorage`. Callers (components/pages) should generally go through this layer, not firestore.ts directly, unless doing shared/admin data or cycle/metabolic data (which live in their own modules).
 3. Domain-specific data modules follow the same pattern: [src/lib/metabolic-firestore.ts](src/lib/metabolic-firestore.ts) for cycle tracking data, [src/lib/products.ts](src/lib/products.ts) / [src/lib/recipes.ts](src/lib/recipes.ts) for the shared food/recipe database.
 
+### Manual activity log (`activityLog`) vs Apple Watch activity (`activity`)
+
+Two separate per-day collections under `users/{uid}/`, deliberately not merged:
+- `activity` — Apple Watch kcal. **Feeds the norm**: `loadActivityRange` drives `calculateMacrosWithWatchTDEE` and the auto-recalculation after a weight/activity save.
+- `activityLog` — kcal and steps typed in by hand (Профиль → «Активность и шаги», admin only, [ActivityLogCard](src/components/ActivityLogCard.tsx)). **Must never feed the norm or TDEE.** It only appears in the data export (section 7) and in the MCP server. Don't read it from `nutrition.ts`, `storage.ts`, or the recalculation code in Index/Body/Profile — `src/lib/activity-log.test.ts` fails if you do. Writes merge into the day's document, so a value left blank keeps what was stored.
+
+A new Firestore subcollection needs its own `match` block in `firestore.rules` and a rules deploy (`npx firebase deploy --only firestore:rules`) — without it the app gets permission-denied.
+
 ### Metabolic/cycle engine
 
 [src/lib/cycle-engine.ts](src/lib/cycle-engine.ts) is pure, side-effect-free logic (no Firebase imports) operating on types from [src/lib/metabolic-types.ts](src/lib/metabolic-types.ts). It predicts the next menstrual cycle from history (weighted median + MAD-based confidence), computes phase boundaries, derives calorie/macro adjustments per phase, and does EMA-based symptom learning. It's the one file with a real unit test suite ([src/lib/cycle-engine.test.ts](src/lib/cycle-engine.test.ts)) — follow that pattern (pure functions, table-driven date math) if extending it. `getCycleCalorieAdjustmentForDate` is composed into the daily norm via `loadEffectiveNorm` in storage.ts, so the diary/calorie UI reflects cycle-phase adjustments automatically.

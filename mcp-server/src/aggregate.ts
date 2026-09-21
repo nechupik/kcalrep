@@ -1,6 +1,6 @@
 import { dateInZone, eachDate, timeInZone } from "./dates.js";
 import { round } from "./format.js";
-import type { ActivityEntry, DiaryEntry, Norm, NormSnapshot, WeightEntry } from "./models.js";
+import type { ActivityEntry, ActivityLogEntry, DiaryEntry, Norm, NormSnapshot, WeightEntry } from "./models.js";
 
 export interface DayTargets {
   calories: number;
@@ -67,6 +67,8 @@ export interface DaySummary {
   /** tdee − eaten. Positive = ate less than the maintenance level. Null when the TDEE is unknown (manual targets). */
   deficitVsTdee: number | null;
   activity: { type: string; value: number; caloriesBurned: number } | null;
+  /** Kcal/steps typed in by hand for the day; unrelated to `activity` and to the norm. Null when nothing was entered. */
+  manualActivity: { calories: number | null; steps: number | null } | null;
   /** Last weigh-in of the day, kg. */
   weight: number | null;
 }
@@ -97,6 +99,7 @@ export interface SummaryInput {
   normHistory: NormSnapshot[];
   currentNorm: Norm | null;
   activity: ActivityEntry[];
+  activityLog: ActivityLogEntry[];
   weight: WeightEntry[];
 }
 
@@ -108,6 +111,7 @@ export function buildDailySummary(input: SummaryInput): { days: DaySummary[]; pe
 
   const diaryByDate = groupBy(input.diary, (e) => e.date);
   const activityByDate = new Map(input.activity.map((a) => [a.date, a]));
+  const activityLogByDate = new Map(input.activityLog.map((a) => [a.date, a]));
   // Later weigh-ins overwrite earlier ones (input is ordered by date, then entry time).
   const weightByDate = new Map(input.weight.map((w) => [w.date, w.weight]));
 
@@ -132,6 +136,7 @@ export function buildDailySummary(input: SummaryInput): { days: DaySummary[]; pe
     const targets = targetsForDay(date, input.normHistory, input.currentNorm);
     const logged = entries.length > 0;
     const activity = activityByDate.get(date);
+    const manual = activityLogByDate.get(date);
 
     return {
       date,
@@ -150,6 +155,9 @@ export function buildDailySummary(input: SummaryInput): { days: DaySummary[]; pe
       deficitVsTdee: logged && targets && targets.tdee !== null ? round(targets.tdee - eaten.calories) : null,
       activity: activity
         ? { type: activity.type, value: activity.value, caloriesBurned: round(activity.caloriesBurned) }
+        : null,
+      manualActivity: manual
+        ? { calories: manual.calories === null ? null : round(manual.calories), steps: manual.steps }
         : null,
       weight: weightByDate.get(date) ?? null,
     };

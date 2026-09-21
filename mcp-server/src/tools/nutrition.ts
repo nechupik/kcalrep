@@ -75,7 +75,9 @@ function summaryMarkdown(
   const rows = days.map((d) => {
     const label = d.partial ? `${d.date} (today, partial)` : d.date;
     const burned = d.activity ? `${d.activity.caloriesBurned} (${activityLabel(d.activity.type)})` : null;
-    if (!d.logged) return [label, "not logged", null, null, null, null, null, null, null, null, null, burned, d.weight];
+    const manualKcal = d.manualActivity?.calories ?? null;
+    const steps = d.manualActivity?.steps ?? null;
+    if (!d.logged) return [label, "not logged", null, null, null, null, null, null, null, null, null, burned, manualKcal, steps, d.weight];
     const target = d.targets ? `${d.targets.calories}${d.targets.source === "current" ? "~" : ""}` : null;
     return [
       label,
@@ -90,6 +92,8 @@ function summaryMarkdown(
       signed(d.deficitVsTarget),
       signed(d.deficitVsTdee),
       burned,
+      manualKcal,
+      steps,
       d.weight,
     ];
   });
@@ -98,13 +102,13 @@ function summaryMarkdown(
   const lines = [
     `# Daily summary ${rangeLabel(start, end)}`,
     "",
-    "Δ columns: positive = ate LESS than the target/TDEE (deficit), negative = surplus. `~` = no dated norm existed for that day, today's norm used as an estimate. Targets are base norms without cycle-phase adjustments.",
+    "Δ columns: positive = ate LESS than the target/TDEE (deficit), negative = surplus. `~` = no dated norm existed for that day, today's norm used as an estimate. Targets are base norms without cycle-phase adjustments. `Burned` is the Apple Watch entry; `Logged kcal` and `Steps` are typed in by hand and never used for the norm or TDEE.",
     ...(manualTargets
       ? ["TDEE and Δ TDEE are blank where the targets were typed in manually: the app then stores no real TDEE, only the calorie target."]
       : []),
     "",
     mdTable(
-      ["Date", "kcal", "P g", "F g", "C g", "Meals", "First–last", "Target", "TDEE", "Δ target", "Δ TDEE", "Burned", "Weight kg"],
+      ["Date", "kcal", "P g", "F g", "C g", "Meals", "First–last", "Target", "TDEE", "Δ target", "Δ TDEE", "Burned", "Logged kcal", "Steps", "Weight kg"],
       rows,
     ),
     "",
@@ -200,15 +204,15 @@ Returns (json): { start, end, total, count, offset, hasMore, nextOffset?, totals
     {
       name: "kcalrep_get_daily_summary",
       title: "Get daily nutrition summary",
-      description: `Per-day overview for a date range — the best starting point for questions like "how did I eat this week?". For every day: calories and macros eaten, number of meals, first/last meal time and eating window, the calorie/macro targets and TDEE that applied that day, deficit versus target and versus TDEE, calories burned (Apple Watch / steps), and weight. Plus period averages.
+      description: `Per-day overview for a date range — the best starting point for questions like "how did I eat this week?". For every day: calories and macros eaten, number of meals, first/last meal time and eating window, the calorie/macro targets and TDEE that applied that day, deficit versus target and versus TDEE, calories burned (Apple Watch / steps), the kcal and steps the user typed in by hand, and weight. Plus period averages.
 Read-only. Default window: last 7 days. Max range ${MAX_RANGE_DAYS} days. Individual foods are not listed — use kcalrep_get_diary for those.
 
 Args:
   - start_date, end_date (YYYY-MM-DD): inclusive range (default: 7 days ending today; end is clamped to today)
   - response_format ('markdown' | 'json')
 
-Returns (json): { start, end, period: { days, loggedDays, avgCalories, avgProtein, avgFat, avgCarbs, avgDeficitVsTarget, avgDeficitVsTdee, weightFirst, weightLast, weightChange }, days: [{ date, logged, partial, meals, calories, protein, fat, carbs, firstMeal, lastMeal, eatingWindowMinutes, targets: { calories, protein, fat, carbs, bmr, tdee, source } | null, deficitVsTarget, deficitVsTdee, activity: { type, value, caloriesBurned } | null, weight }] }
-Sign convention: deficit > 0 means the user ate LESS than the target/TDEE; < 0 is a surplus. Days without diary entries are 'logged: false' and are NOT counted as zero intake. The current day is 'partial: true' and excluded from averages. First/last meal times only use entries logged on their own day. Targets exclude cycle-phase adjustments. targets.bmr/tdee and deficitVsTdee are null on days whose targets were typed in manually, because the app then stores no real TDEE.
+Returns (json): { start, end, period: { days, loggedDays, avgCalories, avgProtein, avgFat, avgCarbs, avgDeficitVsTarget, avgDeficitVsTdee, weightFirst, weightLast, weightChange }, days: [{ date, logged, partial, meals, calories, protein, fat, carbs, firstMeal, lastMeal, eatingWindowMinutes, targets: { calories, protein, fat, carbs, bmr, tdee, source } | null, deficitVsTarget, deficitVsTdee, activity: { type, value, caloriesBurned } | null, manualActivity: { calories, steps } | null, weight }] }
+Sign convention: deficit > 0 means the user ate LESS than the target/TDEE; < 0 is a surplus. Days without diary entries are 'logged: false' and are NOT counted as zero intake. The current day is 'partial: true' and excluded from averages. First/last meal times only use entries logged on their own day. Targets exclude cycle-phase adjustments. manualActivity (calories/steps typed in by hand) is separate from the Apple Watch 'activity' and is never used for targets or TDEE; a value never entered is null. targets.bmr/tdee and deficitVsTdee are null on days whose targets were typed in manually, because the app then stores no real TDEE.
 For the exact document the website exports (with every meal listed) use kcalrep_get_report; this tool is the compact, structured alternative for longer periods.`,
       inputSchema: SummaryInput,
     },
@@ -224,11 +228,12 @@ For the exact document the website exports (with every meal listed) use kcalrep_
         { defaultDays: 7, maxDays: MAX_RANGE_DAYS, today },
       );
 
-      const [diary, normHistory, currentNorm, activity, weight] = await Promise.all([
+      const [diary, normHistory, currentNorm, activity, activityLog, weight] = await Promise.all([
         ctx.db.getDiary(start, end),
         ctx.db.getNormHistory(start, end),
         ctx.db.getNorm(),
         ctx.db.getActivity(start, end),
+        ctx.db.getActivityLog(start, end),
         ctx.db.getWeight(start, end),
       ]);
 
@@ -241,6 +246,7 @@ For the exact document the website exports (with every meal listed) use kcalrep_
         normHistory,
         currentNorm,
         activity,
+        activityLog,
         weight,
       });
 

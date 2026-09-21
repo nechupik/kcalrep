@@ -10,6 +10,7 @@ import { SimpleCalculatorForm } from "@/components/SimpleCalculatorForm";
 import { ResultsCard } from "@/components/ResultsCard";
 import { EditProfileDataModal } from "@/components/EditProfileDataModal";
 import { ExportDataModal } from "@/components/ExportDataModal";
+import { ActivityLogCard } from "@/components/ActivityLogCard";
 import {
   User,
   LogIn,
@@ -415,6 +416,9 @@ const Profile = () => {
 
                       </Card>
         )}
+
+        {/* Manual activity + steps log — admin only, right after the name; never feeds the norm */}
+        {user && user.uid === ADMIN_UID && <ActivityLogCard userId={user.uid} />}
 
         {/* Deficit slider — above Моя норма */}
         {user && norm && !showCalculator && !manualMode && (
