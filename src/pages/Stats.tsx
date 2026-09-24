@@ -855,21 +855,21 @@ const Stats = () => {
                 </div>
               ))}
             </div>
-            <div className="flex gap-4 mt-4 text-xs">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-purple-300 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 shrink-0 bg-purple-300 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span className="text-purple-300">90-110%</span>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-purple-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 shrink-0 bg-purple-500 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span className="text-purple-300">70-90% / 110-130%</span>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-purple-900 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 shrink-0 bg-purple-900 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span className="text-purple-300">&lt;70% / &gt;130%</span>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-purple-950/40 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 shrink-0 bg-purple-950/40 rounded-full" style={{ width: '12px', height: '12px', aspectRatio: '1/1' }}></div>
                 <span className="text-purple-300">Нет данных</span>
               </div>
             </div>
